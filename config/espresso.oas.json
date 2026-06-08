@@ -1,6 +1,6 @@
 {
   "info": {
-    "title": "Cafecito - Espresso API & MCP",
+    "title": "Espresso API & MCP",
     "description": "Espresso API & MCP is Cafecito's curated business intelligence service. It provides access to the pre-analyzed structured data behind Espresso market intelligence — events, signals, tags, and sip relationships. A sip is the basic unit of information: an event is a self-contained digest of micro actions, and a signal is larger derived intelligence from related events. Query by UUIDs, tags, or semantic search with fast JSON or token-efficient plain-text responses, perfect for developers building intelligence apps or integrating with MCPs and AI agents.",
     "version": "0.1"
   },
@@ -23,7 +23,7 @@
       "description": "Unique tag strings for filtering events and signals"
     },
     {
-      "name": "Endpoints",
+      "name": "General",
       "description": "Infrastructure endpoints"
     }
   ],
@@ -275,7 +275,7 @@
         "summary": "Health check",
         "description": "Returns service health status.",
         "tags": [
-          "Endpoints"
+          "General"
         ],
         "responses": {
           "200": {

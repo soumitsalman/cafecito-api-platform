@@ -1,14 +1,26 @@
 {
   "info": {
-    "title": "Cafecito - Beans API & MCP",
+    "title": "Beans API & MCP",
     "description": "Beans API & MCP is the Cafecito intelligent news & blogs aggregation and search service. It curates fresh content from RSS feeds using AI-powered natural language queries and filters. Access trending articles, publishers, categories, and entities with fast JSON responses, perfect for developers building news apps or integrating smart content discovery.",
     "version": "0.1"
   },
   "openapi": "3.1.0",
   "tags": [
     {
-      "name": "Endpoints",
-      "description": "All Beans API endpoints for accessing articles, categories, entities, regions, and publisher information"
+      "name": "Articles",
+      "description": "Trending, latest, and searchable news and blog articles"
+    },
+    {
+      "name": "Tags",
+      "description": "Unique categories, entities, and regions for filtering articles"
+    },
+    {
+      "name": "Sources",
+      "description": "Publisher metadata for article sources"
+    },
+    {
+      "name": "General",
+      "description": "Infrastructure endpoints"
     }
   ],
   "components": {
@@ -508,7 +520,7 @@
         "summary": "Health check",
         "description": "Returns service health status",
         "tags": [
-          "Endpoints"
+          "General"
         ],
         "responses": {
           "200": {
@@ -549,7 +561,7 @@
         "summary": "List article categories",
         "description": "Retrieves a paginated list of unique article categories/topics discovered in the database.",
         "tags": [
-          "Endpoints"
+          "Tags"
         ],
         "parameters": [
           {
@@ -642,12 +654,7 @@
             ]
           }
         },
-        "operationId": "getBeanCategories",
-        "additionalOperationContext": {
-          "oasFilePath": "/config/beans.oas.json",
-          "method": "get",
-          "path": "/beans/tags/categories"
-        }
+        "operationId": "getBeanCategories"
       }
     },
     "/beans/tags/entities": {
@@ -655,7 +662,7 @@
         "summary": "List named entities",
         "description": "Retrieves a paginated list of unique named entities (persons, organizations, products, places) extracted from articles.",
         "tags": [
-          "Endpoints"
+          "Tags"
         ],
         "parameters": [
           {
@@ -756,7 +763,7 @@
         "summary": "List geographic regions",
         "description": "Retrieves a paginated list of unique geographic regions mentioned in articles.",
         "tags": [
-          "Endpoints"
+          "Tags"
         ],
         "parameters": [
           {
@@ -857,7 +864,7 @@
         "summary": "Get top headlines",
         "description": "Retrieves top trending headlines from the past 24 hours, ranked by trend score.",
         "tags": [
-          "Endpoints"
+          "Articles"
         ],
         "parameters": [
           {
@@ -1087,7 +1094,7 @@
         "summary": "Get latest articles",
         "description": "Retrieves the most recently published articles, sorted by publish date (newest first).",
         "tags": [
-          "Endpoints"
+          "Articles"
         ],
         "parameters": [
           {
@@ -1328,7 +1335,7 @@
         "summary": "Get trending articles",
         "description": "Retrieves trending articles ranked by trend score. Trend score is computed from:",
         "tags": [
-          "Endpoints"
+          "Articles"
         ],
         "parameters": [
           {
@@ -1569,7 +1576,7 @@
         "summary": "Search articles",
         "description": "Perform semantic (vector embedding) or tag-based search across all articles in the database.",
         "tags": [
-          "Endpoints"
+          "Articles"
         ],
         "parameters": [
           {
@@ -1825,7 +1832,7 @@
         "summary": "Get sources metadata",
         "description": "Retrieves detailed metadata for one or more sources including site name, description, favicon.",
         "tags": [
-          "Endpoints"
+          "Sources"
         ],
         "parameters": [
           {

@@ -16,7 +16,7 @@ import { Button } from "zudoku/ui/Button";
 
 ## Key features
 
-- **Business intelligence sips** - Event and signal records with UUIDs, timestamps, and flattened digest fields
+- **Business intelligence data** - Event and signal records with UUIDs, timestamps, and domain specific structured fields
 - **Semantic search** - Natural language search with an adjustable similarity threshold
 - **Tag filtering** - Filter events and signals by scalar tags such as topics, domains, regions, or entities
 - **Relationship traversal** - Follow `same_as` and `derived_from` links between related sips
@@ -37,7 +37,7 @@ Authorization: Bearer YOUR-API-KEY
 All Espresso gateway endpoints live under the `/espresso` path prefix.
 
 ```bash
-BASE_URL="https://api.cafecito.tech/espresso"
+BASE_URL="https://api.cafecito.tech"
 API_KEY="YOUR-API-KEY"
 ```
 
@@ -120,49 +120,281 @@ Espresso endpoints are exposed as hosted MCP tools for AI agent integration. See
 
 ## Examples
 
-Replace `YOUR-API-KEY` with the key you generated in the [developer portal](/settings/api-keys).
+Below are real-world examples. Replace `YOUR-API-KEY` with the key you generated in the [developer portal](/settings/api-keys).
+
+<CodeTabs syncKey="espresso-api">
+```js
+const API_KEY = process.env.CAFECITO_API_KEY;
+const BASE_URL = "https://api.cafecito.tech";
+```
+
+```python
+import os
+
+API_KEY = os.environ["CAFECITO_API_KEY"]
+BASE_URL = "https://api.cafecito.tech"
+```
+
+```bash title="cURL"
+API_KEY="YOUR-API-KEY"
+BASE_URL="https://api.cafecito.tech"
+```
+</CodeTabs>
 
 ### 1. Health check
 
-```bash
-curl -s "https://api.cafecito.tech/espresso/health" \
-  -H "Authorization: Bearer YOUR-API-KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const res = await fetch(`${BASE_URL}/espresso/health`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const status = await res.json();
+console.log("Service status:", status);
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/health",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    timeout=30,
+)
+resp.raise_for_status()
+
+print("Service status:", resp.json())
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/health" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
 
 ### 2. List tags
 
-```bash
-curl -s "$BASE_URL/tags?limit=20&offset=0" \
-  -H "Authorization: Bearer $API_KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  limit: "20",
+  offset: "0",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/tags?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const tags = await res.json();
+console.log("Tags:", tags);
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/tags",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={"limit": 20, "offset": 0},
+    timeout=30,
+)
+resp.raise_for_status()
+
+print("Tags:", resp.json())
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/tags?limit=20&offset=0" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
 
 ### 3. Filter events by tag and date
 
-```bash
-curl -s "$BASE_URL/events?tags=supreme_court,gerrymandering&from=2026-05-01&limit=5" \
-  -H "Authorization: Bearer $API_KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  tags: "supreme_court,gerrymandering",
+  from: "2026-05-01",
+  limit: "5",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/events?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const events = await res.json();
+events?.forEach((e) => console.log(e.id, e.briefing));
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/events",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "tags": "supreme_court,gerrymandering",
+        "from": "2026-05-01",
+        "limit": 5,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for event in resp.json() or []:
+    print(event.get("id"), event.get("briefing"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/events?tags=supreme_court,gerrymandering&from=2026-05-01&limit=5" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
 
 ### 4. Semantic event search
 
-```bash
-curl -s "$BASE_URL/events?q=voting+rights+redistricting&acc=0.8&limit=5" \
-  -H "Authorization: Bearer $API_KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  q: "voting rights redistricting",
+  acc: "0.8",
+  limit: "5",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/events?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const events = await res.json();
+events?.forEach((e) => console.log(e.id, e.event_type, e.impact_level));
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/events",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "q": "voting rights redistricting",
+        "acc": 0.8,
+        "limit": 5,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for event in resp.json() or []:
+    print(event.get("id"), event.get("event_type"), event.get("impact_level"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/events?q=voting+rights+redistricting&acc=0.8&limit=5" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
 
 ### 5. Search signals as plain text
 
-```bash
-curl -s "$BASE_URL/signals?q=market+volatility&acc=0.75&limit=5&response_type=text" \
-  -H "Authorization: Bearer $API_KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  q: "market volatility",
+  acc: "0.75",
+  limit: "5",
+  response_type: "text",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/signals?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const text = await res.text();
+console.log(text);
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/signals",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "q": "market volatility",
+        "acc": 0.75,
+        "limit": 5,
+        "response_type": "text",
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+print(resp.text)
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/signals?q=market+volatility&acc=0.75&limit=5&response_type=text" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
 
 ### 6. Fetch related sips
 
-```bash
-curl -s "$BASE_URL/related/derived_from?ids=b07049b5-54c0-50b0-a620-d3aea3f8a173&limit=10" \
-  -H "Authorization: Bearer $API_KEY"
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  ids: "b07049b5-54c0-50b0-a620-d3aea3f8a173",
+  limit: "10",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/related/derived_from?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const related = await res.json();
+related?.forEach((sip) => console.log(sip.id, sip.briefing));
 ```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/related/derived_from",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "ids": "b07049b5-54c0-50b0-a620-d3aea3f8a173",
+        "limit": 10,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for sip in resp.json() or []:
+    print(sip.get("id"), sip.get("briefing"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/related/derived_from?ids=b07049b5-54c0-50b0-a620-d3aea3f8a173&limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
 
 ## Status codes
 
