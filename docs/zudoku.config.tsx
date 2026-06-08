@@ -20,6 +20,16 @@ const config: ZudokuConfig = {
       width: "60px",
     },    
   },
+  search: {
+    type: "pagefind",
+    maxSubResults: 3,
+    ranking: {
+      termFrequency: 0.7,
+      pageLength: 0.5,
+      termSimilarity: 1.2,
+      termSaturation: 1.1,
+    },
+  },
   docs: {    
     publishMarkdown: true,
     llms: {
@@ -30,7 +40,7 @@ const config: ZudokuConfig = {
   metadata: {
     title: "Cafecito Developer Portal",
     description: "Developer documentation for Cafecito APIs & MCPs. Project Cafecito offers AI tools to automate business tasks like news, PR and medical billing.",
-    keywords: ["AI automation", "business tools", "billing software", "PR management", "news api", "news mcp", "tech startup"],
+    keywords: ["AI automation", "business tools", "billing software", "PR management", "news api", "news mcp", "market intelligence", "tech startup"],
     favicon: "/cafecito-dark.png",
   },
   theme: {
@@ -179,11 +189,28 @@ const config: ZudokuConfig = {
     {
       type: "category",
       label: "API Reference",
+      link: {
+        type: "doc",
+        file: "api-overview",
+        path: "/api/overview",
+        label: "Overview",
+      },
       items: [
+        {
+          type: "doc",
+          file: "api-overview",
+          path: "/api/overview",
+          label: "Overview",
+        },
         {
           type: "link",
           to: "/api/beans",
-          label: "Beans",
+          label: "Beans API",
+        },
+        {
+          type: "link",
+          to: "/api/espresso",
+          label: "Espresso API",
         },
       ],
     },
@@ -204,7 +231,12 @@ const config: ZudokuConfig = {
     {
       type: "file",
       input: "../config/beans.oas.json",
-      path: "api/beans",
+      path: "/api/beans",
+    },
+    {
+      type: "file",
+      input: "../config/espresso.oas.json",
+      path: "/api/espresso",
     },
   ],
   authentication: {

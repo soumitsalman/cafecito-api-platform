@@ -1,28 +1,407 @@
 ---
-description: Getting Started with Espresso API - Coffee-fueled market intelligence tools for analysis and insights, powered by Project Cafecito's AI automation suite.
+description: Getting Started with Espresso API - Business intelligence sips, event and signal digests, semantic search, and MCP-friendly text responses from Project Cafecito.
 navigation_label: Espresso
 category: "Getting Started"
 ---
 import { Badge } from "zudoku/ui/Badge";
+import { Button } from "zudoku/ui/Button";
 
 ![Espresso banner](/espresso-banner-E.png)
 
 # Espresso API & MCP
 
-<Badge variant="secondary">Coming Soon</Badge> 
+<Badge variant="default">v0.1</Badge><Badge className="badge-live">Live</Badge>
 
-[Espresso](https://espresso.cafecito.tech) is **Cafecito's own publishing arm** — original content from. The API will expose the underlying pre-analyzed structured data that goes into building investigating contents such as [Espresso](https://espresso.cafecito.tech).
+[Espresso](https://espresso.cafecito.tech) is Cafecito's curated business intelligence product suite. The API exposes the structured data behind Espresso as read-only **sips**: event digests, derived signals, tags, and relationships that are ready for dashboards, monitoring workflows, and AI agents.
 
-## What to expect
+## Key features
 
-- Access to Cafecito-owned original content
-- Same clean JSON format you know from Beans
-- Search and filter capabilities
-- MCP integration
+- **Business intelligence data** - Event and signal records with UUIDs, timestamps, and domain specific structured fields
+- **Semantic search** - Natural language search with an adjustable similarity threshold
+- **Tag filtering** - Filter events and signals by scalar tags such as topics, domains, regions, or entities
+- **Relationship traversal** - Follow `same_as` and `derived_from` links between related sips
+- **MCP-friendly responses** - Return normal JSON or flat plain text with `response_type=text`
 
-## When?
+## Authentication
 
-Soon. We'll update this page when there's something to show.
+<Button className="btn-with-link" asChild>
+  <a href="/settings/api-keys">Get API Key</a>
+</Button>
 
-Meanwhile, [Beans](/howtos/beans-howto) is live and free during the [launch preview](/pricing). Go play with that.
+```
+Authorization: Bearer YOUR-API-KEY
+```
+
+## Base URL
+
+All Espresso gateway endpoints live under the `/espresso` path prefix.
+
+```bash
+BASE_URL="https://api.cafecito.tech"
+API_KEY="YOUR-API-KEY"
+```
+
+::::info
+Check out [API reference](/api/espresso) for the complete schema, parameters, and response details.
+::::
+
+## Data model
+
+A **sip** is the basic unit of information. Each sip has a UUID, a `created` timestamp, and a JSON digest. Espresso currently exposes:
+
+- **Events** - Self-contained digests of related actions or developments, such as a policy change and its local fallout
+- **Signals** - Larger derived intelligence synthesized from related events and actions, such as a cross-domain market or policy outlook
+- **Tags** - Scalar labels that can be used to filter event and signal lists
+- **Relationships** - Links between sips, including `same_as` and `derived_from`
+
+List endpoints flatten each sip's digest and merge `id` and `created` into every returned object. Some records may include additional pipeline-specific keys beyond the stable fields shown in the reference.
+
+## Core endpoints
+
+| Endpoint | Description |
+| -------- | ----------- |
+| `GET /espresso/health` | Service health check |
+| `GET /espresso/tags` | Paginated list of unique tag strings |
+| `GET /espresso/events` | Event-kind sips, sorted by `created` descending |
+| `GET /espresso/signals` | Signal-kind sips, sorted by `created` descending |
+| `GET /espresso/related/{relationship}` | Sips linked by `same_as` or `derived_from` |
+
+## Query parameters
+
+### Events and signals
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `ids` | CSV UUIDs | Fetch specific sips by UUID |
+| `tags` | CSV strings | Tag filters, ANDed across supplied tags |
+| `q` | string | Semantic search query, max 1024 characters |
+| `acc` | number (0-1) | Minimum similarity for `q`, default `0.75` |
+| `from` | date | Include sips created on or after `YYYY-MM-DD` |
+| `response_type` | string | `json` or `text`, default `json` |
+| `limit` | integer (1-128) | Page size, default `16` |
+| `offset` | integer | Pagination offset |
+
+### Tags
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `response_type` | string | `json` returns a string array; `text` returns comma-separated tags |
+| `limit` | integer (1-128) | Page size, default `16` |
+| `offset` | integer | Pagination offset |
+
+### Related sips
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `relationship` | path string | `same_as` or `derived_from` |
+| `ids` | CSV UUIDs | Required source sip UUIDs |
+| `response_type` | string | `json` or `text`, default `json` |
+| `limit` | integer (1-128) | Page size, default `16` |
+| `offset` | integer | Pagination offset |
+
+## Response formats
+
+Use `response_type=json` for structured objects and arrays. Use `response_type=text` when sending results to MCP clients or LLM workflows that do not need JSON syntax.
+
+```text
+date: 2026-06-07
+briefing: Analysis of upcoming policy and market shifts...
+event_type: policy_reform
+impact_level: high
+actions: Cooperation agreement signed, reevaluation scheduled
+related_to: public_policy, market_trends, regulation
+```
+
+## MCP Server
+
+**Server URL**: `https://api.cafecito.tech/espresso/mcp`
+
+Espresso endpoints are exposed as hosted MCP tools for AI agent integration. See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
+
+## Examples
+
+Below are real-world examples. Replace `YOUR-API-KEY` with the key you generated in the [developer portal](/settings/api-keys).
+
+<CodeTabs syncKey="espresso-api">
+```js
+const API_KEY = process.env.CAFECITO_API_KEY;
+const BASE_URL = "https://api.cafecito.tech";
+```
+
+```python
+import os
+
+API_KEY = os.environ["CAFECITO_API_KEY"]
+BASE_URL = "https://api.cafecito.tech"
+```
+
+```bash title="cURL"
+API_KEY="YOUR-API-KEY"
+BASE_URL="https://api.cafecito.tech"
+```
+</CodeTabs>
+
+### 1. Health check
+
+<CodeTabs syncKey="espresso-api">
+```js
+const res = await fetch(`${BASE_URL}/espresso/health`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const status = await res.json();
+console.log("Service status:", status);
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/health",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    timeout=30,
+)
+resp.raise_for_status()
+
+print("Service status:", resp.json())
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/health" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
+
+### 2. List tags
+
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  limit: "20",
+  offset: "0",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/tags?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const tags = await res.json();
+console.log("Tags:", tags);
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/tags",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={"limit": 20, "offset": 0},
+    timeout=30,
+)
+resp.raise_for_status()
+
+print("Tags:", resp.json())
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/tags?limit=20&offset=0" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
+
+### 3. Filter events by tag and date
+
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  tags: "supreme_court,gerrymandering",
+  from: "2026-05-01",
+  limit: "5",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/events?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const events = await res.json();
+events?.forEach((e) => console.log(e.id, e.briefing));
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/events",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "tags": "supreme_court,gerrymandering",
+        "from": "2026-05-01",
+        "limit": 5,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for event in resp.json() or []:
+    print(event.get("id"), event.get("briefing"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/events?tags=supreme_court,gerrymandering&from=2026-05-01&limit=5" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
+
+### 4. Semantic event search
+
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  q: "voting rights redistricting",
+  acc: "0.8",
+  limit: "5",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/events?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const events = await res.json();
+events?.forEach((e) => console.log(e.id, e.event_type, e.impact_level));
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/events",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "q": "voting rights redistricting",
+        "acc": 0.8,
+        "limit": 5,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for event in resp.json() or []:
+    print(event.get("id"), event.get("event_type"), event.get("impact_level"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/events?q=voting+rights+redistricting&acc=0.8&limit=5" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
+
+### 5. Search signals as plain text
+
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  q: "market volatility",
+  acc: "0.75",
+  limit: "5",
+  response_type: "text",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/signals?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const text = await res.text();
+console.log(text);
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/signals",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "q": "market volatility",
+        "acc": 0.75,
+        "limit": 5,
+        "response_type": "text",
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+print(resp.text)
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/signals?q=market+volatility&acc=0.75&limit=5&response_type=text" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+---
+
+### 6. Fetch related sips
+
+<CodeTabs syncKey="espresso-api">
+```js
+const params = new URLSearchParams({
+  ids: "b07049b5-54c0-50b0-a620-d3aea3f8a173",
+  limit: "10",
+});
+
+const res = await fetch(`${BASE_URL}/espresso/related/derived_from?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const related = await res.json();
+related?.forEach((sip) => console.log(sip.id, sip.briefing));
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/espresso/related/derived_from",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={
+        "ids": "b07049b5-54c0-50b0-a620-d3aea3f8a173",
+        "limit": 10,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+
+for sip in resp.json() or []:
+    print(sip.get("id"), sip.get("briefing"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/espresso/related/derived_from?ids=b07049b5-54c0-50b0-a620-d3aea3f8a173&limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+## Status codes
+
+- `200` - Matching data returned
+- `204` - Empty result set
+- `400` - Invalid query parameters or malformed UUID
+- `401` - Missing or invalid API key
+- `429` - Rate limit exceeded
+- `500` - Database or embedder error
 

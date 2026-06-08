@@ -1,0 +1,1015 @@
+{
+  "info": {
+    "title": "Espresso API & MCP",
+    "description": "Espresso API & MCP is Cafecito's curated business intelligence service. It provides access to the pre-analyzed structured data behind Espresso market intelligence — events, signals, tags, and sip relationships. A sip is the basic unit of information: an event is a self-contained digest of micro actions, and a signal is larger derived intelligence from related events. Query by UUIDs, tags, or semantic search with fast JSON or token-efficient plain-text responses, perfect for developers building intelligence apps or integrating with MCPs and AI agents.",
+    "version": "0.1"
+  },
+  "openapi": "3.1.0",
+  "tags": [
+    {
+      "name": "Events",
+      "description": "Event-kind sips — self-contained digests of micro actions and developments"
+    },
+    {
+      "name": "Signals",
+      "description": "Signal-kind sips — derived intelligence synthesized from related events and actions"
+    },
+    {
+      "name": "Related",
+      "description": "Sips linked to source UUIDs through same_as or derived_from relationships"
+    },
+    {
+      "name": "Tags",
+      "description": "Unique tag strings for filtering events and signals"
+    },
+    {
+      "name": "General",
+      "description": "Infrastructure endpoints"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Human-readable error message.",
+            "example": "invalid id: not-a-uuid"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "Standard JSON error envelope for 4xx and 5xx responses."
+      },
+      "Event": {
+        "type": "object",
+        "title": "Event",
+        "description": "Flattened JSON shape returned for event-kind sips. The handler merges persisted sip metadata (`id`, `created`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Sip UUID (RFC 4122).",
+            "example": "339366bc-464d-582f-8132-6875ccc814d2"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created",
+            "description": "Creation timestamp of the sip.",
+            "example": "2026-05-19T06:00:00-04:00"
+          },
+          "briefing": {
+            "type": "string",
+            "title": "Briefing",
+            "description": "Concise summary of the event.",
+            "example": "Discussion on recent Supreme Court rulings affecting redistricting and implications for Black political representation in Mississippi."
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type",
+            "description": "Category or classification of the event.",
+            "example": "political_analysis"
+          },
+          "impact_level": {
+            "type": "string",
+            "title": "Impact Level",
+            "description": "Assessed impact severity.",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "example": "high"
+          },
+          "future_outlook": {
+            "type": "string",
+            "title": "Future Outlook",
+            "description": "Forward-looking assessment of likely developments.",
+            "example": "Concerns about erosion of Black political influence amid ongoing gerrymandering debates; potential shifts in power dynamics."
+          },
+          "actions": {
+            "type": "array",
+            "title": "Actions",
+            "description": "Micro actions or developments that compose the event.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Senator Bernie Sanders introduced a 50% ownership tax on major AI firms"
+            ]
+          },
+          "cross_domain_impacts": {
+            "type": "array",
+            "title": "Cross Domain Impacts",
+            "description": "Effects spanning multiple domains or sectors.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Legislative actions influencing redistricting",
+              "Judicial changes altering court mandates on fair representation"
+            ]
+          },
+          "people": {
+            "type": "array",
+            "title": "People",
+            "description": "People mentioned or involved in the event.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "michael_watts",
+              "rep_bennie_thompson"
+            ]
+          },
+          "regions": {
+            "type": "array",
+            "title": "Regions",
+            "description": "Geographic regions associated with the event.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "mississippi",
+              "deep_south"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "title": "Tags",
+            "description": "Scalar tags for filtering and discovery.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "voter_suppression",
+              "gerrymandering",
+              "racial_politics",
+              "supreme_court",
+              "political_representation"
+            ]
+          }
+        }
+      },
+      "Signal": {
+        "type": "object",
+        "title": "Signal",
+        "description": "Flattened JSON shape returned for signal-kind sips. The handler merges persisted sip metadata (`id`, `created`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Sip UUID (RFC 4122).",
+            "example": "e7d7571a-13f0-56f0-8563-50863b79c781"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created",
+            "description": "Creation timestamp of the sip.",
+            "example": "2026-06-02T14:02:00-04:00"
+          },
+          "briefing": {
+            "type": "string",
+            "title": "Briefing",
+            "description": "Concise summary of the signal.",
+            "example": "On 2026-06-02, U.S. lawmakers and the Trump administration debated AI sovereign-wealth and compute-tax proposals amid soaring inflation..."
+          },
+          "impact_level": {
+            "type": "string",
+            "title": "Impact Level",
+            "description": "Assessed impact severity.",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "example": "high"
+          },
+          "forecast": {
+            "type": "string",
+            "title": "Forecast",
+            "description": "Forward-looking outlook synthesized from related events.",
+            "example": "Short-term: Market volatility will persist, AI regulatory scrutiny will intensify, and consumer confidence remains low."
+          },
+          "events": {
+            "type": "array",
+            "title": "Events",
+            "description": "Related events that contributed to this signal.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "2026-06-01: Senator Bernie Sanders introduced a 50% ownership tax on major AI firms"
+            ]
+          },
+          "impacts": {
+            "type": "array",
+            "title": "Impacts",
+            "description": "Observed or projected impacts.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "9.3% market sell-off across tech and financial sectors.",
+              "Decline in consumer confidence and increased credit-card delinquency."
+            ]
+          },
+          "drivers": {
+            "type": "array",
+            "title": "Drivers",
+            "description": "Underlying drivers or catalysts.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "High inflation and rising consumer costs driven by supply-chain bottlenecks and geopolitical tensions."
+            ]
+          },
+          "impacted_domains": {
+            "type": "array",
+            "title": "Impacted Domains",
+            "description": "Business or policy domains affected by the signal.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "finance",
+              "technology",
+              "cybersecurity",
+              "labor",
+              "healthcare",
+              "energy",
+              "policy"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "title": "Tags",
+            "description": "Scalar tags for filtering and discovery.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "ai_sovereign_wealth_fund",
+              "ai_taxation",
+              "compute_tax",
+              "inflation",
+              "market_volatility"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/espresso/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Returns service health status.",
+        "tags": [
+          "General"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "alive"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/health"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "infra-rate-limit-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "getEspressoHealth"
+      }
+    },
+    "/espresso/events": {
+      "get": {
+        "summary": "List events",
+        "description": "Returns event-kind sips sorted by `created` descending (newest first). With `response_type=text`, each event is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": "Ids"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Fetch specific event sips by UUID (RFC 4122), e.g. 339366bc-464d-582f-8132-6875ccc814d2"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Scalar tag filters (inclusive AND across supplied tags)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "title": "Q"
+            },
+            "description": "Semantic search query (max 1024 characters; requires embedder)"
+          },
+          {
+            "name": "acc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1,
+              "minimum": 0,
+              "default": 0.75,
+              "title": "Acc"
+            },
+            "description": "Minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From"
+            },
+            "description": "Include events created on or after this date (YYYY-MM-DD)"
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json",
+              "title": "Response Type"
+            },
+            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 128,
+              "minimum": 1,
+              "default": 16,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Offset"
+            },
+            "description": "Pagination offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON array of flattened event digests when response_type=json (default); plain-text event digests when response_type=text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No matching events"
+          },
+          "400": {
+            "description": "Invalid query parameters or malformed UUID in ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or embedder error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/events"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "listEspressoEvents"
+      }
+    },
+    "/espresso/signals": {
+      "get": {
+        "summary": "List signals",
+        "description": "Returns signal-kind sips sorted by `created` descending (newest first). With `response_type=text`, each signal is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "tags": [
+          "Signals"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": "Ids"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Fetch specific signal sips by UUID (RFC 4122), e.g. e7d7571a-13f0-56f0-8563-50863b79c781"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Scalar tag filters (inclusive AND across supplied tags)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "title": "Q"
+            },
+            "description": "Semantic search query (max 1024 characters; requires embedder)"
+          },
+          {
+            "name": "acc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1,
+              "minimum": 0,
+              "default": 0.75,
+              "title": "Acc"
+            },
+            "description": "Minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From"
+            },
+            "description": "Include signals created on or after this date (YYYY-MM-DD)"
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json",
+              "title": "Response Type"
+            },
+            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 128,
+              "minimum": 1,
+              "default": 16,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Offset"
+            },
+            "description": "Pagination offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON array of flattened signal digests when response_type=json (default); plain-text signal digests when response_type=text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Signal"
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No matching signals"
+          },
+          "400": {
+            "description": "Invalid query parameters or malformed UUID in ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or embedder error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/signals"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "listEspressoSignals"
+      }
+    },
+    "/espresso/tags": {
+      "get": {
+        "summary": "List tags",
+        "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips. Tags can be passed to `/espresso/events` and `/espresso/signals` for scalar filtering. With `response_type=text`, tags are returned as a single comma-separated plain-text string instead of a JSON array.",
+        "tags": [
+          "Tags"
+        ],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json",
+              "title": "Response Type"
+            },
+            "description": "Output format: json (default) returns a JSON string array; text returns the same tags as comma-separated plain text (lower token cost for MCPs and AI agents)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 128,
+              "minimum": 1,
+              "default": 16,
+              "title": "Limit"
+            },
+            "description": "Page limit (items per page)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Offset"
+            },
+            "description": "Pagination offset (number of items to skip)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON string array when response_type=json (default); comma-separated tags when response_type=text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No matching tags"
+          },
+          "400": {
+            "description": "Invalid pagination parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/tags"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "listEspressoTags"
+      }
+    },
+    "/espresso/related/{relationship}": {
+      "get": {
+        "summary": "List related sips",
+        "description": "Returns sips linked to the supplied UUIDs through the requested relationship. With `response_type=text`, each related sip is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "tags": [
+          "Related"
+        ],
+        "parameters": [
+          {
+            "name": "relationship",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "same_as",
+                "derived_from"
+              ],
+              "title": "Relationship"
+            },
+            "description": "Relationship to traverse"
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": "Ids"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Source sip UUIDs (RFC 4122), e.g. b07049b5-54c0-50b0-a620-d3aea3f8a173"
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json",
+              "title": "Response Type"
+            },
+            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 128,
+              "minimum": 1,
+              "default": 16,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Offset"
+            },
+            "description": "Pagination offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON array of flattened related-sip digests when response_type=json (default); plain-text related-sip digests when response_type=text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Event"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Signal"
+                      }
+                    ]
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No related sips found"
+          },
+          "400": {
+            "description": "Missing ids, invalid relationship, or malformed UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/related/${params.relationship}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "listEspressoRelatedSips"
+      }
+    }
+  }
+}

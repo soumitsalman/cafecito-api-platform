@@ -15,7 +15,7 @@ import { Badge } from "zudoku/ui/Badge";
 | Product | Status | Features |
 | --- | --- | --- |
 | **[Beans](/howtos/beans-howto)** News & Blogs | <Badge className="badge-live">Live</Badge> | 7,000+ Publishers, Semantic Search, Trend Signals, Propagation Timeline. |
-| **[Espresso](/howtos/espresso-howto)** Market Intelligence | <Badge variant="secondary">Coming Soon</Badge> | Stay tuned for launch updates. |
+| **[Espresso](/howtos/espresso-howto)** Market Intelligence | <Badge className="badge-live">Live</Badge> | Market Actions, Events Intelligence, Derived Signals, Semantic Search, Tag Filtering, Event Relationship, MCP-friendly text responses. |
 | **[Cortado](/howtos/cortado-howto)** Social Media Automation | <Badge variant="secondary">Coming Soon</Badge> | Stay tuned for launch updates. |
 
 ## Get Started in 37 Seconds
@@ -36,6 +36,15 @@ curl -X GET "https://api.cafecito.tech/<product>/<path>?<query-params>" \
 <CodeTabs>
 ```bash
 curl -X GET "https://api.cafecito.tech/beans/articles/latest?tags=us&sources=techcrunch" \
+-H "Authorization: Bearer YOUR-API-KEY"
+```
+</CodeTabs>
+
+**Example**: Espresso API (for market intelligence)
+
+<CodeTabs>
+```bash
+curl -X GET "https://api.cafecito.tech/espresso/signals?q=market+volatility&limit=5" \
 -H "Authorization: Bearer YOUR-API-KEY"
 ```
 </CodeTabs>

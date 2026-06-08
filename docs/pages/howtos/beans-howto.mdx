@@ -33,7 +33,13 @@ Authorization: Bearer YOUR-API-KEY
 ```
 
 ## Base URL
+
 All Beans endpoints live under the `/beans` path prefix.
+
+```bash
+BASE_URL="https://api.cafecito.tech"
+API_KEY="YOUR-API-KEY"
+```
 
 ## Core endpoints
 
@@ -115,19 +121,24 @@ Beans endpoints are exposed as hosted MCP tools for AI agent integration. See th
 
 ## Examples
 
-Below are real-world examples. Replace `YOUR-API-KEY` with the key you generated in the [developer portal](/).
+Below are real-world examples. Replace `YOUR-API-KEY` with the key you generated in the [developer portal](/settings/api-keys).
 
 <CodeTabs syncKey="beans-api">
 ```js
 const API_KEY = process.env.CAFECITO_API_KEY;
-const BASE_URL = "https://api.cafecito.tech/beans"; // or read from env
+const BASE_URL = "https://api.cafecito.tech";
 ```
 
 ```python
 import os
 
 API_KEY = os.environ["CAFECITO_API_KEY"]
-BASE_URL = "https://api.cafecito.tech/beans"
+BASE_URL = "https://api.cafecito.tech"
+```
+
+```bash title="cURL"
+API_KEY="YOUR-API-KEY"
+BASE_URL="https://api.cafecito.tech"
 ```
 </CodeTabs>
 
@@ -135,7 +146,7 @@ BASE_URL = "https://api.cafecito.tech/beans"
 
 <CodeTabs syncKey="beans-api">
 ```js
-const res = await fetch(`${BASE_URL.replace('/beans', '')}/beans/health`, {
+const res = await fetch(`${BASE_URL}/beans/health`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -148,13 +159,18 @@ console.log("Service status:", status);
 import requests
 
 resp = requests.get(
-    f"{BASE_URL.replace('/beans', '')}/beans/health",
+    f"{BASE_URL}/beans/health",
     headers={"Authorization": f"Bearer {API_KEY}"},
     timeout=30,
 )
 resp.raise_for_status()
 
 print("Service status:", resp.json())
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/health" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
@@ -170,7 +186,7 @@ const params = new URLSearchParams({
   limit: "10",
 });
 
-const res = await fetch(`${BASE_URL}/articles/top-headlines?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/articles/top-headlines?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -183,7 +199,7 @@ headlines?.forEach((h) => console.log(h.title, "→", h.url));
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/articles/top-headlines",
+    f"{BASE_URL}/beans/articles/top-headlines",
     headers={"Authorization": f"Bearer {API_KEY}"},
     params={"limit": 10},
     timeout=30,
@@ -192,6 +208,11 @@ resp.raise_for_status()
 
 for headline in resp.json() or []:
     print(headline.get("title"), "→", headline.get("url"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/top-headlines?limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
@@ -207,7 +228,7 @@ const params = new URLSearchParams({
   limit: "10",
 });
 
-const res = await fetch(`${BASE_URL}/articles/latest?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/articles/latest?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -220,8 +241,8 @@ articles?.forEach((a) => console.log(a.title, "→", a.url));
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/articles/latest",
-    headers={"Authorization": f"Bearer ${API_KEY}"},
+    f"{BASE_URL}/beans/articles/latest",
+    headers={"Authorization": f"Bearer {API_KEY}"},
     params={
         "q": "market performance and economy",
         "content_type": "news",
@@ -233,6 +254,11 @@ resp.raise_for_status()
 
 for article in resp.json() or []:
     print(article.get("title"), "→", article.get("url"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/latest?q=market+performance+and+economy&content_type=news&limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
@@ -250,7 +276,7 @@ params.append("tags", "saudi arabia");
 params.append("content_type", "news");
 params.append("limit", "10");
 
-const res = await fetch(`${BASE_URL}/articles/trending?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/articles/trending?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 const articles = await res.json();
@@ -261,7 +287,7 @@ articles?.forEach((a) => console.log(a.title, "|", a.regions));
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/articles/trending",
+    f"{BASE_URL}/beans/articles/trending",
     headers={"Authorization": f"Bearer {API_KEY}"},
     params={"tags": ["Robotics", "saudi arabia"], "content_type": "news", "limit": 10},
     timeout=30,
@@ -270,6 +296,11 @@ resp.raise_for_status()
 
 for article in resp.json() or []:
     print(article.get("title"), "|", article.get("regions"))
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/trending?tags=Robotics&tags=saudi+arabia&content_type=news&limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
@@ -288,7 +319,7 @@ const params = new URLSearchParams({
   limit: "5",
 });
 
-const res = await fetch(`${BASE_URL}/articles/search?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/articles/search?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -305,7 +336,7 @@ results?.forEach((a) => {
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/articles/search",
+    f"{BASE_URL}/beans/articles/search",
     headers={"Authorization": f"Bearer {API_KEY}"},
     params={
         "q": "AI safety risks and concerns",
@@ -322,6 +353,11 @@ for article in resp.json() or []:
     print(f"  → {article.get('source')} ({article.get('likes')} likes, {article.get('shares')} shares)")
     print(f"  URL: {article.get('url')}\n")
 ```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/search?q=AI+safety+risks+and+concerns&acc=0.8&full_content=true&limit=5" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
 </CodeTabs>
 
 ---
@@ -337,7 +373,7 @@ params.append("sources", "barchart");
 params.append("sources", "reuters");
 params.append("sources", "techcrunch");
 
-const res = await fetch(`${BASE_URL}/publishers?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/sources?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -355,7 +391,7 @@ publishers?.forEach((p) => {
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/publishers",
+    f"{BASE_URL}/beans/sources",
     headers={"Authorization": f"Bearer {API_KEY}"},
     params={"sources": ["barchart", "reuters", "techcrunch"]},
     timeout=30,
@@ -367,6 +403,11 @@ for publisher in resp.json() or []:
     print(f"  ID: {publisher.get('source')}")
     print(f"  URL: {publisher.get('source_base_url')}")
     print(f"  Description: {publisher.get('source_description')}\n")
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/sources?sources=barchart&sources=reuters&sources=techcrunch" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
@@ -383,7 +424,7 @@ const params = new URLSearchParams({
   offset: "0",
 });
 
-const res = await fetch(`${BASE_URL}/tags/categories?${params}`, {
+const res = await fetch(`${BASE_URL}/beans/tags/categories?${params}`, {
   headers: { Authorization: `Bearer ${API_KEY}` },
 });
 
@@ -397,7 +438,7 @@ categories?.forEach((cat) => console.log(`  - ${cat}`));
 import requests
 
 resp = requests.get(
-    f"{BASE_URL}/tags/categories",
+    f"{BASE_URL}/beans/tags/categories",
     headers={"Authorization": f"Bearer {API_KEY}"},
     params={"limit": 50, "offset": 0},
     timeout=30,
@@ -408,6 +449,11 @@ categories = resp.json() or []
 print("Article categories:")
 for cat in categories:
     print(f"  - {cat}")
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/tags/categories?limit=50&offset=0" \
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
 
