@@ -10,7 +10,7 @@ import { Button } from "zudoku/ui/Button";
 
 # Beans API & MCP
 
-<Badge variant="default">v0.1</Badge><Badge className="badge-live">Live</Badge>
+<Badge variant="default">v0.8</Badge><Badge className="badge-live">Live</Badge>
 
 Beans is a news and blog aggregator. It collects data from **7 000+ sources/publishers** every day.
 
@@ -20,7 +20,7 @@ Beans is a news and blog aggregator. It collects data from **7 000+ sources/publ
 - **Comprehensive filtering** — By tags (categories, entities, regions), sources, and time ranges
 - **Entity & sentiment enrichment** — Automatic extraction of sentiment, named entities, and metadata optimized for analytics and AI pipelines
 - **Trend scoring** — Articles ranked by social engagement metrics for relevance and timeliness
-- **Cross-publisher linking** — Related articles mapped across the entire feed
+- **Propagation timeline** — Track publisher coverage and social mentions for article URLs across the feed
 
 ## Authentication
 
@@ -51,6 +51,8 @@ API_KEY="YOUR-API-KEY"
 | `GET /beans/articles/latest` | Most recently published articles, sorted by publish date (newest first) |
 | `GET /beans/articles/trending` | Trending articles ranked by trend score (based on social engagement) |
 | `GET /beans/articles/search` | Semantic or tag-based search across all articles in the database |
+| `GET /beans/articles/propagation` | Publisher coverage and social mentions for up to 128 article URLs (CSV query) |
+| `POST /beans/articles/propagation` | Same as GET, with JSON body `{ "urls": [...] }` |
 
 ### Sources
 
@@ -76,20 +78,37 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `q` | string (3–512) | Optional semantic search query (natural language, triggers vector embedding) |
+| `q` | string (max 512) | Optional semantic search query (natural language, triggers vector embedding) |
 | `acc` | number (0–1) | Embedding accuracy/similarity threshold — higher = stricter match (default `0.75`) |
-| `content_type` | string | Content type filter: `news`, `blog`, `post`, `comment`, etc. |
+| `content_type` | string | Content type filter: `news` or `blog` |
 | `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (recommended). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
 | `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive |
 | `regions` | string[] | Precise geographic region filters — inclusive OR, case/whitespace-sensitive |
 | `entities` | string[] | Precise named entity filters — inclusive OR, case/whitespace-sensitive |
 | `sources` | string[] | Publisher/source ID filters — inclusive OR |
-| `from` | date (YYYY-MM-DD) | **Latest/Trending only:** Articles published/trending since this date (defaults to 7 days ago) |
+| `urls` | string[] | **Search only:** Specific article URLs to fetch directly (CSV) |
+| `from` | date (YYYY-MM-DD) | **Latest, trending, or search:** Filter articles published/updated since this date (defaults to 7 days ago on latest/trending when omitted) |
 | `full_content` | boolean | Include full article text (default `false`) — large payload |
 | `limit` | integer (1–128) | Results per page (default `16`) |
 | `offset` | integer | Pagination offset — number of items to skip (default `0`) |
 
-**Response:** `200 OK` → array of article objects.
+**Response:** `200 OK` → array of article objects. Shape depends on endpoint:
+
+| Endpoint | Type | Notable fields |
+| -------- | ---- | -------------- |
+| `/articles/latest` | `Bean` | `content_type`, `published_at`, `tags` — no engagement metrics |
+| `/articles/top-headlines`, `/articles/trending` | `BeanTrend` | Above plus `likes`, `comments`, `shares`, `related`, `trend_score` |
+| `/articles/search` | `BeanAggregate` | Above plus publisher fields (`source_site_name`, etc.) and `likes`, `comments`, `shares`, `related` — no `trend_score` |
+
+`related` is always a count of related articles, not a list of URLs.
+
+### Propagation
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `urls` | string[] | **Required.** Valid article URLs to look up (max 128). GET: comma-separated CSV in one `urls` param; POST: JSON array in request body |
+
+**Response:** `200 OK` → array of `PropagationResult` objects, each with `url`, `coverage` (publisher republications), and `mentions` (social/forum mentions).
 
 ### Sources
 
@@ -326,7 +345,7 @@ const res = await fetch(`${BASE_URL}/beans/articles/search?${params}`, {
 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 const results = await res.json();
 results?.forEach((a) => {
-  console.log(`${a.title} [trend_score: ${a.trend_score}]`);
+  console.log(`${a.title} [related: ${a.related}]`);
   console.log(`  → ${a.source} (${a.likes} likes, ${a.shares} shares)`);
   console.log(`  URL: ${a.url}\n`);
 });
@@ -349,7 +368,7 @@ resp = requests.get(
 resp.raise_for_status()
 
 for article in resp.json() or []:
-    print(f"{article.get('title')} [trend_score: {article.get('trend_score')}]")
+    print(f"{article.get('title')} [related: {article.get('related')}]")
     print(f"  → {article.get('source')} ({article.get('likes')} likes, {article.get('shares')} shares)")
     print(f"  URL: {article.get('url')}\n")
 ```
@@ -456,6 +475,67 @@ curl -s "${BASE_URL}/beans/tags/categories?limit=50&offset=0" \
   -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>
+
+---
+
+### 8. Article propagation — track coverage and social mentions
+
+See how a story spread across publishers and social platforms.
+
+<CodeTabs syncKey="beans-api">
+```js
+const params = new URLSearchParams();
+params.append("urls", "https://example.com/breaking-story");
+
+const res = await fetch(`${BASE_URL}/beans/articles/propagation?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const results = await res.json();
+results?.forEach((r) => {
+  console.log(r.url, "→", r.coverage?.length, "coverage,", r.mentions?.length, "mentions");
+});
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/beans/articles/propagation",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={"urls": ["https://example.com/breaking-story"]},
+    timeout=30,
+)
+resp.raise_for_status()
+
+for result in resp.json() or []:
+    coverage = result.get("coverage") or []
+    mentions = result.get("mentions") or []
+    print(result.get("url"), "→", len(coverage), "coverage,", len(mentions), "mentions")
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/breaking-story" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+For batch lookups, use POST with a JSON body:
+
+```bash
+curl -s -X POST "${BASE_URL}/beans/articles/propagation" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["https://example.com/story-a","https://example.com/story-b"]}'
+```
+
+Multi-URL GET (comma-separated):
+
+```bash
+curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/story-a,https://example.com/story-b" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
 
 ---
 

@@ -26,180 +26,87 @@
   "components": {
     "schemas": {
       "Bean": {
+        "type": "object",
+        "title": "Bean",
+        "description": "Bean is the main content model returned by article endpoints.",
         "properties": {
           "url": {
             "type": "string",
-            "title": "Url",
-            "description": "The URL of the article."
+            "description": "URL is the canonical URL of the article or post."
           },
-          "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Kind",
-            "description": "The content type of the article, e.g., news, blog, oped, job, post."
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source",
-            "description": "The publisher ID of the article."
+          "content_type": {
+            "type": "string",
+            "description": "Kind is the content type, for example news, blog, post, generated, or comment."
           },
           "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title",
-            "description": "The title of the article."
+            "type": "string",
+            "description": "Title is the human-readable headline or title of the content."
           },
           "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary",
-            "description": "A summary of the article."
+            "type": "string",
+            "description": "Summary is a short abstract or teaser used in listings and previews."
           },
           "content": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Content",
-            "description": "The full content of the article if available."
-          },
-          "image_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Url",
-            "description": "The URL of the article's featured image."
+            "type": "string",
+            "description": "Content is the full body text when the source content is available."
           },
           "author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Author",
-            "description": "The author of the article (if available)."
+            "type": "string",
+            "description": "Author is the byline or attributed creator when available from the source."
           },
-          "created": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created",
-            "description": "The publish date of the article."
+          "source": {
+            "type": "string",
+            "description": "Source is the canonical publisher identifier and matches Publisher.Source."
           },
-          "entities": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Entities",
-            "description": "Named entities mentioned in the article content."
+          "image_url": {
+            "type": "string",
+            "description": "ImageUrl is the featured image or preview image associated with the content."
           },
-          "regions": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Regions",
-            "description": "Geographic regions mentioned in the article content."
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Created is the original publish timestamp of the article or post."
           },
           "categories": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Categories",
-            "description": "Categories/topics of the article content."
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Categories lists the inferred topics assigned to the content."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Regions lists geographic regions mentioned in or associated with the content."
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Entities lists named entities such as people, places, organizations, or products."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Computed tags merged from categories/regions/entities for display"
           },
           "sentiments": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sentiments",
-            "description": "Sentiments expressed in the article content."
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sentiments lists inferred tones or sentiments expressed in the content."
           }
-        },
-        "type": "object",
-        "required": [
-          "url"
-        ],
-        "title": "Bean",
-        "description": "Metadata of an article such as a news or blog post."
+        }
       },
       "BeanTrend": {
         "type": "object",
-        "description": "BeanAggregate composes a `Bean` with the publisher's display fields",
+        "description": "BeanTrend composes a `Bean` with aggregated social metrics (Likes, Comments, Subscribers, Shares, Related, TrendScore).",
         "properties": {
           "url": {
             "description": "URL is the canonical URL of the article or post.",
@@ -218,7 +125,7 @@
             "type": "string"
           },
           "content_type": {
-            "description": "Content type such as news, blog, post, comment, job, etc.",
+            "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
             "type": "string"
           },
           "author": {
@@ -261,7 +168,7 @@
             },
             "description": "Computed tags merged from categories/regions/entities for display"
           },
-          "publish_date": {
+          "published_at": {
             "description": "Created is the original publish timestamp of the article or post.",
             "type": "string",
             "format": "date-time"
@@ -279,11 +186,15 @@
             "type": "integer"
           },
           "subscribers": {
-            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
+            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter. Not populated on current list endpoints.",
+            "type": "integer"
+          },
+          "related": {
+            "description": "Related is the count of semantically or editorially related Beans.",
             "type": "integer"
           },
           "trend_score": {
-            "description": "TrendScore is the computed ranking score used to order trending results.",
+            "description": "TrendScore is the computed ranking score used to order trending results. Returned by top-headlines and trending; not returned by search.",
             "type": "number"
           },
           "sentiments": {
@@ -297,7 +208,7 @@
       },
       "BeanAggregate": {
         "type": "object",
-        "description": "BeanAggregate composes a `Bean` with the publisher's display fields",
+        "description": "BeanAggregate composes a `BeanTrend` with the publisher's display fields",
         "properties": {
           "url": {
             "description": "URL is the canonical URL of the article or post.",
@@ -316,7 +227,7 @@
             "type": "string"
           },
           "content_type": {
-            "description": "Content type such as news, blog, post, comment, job, etc.",
+            "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
             "type": "string"
           },
           "author": {
@@ -375,25 +286,10 @@
             },
             "description": "Computed tags merged from categories/regions/entities for display"
           },
-          "publish_date": {
+          "published_at": {
             "description": "Created is the original publish timestamp of the article or post.",
             "type": "string",
             "format": "date-time"
-          },
-          "cluster_id": {
-            "description": "ClusterId identifies the related-content cluster containing this Bean.",
-            "type": "string"
-          },
-          "related": {
-            "description": "Related lists URLs of semantically or editorially related Beans.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "num_related": {
-            "description": "ClusterSize is the total number of Beans in the same related-content cluster.",
-            "type": "integer"
           },
           "likes": {
             "description": "Likes is the aggregate number of likes or upvotes associated with this Bean.",
@@ -408,16 +304,97 @@
             "type": "integer"
           },
           "subscribers": {
-            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
+            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter. Not populated on current list endpoints.",
+            "type": "integer"
+          },
+          "related": {
+            "description": "Related is the count of semantically or editorially related Beans.",
             "type": "integer"
           },
           "trend_score": {
-            "description": "TrendScore is the computed ranking score used to order trending results.",
+            "description": "TrendScore is the computed ranking score used to order trending results. Returned by top-headlines and trending; not returned by search.",
             "type": "number"
           },
           "sentiments": {
             "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
             "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PropagationCoverage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "site_name": {
+            "type": "string"
+          }
+        }
+      },
+      "PropagationMention": {
+        "type": "object",
+        "properties": {
+          "share_url": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "forum": {
+            "type": "string"
+          },
+          "observed": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comments": {
+            "type": "integer"
+          },
+          "likes": {
+            "type": "integer"
+          }
+        }
+      },
+      "PropagationResult": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "coverage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropagationCoverage"
+            }
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropagationMention"
+            }
+          }
+        }
+      },
+      "PropagationInput": {
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "properties": {
+          "urls": {
+            "type": "array",
+            "minItems": 1,
             "items": {
               "type": "string"
             }
@@ -583,6 +560,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset (number of items to skip)"
@@ -604,6 +582,16 @@
           },
           "204": {
             "description": "no data available"
+          },
+          "400": {
+            "description": "invalid pagination parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "unauthorized: missing or invalid API key",
@@ -684,6 +672,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset (number of items to skip)"
@@ -705,6 +694,16 @@
           },
           "204": {
             "description": "no data available"
+          },
+          "400": {
+            "description": "invalid pagination parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "unauthorized: missing or invalid API key",
@@ -785,6 +784,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset (number of items to skip)"
@@ -806,6 +806,16 @@
           },
           "204": {
             "description": "no data available"
+          },
+          "400": {
+            "description": "invalid pagination parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "unauthorized: missing or invalid API key",
@@ -861,7 +871,7 @@
     },
     "/beans/articles/top-headlines": {
       "get": {
-        "summary": "Get top headlines",
+        "summary": "Get top headlines (last 24 hours)",
         "description": "Retrieves top trending headlines from the past 24 hours, ranked by trend score.",
         "tags": [
           "Articles"
@@ -875,7 +885,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "optional semantic search query (character length 3-512)"
+            "description": "optional semantic search query (max 512 characters)"
           },
           {
             "name": "acc",
@@ -896,9 +906,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "enum": ["news", "blog"],
               "title": "Content Type"
             },
-            "description": "content type filter (news, blog, post, etc.)"
+            "description": "content type filter (news or blog)"
           },
           {
             "name": "tags",
@@ -1005,6 +1016,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset"
@@ -1091,7 +1103,7 @@
     },
     "/beans/articles/latest": {
       "get": {
-        "summary": "Get latest articles",
+        "summary": "Get latest articles (reverse chronological)",
         "description": "Retrieves the most recently published articles, sorted by publish date (newest first).",
         "tags": [
           "Articles"
@@ -1105,7 +1117,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "optional semantic search query (character length 3-512)"
+            "description": "optional semantic search query (max 512 characters)"
           },
           {
             "name": "acc",
@@ -1126,9 +1138,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "enum": ["news", "blog"],
               "title": "Content Type"
             },
-            "description": "content type filter (news, blog, post, etc.)"
+            "description": "content type filter (news or blog)"
           },
           {
             "name": "tags",
@@ -1246,6 +1259,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset"
@@ -1333,7 +1347,7 @@
     "/beans/articles/trending": {
       "get": {
         "summary": "Get trending articles",
-        "description": "Retrieves trending articles ranked by trend score. Trend score is computed from:",
+        "description": "Retrieves trending articles ranked by trend score. Trend score is computed from social engagement metrics (likes, comments, shares, subscriber reactions), publication coverage (number of sources publishing the same content), and recency of engagement.",
         "tags": [
           "Articles"
         ],
@@ -1346,7 +1360,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "optional semantic search query (character length 3-512)"
+            "description": "optional semantic search query (max 512 characters)"
           },
           {
             "name": "acc",
@@ -1367,9 +1381,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "enum": ["news", "blog"],
               "title": "Content Type"
             },
-            "description": "content type filter (news, blog, post, etc.)"
+            "description": "content type filter (news or blog)"
           },
           {
             "name": "tags",
@@ -1487,6 +1502,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset"
@@ -1574,7 +1590,7 @@
     "/beans/articles/search": {
       "get": {
         "summary": "Search articles",
-        "description": "Perform semantic (vector embedding) or tag-based search across all articles in the database.",
+        "description": "Perform semantic (vector embedding) or tag-based search across all articles in the database. At least one of `q`, `tags`, `categories`, `regions`, `entities`, or `urls` is required.",
         "tags": [
           "Articles"
         ],
@@ -1587,7 +1603,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "semantic vector search query (character length 3-512, natural language)"
+            "description": "semantic vector search query (max 512 characters, natural language)"
           },
           {
             "name": "acc",
@@ -1608,9 +1624,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "enum": ["news", "blog"],
               "title": "Content Type"
             },
-            "description": "content type filter (news, blog, post, generated, comment, etc.)"
+            "description": "content type filter (news or blog)"
           },
           {
             "name": "urls",
@@ -1743,6 +1760,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset (number of items to skip)"
@@ -1750,7 +1768,7 @@
         ],
         "responses": {
           "200": {
-            "description": "array of article aggregates with engagement metrics",
+            "description": "array of article aggregates with engagement metrics (likes, comments, shares, related) and publisher fields; does not include trend_score",
             "content": {
               "application/json": {
                 "schema": {
@@ -1827,9 +1845,200 @@
         "operationId": "searchBeansArticles"
       }
     },
+    "/beans/articles/propagation": {
+      "get": {
+        "summary": "Get article propagation",
+        "description": "For each article URL, returns publisher coverage (from related_beans) and social mentions (from chatters).",
+        "tags": [
+          "Articles"
+        ],
+        "parameters": [
+          {
+            "name": "urls",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "title": "Urls"
+            },
+            "style": "form",
+            "explode": false,
+            "description": "Article URLs (CSV, GET only, max 128)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PropagationResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "missing urls, too many urls (>128), invalid URL, or binding error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized: missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/articles/propagation"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "getBeansArticlePropagation"
+      },
+      "post": {
+        "summary": "Get article propagation",
+        "description": "For each article URL, returns publisher coverage (from related_beans) and social mentions (from chatters).",
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropagationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PropagationResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "missing urls, too many urls (>128), invalid URL, or binding error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized: missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/articles/propagation"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "postBeansArticlePropagation"
+      }
+    },
     "/beans/sources": {
       "get": {
-        "summary": "Get sources metadata",
+        "summary": "Query source metadata",
         "description": "Retrieves detailed metadata for one or more sources including site name, description, favicon.",
         "tags": [
           "Sources"
@@ -1869,6 +2078,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "title": "Offset"
             },
             "description": "pagination offset (number of items to skip)"
@@ -1892,7 +2102,7 @@
             "description": "no data available"
           },
           "400": {
-            "description": "bad request: missing or invalid sources parameter",
+            "description": "invalid pagination parameters or missing/invalid sources",
             "content": {
               "application/json": {
                 "schema": {
