@@ -12,7 +12,11 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v0.1</Badge><Badge className="badge-live">Live</Badge>
 
-[Espresso](https://espresso.cafecito.tech) is Cafecito's curated business intelligence product suite. The API exposes the structured data behind Espresso as read-only **sips**: event digests, derived signals, tags, and relationships that are ready for dashboards, monitoring workflows, and AI agents.
+[Espresso](https://espresso.cafecito.tech) is Cafecito's curated business intelligence product suite. The API exposes the structured data behind Espresso as read-only **sips** — event digests, derived signals, tags, and relationships ready for dashboards, monitoring workflows, and AI agents.
+
+All sip identifiers are UUIDs (RFC 4122), for example `339366bc-464d-582f-8132-6875ccc814d2`. Pass them as strings in query parameters and path segments.
+
+List endpoints accept an optional `response_type` query parameter: `json` (default) or `text`. Both return the same underlying data; `text` renders flat plain text without JSON syntax, reducing token cost for MCPs and AI agents.
 
 ## Key features
 
@@ -47,24 +51,25 @@ Check out [API reference](/api/espresso) for the complete schema, parameters, an
 
 ## Data model
 
-A **sip** is the basic unit of information. Each sip has a UUID, a `created` timestamp, and a JSON digest. Espresso currently exposes:
+A **sip** is the basic unit of information:
 
-- **Events** - Self-contained digests of related actions or developments, such as a policy change and its local fallout
-- **Signals** - Larger derived intelligence synthesized from related events and actions, such as a cross-domain market or policy outlook
-- **Tags** - Scalar labels that can be used to filter event and signal lists
-- **Relationships** - Links between sips, including `same_as` and `derived_from`
+- **Actions** — micro data such as market performance for a day (domain model; not yet exposed as a list endpoint)
+- **Events** — self-contained digests of related actions or developments, such as a policy change and its local fallout
+- **Signals** — larger derived intelligence synthesized from related events and actions, such as a cross-domain market or policy outlook
+- **Tags** — scalar labels for filtering event and signal lists
+- **Relationships** — links between sips, including `same_as` and `derived_from`
 
-List endpoints flatten each sip's digest and merge `id` and `created` into every returned object. Some records may include additional pipeline-specific keys beyond the stable fields shown in the reference.
+List endpoints flatten each sip's digest and merge **`id`**, **`reported`**, and **`site_name`** into every returned object (`reported` maps from the persisted `created` timestamp). Some records may include additional pipeline-specific keys beyond the stable fields shown in the reference.
 
 ## Core endpoints
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /espresso/health` | Service health check |
-| `GET /espresso/tags` | Paginated list of unique tag strings |
-| `GET /espresso/events` | Event-kind sips, sorted by `created` descending |
-| `GET /espresso/signals` | Signal-kind sips, sorted by `created` descending |
-| `GET /espresso/related/{relationship}` | Sips linked by `same_as` or `derived_from` |
+| `GET /espresso/health` | Check API health (liveness probe) |
+| `GET /espresso/tags` | List tags for filtering events and signals |
+| `GET /espresso/events` | Search events (sorted by created descending) |
+| `GET /espresso/signals` | Search signals (sorted by created descending) |
+| `GET /espresso/related/{relationship}` | Get related sips by relationship |
 
 ## Query parameters
 
@@ -72,22 +77,22 @@ List endpoints flatten each sip's digest and merge `id` and `created` into every
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `ids` | CSV UUIDs | Fetch specific sips by UUID |
+| `ids` | CSV UUIDs | Fetch specific sips by UUID (RFC 4122) |
 | `tags` | CSV strings | Tag filters, ANDed across supplied tags |
-| `q` | string | Semantic search query, max 1024 characters |
-| `acc` | number (0-1) | Minimum similarity for `q`, default `0.75` |
-| `from` | date | Include sips created on or after `YYYY-MM-DD` |
+| `q` | string | Semantic search query, max 1024 characters (requires embedder) |
+| `acc` | number (0–1) | Minimum similarity for `q` — `0.0` = broad, `1.0` = strict (default `0.75`) |
+| `from` | date | Include sips created on or after `YYYY-MM-DD` (JSON field is `reported`) |
 | `response_type` | string | `json` or `text`, default `json` |
-| `limit` | integer (1-128) | Page size, default `16` |
-| `offset` | integer | Pagination offset |
+| `limit` | integer (1–128) | Page size, default `16` |
+| `offset` | integer | Pagination offset (default `0`) |
 
 ### Tags
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
 | `response_type` | string | `json` returns a string array; `text` returns comma-separated tags |
-| `limit` | integer (1-128) | Page size, default `16` |
-| `offset` | integer | Pagination offset |
+| `limit` | integer (1–128) | Page size, default `16` |
+| `offset` | integer | Pagination offset (default `0`) |
 
 ### Related sips
 
@@ -96,27 +101,37 @@ List endpoints flatten each sip's digest and merge `id` and `created` into every
 | `relationship` | path string | `same_as` or `derived_from` |
 | `ids` | CSV UUIDs | Required source sip UUIDs |
 | `response_type` | string | `json` or `text`, default `json` |
-| `limit` | integer (1-128) | Page size, default `16` |
-| `offset` | integer | Pagination offset |
+| `limit` | integer (1–128) | Page size, default `16` |
+| `offset` | integer | Pagination offset (default `0`) |
 
 ## Response formats
 
 Use `response_type=json` for structured objects and arrays. Use `response_type=text` when sending results to MCP clients or LLM workflows that do not need JSON syntax.
 
 ```text
-date: 2026-06-07
-briefing: Analysis of upcoming policy and market shifts...
-event_type: policy_reform
-impact_level: high
-actions: Cooperation agreement signed, reevaluation scheduled
-related_to: public_policy, market_trends, regulation
+reported:2026-06-07
+related:public_policy|market_trends|regulation
+briefing:Analysis of upcoming policy and market shifts...
+event_type:policy_reform
+impact_level:high
+actions:Cooperation agreement signed|reevaluation scheduled
+future_outlook:Short-term regulatory scrutiny will intensify...
 ```
 
 ## MCP Server
 
-**Server URL**: `https://api.cafecito.tech/espresso/mcp`
+**Server URL**: `https://api.cafecito.tech/espresso/mcp` (v0.1)
 
-Espresso endpoints are exposed as hosted MCP tools for AI agent integration. See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
+Hosted MCP tools (same names as REST `operationId`s):
+
+| Tool | REST path |
+| ---- | --------- |
+| `searchEvents` | `GET /espresso/events` |
+| `searchSignals` | `GET /espresso/signals` |
+| `listTags` | `GET /espresso/tags` |
+| `getRelatedSips` | `GET /espresso/related/{relationship}` |
+
+Use `response_type=text` on list endpoints for token-efficient agent consumption. See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
 
 ## Examples
 
@@ -231,7 +246,7 @@ const res = await fetch(`${BASE_URL}/espresso/events?${params}`, {
 
 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 const events = await res.json();
-events?.forEach((e) => console.log(e.id, e.briefing));
+events?.forEach((e) => console.log(e.id, e.reported, e.site_name, e.briefing));
 ```
 
 ```python
@@ -250,7 +265,7 @@ resp = requests.get(
 resp.raise_for_status()
 
 for event in resp.json() or []:
-    print(event.get("id"), event.get("briefing"))
+    print(event.get("id"), event.get("reported"), event.get("site_name"), event.get("briefing"))
 ```
 
 ```bash title="cURL"
@@ -398,10 +413,10 @@ curl -s "${BASE_URL}/espresso/related/derived_from?ids=b07049b5-54c0-50b0-a620-d
 
 ## Status codes
 
-- `200` - Matching data returned
-- `204` - Empty result set
-- `400` - Invalid query parameters or malformed UUID
-- `401` - Missing or invalid API key
-- `429` - Rate limit exceeded
-- `500` - Database or embedder error
+- `200` — Matching data returned
+- `204` — Empty result set (**not an error**)
+- `400` — Invalid query parameters or malformed UUID
+- `401` — Missing or invalid API key
+- `429` — Rate limit exceeded
+- `500` — Database or embedder error
 

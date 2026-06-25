@@ -1,5 +1,5 @@
 ---
-description: Getting Started with Beans API - AI-powered news and blogs aggregator with semantic search, vector retrieval, and MCP-friendly workflows for curated content and clean JSON endpoints.
+description: Getting Started with Beans News API - MCP-ready news aggregation, semantic search, vector retrieval, and agent workflows for curated content and clean JSON endpoints.
 navigation_label: Beans
 category: "Getting Started"
 ---
@@ -8,11 +8,25 @@ import { Button } from "zudoku/ui/Button";
 
 ![Beans banner](/beans-banner.png)
 
-# Beans API & MCP
+# Beans News API & MCP
 
-<Badge variant="default">v0.1</Badge><Badge className="badge-live">Live</Badge>
+<Badge variant="default">v0.8</Badge><Badge className="badge-live">Live</Badge>
 
 Beans is a news and blog aggregator. It collects data from **7 000+ sources/publishers** every day.
+
+## MCP agent workflow
+
+Recommended tool order for AI agents and MCP clients:
+
+1. **`listCategories`**, **`listEntities`**, **`listRegions`** — discover exact filter values
+2. **`searchArticles`** — primary full-corpus search
+3. **`getLatestArticles`**, **`getTrendingArticles`**, **`getTopHeadlines`** — time-ordered feeds
+4. **`getPublishers`** — resolve publisher source IDs to display metadata
+5. **`getArticlePropagation`** / **`postArticlePropagation`** — track how stories spread
+
+:::info{title="Conventions"}
+Pagination defaults: `limit=16` (max 128), `offset=0`. Empty results return **HTTP 204** (not an error). Start with fuzzy `tags`; use exact `categories` / `regions` / `entities` after calling the tag-list tools. Combine `q` + `acc` for semantic vector search.
+:::
 
 ## Key features
 
@@ -20,7 +34,7 @@ Beans is a news and blog aggregator. It collects data from **7 000+ sources/publ
 - **Comprehensive filtering** — By tags (categories, entities, regions), sources, and time ranges
 - **Entity & sentiment enrichment** — Automatic extraction of sentiment, named entities, and metadata optimized for analytics and AI pipelines
 - **Trend scoring** — Articles ranked by social engagement metrics for relevance and timeliness
-- **Cross-publisher linking** — Related articles mapped across the entire feed
+- **Propagation timeline** — Track publisher coverage and social mentions for article URLs across the feed
 
 ## Authentication
 
@@ -43,28 +57,36 @@ API_KEY="YOUR-API-KEY"
 
 ## Core endpoints
 
+### Health
+
+| Endpoint | Description |
+| -------- | ----------- |
+| `GET /beans/health` | Check API health (liveness probe) |
+
 ### Articles
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/articles/top-headlines` | Top trending headlines from past 24 hours, ranked by trend score |
-| `GET /beans/articles/latest` | Most recently published articles, sorted by publish date (newest first) |
-| `GET /beans/articles/trending` | Trending articles ranked by trend score (based on social engagement) |
-| `GET /beans/articles/search` | Semantic or tag-based search across all articles in the database |
+| `GET /beans/articles/top-headlines` | Search or list top headlines from the last 24 hours |
+| `GET /beans/articles/latest` | Search or list newest articles (reverse chronological) |
+| `GET /beans/articles/trending` | Search or list trending articles by engagement score |
+| `GET /beans/articles/search` | Search all articles by topic, tags, or URL (**primary MCP tool**) |
+| `GET /beans/articles/propagation` | Track how articles spread (GET — CSV `urls` query) |
+| `POST /beans/articles/propagation` | Track how articles spread (POST — JSON `{ "urls": [...] }`) |
 
-### Sources
+### Publishers
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/sources` | Retrieves detailed metadata for sources (site name, description, favicon) |
+| `GET /beans/sources` | Resolve publisher source metadata (site name, description, favicon) |
 
 ### Tags / Metadata
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/tags/categories` | Paginated list of unique article categories/topics |
-| `GET /beans/tags/entities` | Paginated list of named entities (persons, orgs, products, places) |
-| `GET /beans/tags/regions` | Paginated list of geographic regions mentioned in articles |
+| `GET /beans/tags/categories` | List article category topics |
+| `GET /beans/tags/entities` | List named entities |
+| `GET /beans/tags/regions` | List geographic regions |
 
 :::info{title="Pagination"}
 All metadata endpoints support `offset` (default 0) and `limit` (default 16, max 128).
@@ -74,28 +96,49 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 ### Articles
 
+:::warning{title="Search requires a filter"}
+`GET /beans/articles/search` requires **at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.
+:::
+
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
 | `q` | string (3–512) | Optional semantic search query (natural language, triggers vector embedding) |
-| `acc` | number (0–1) | Embedding accuracy/similarity threshold — higher = stricter match (default `0.75`) |
-| `content_type` | string | Content type filter: `news`, `blog`, `post`, `comment`, etc. |
-| `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (recommended). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
-| `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive |
-| `regions` | string[] | Precise geographic region filters — inclusive OR, case/whitespace-sensitive |
-| `entities` | string[] | Precise named entity filters — inclusive OR, case/whitespace-sensitive |
+| `acc` | number (0–1) | Embedding similarity threshold — `0.0` = broad, `1.0` = strict (default `0.75`) |
+| `content_type` | string | Content type filter: `news` or `blog` |
+| `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (**recommended**). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
+| `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive (discover values via `listCategories`) |
+| `regions` | string[] | Precise geographic region filters — inclusive OR, case/whitespace-sensitive (discover values via `listRegions`) |
+| `entities` | string[] | Precise named entity filters — inclusive OR, case/whitespace-sensitive (discover values via `listEntities`) |
 | `sources` | string[] | Publisher/source ID filters — inclusive OR |
-| `from` | date (YYYY-MM-DD) | **Latest/Trending only:** Articles published/trending since this date (defaults to 7 days ago) |
+| `urls` | string[] | **Search only:** Specific article URLs to fetch directly (CSV) |
+| `from` | date (YYYY-MM-DD) | **Latest / trending:** published since date (defaults to 7 days ago when omitted). **Search:** published/updated since date. **Top-headlines:** not accepted (fixed 24h window). |
 | `full_content` | boolean | Include full article text (default `false`) — large payload |
 | `limit` | integer (1–128) | Results per page (default `16`) |
 | `offset` | integer | Pagination offset — number of items to skip (default `0`) |
 
-**Response:** `200 OK` → array of article objects.
+**Response:** `200 OK` → array of article objects. Shape depends on endpoint:
 
-### Sources
+| Endpoint | Type | Notable fields |
+| -------- | ---- | -------------- |
+| `/articles/latest` | `Bean` | `content_type`, `published_at`, `tags` — no engagement metrics |
+| `/articles/top-headlines`, `/articles/trending` | `BeanTrend` | Above plus `likes`, `comments`, `shares`, `related`, `trend_score` |
+| `/articles/search` | `BeanAggregate` | Above plus publisher fields (`source_site_name`, etc.) and `likes`, `comments`, `shares`, `related` — no `trend_score` |
+
+`related` is always a count of related articles, not a list of URLs.
+
+### Propagation
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `sources` | string[] | **Required.** Source IDs to fetch metadata for (CSV, case-sensitive) |
+| `urls` | string[] | **Required.** Valid article URLs to look up (max 128). GET: comma-separated CSV in one `urls` param; POST: JSON array in request body |
+
+**Response:** `200 OK` → array of `PropagationResult` objects, each with `url`, `coverage` (publisher republications), and `mentions` (social/forum mentions).
+
+### Publishers
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `sources` | string[] | **Required.** Source IDs to fetch metadata for (CSV, e.g. `techcrunch.com,theverge.com`) |
 | `limit` | integer (1–128) | Items per page (default `16`) |
 | `offset` | integer | Pagination offset (default `0`) |
 
@@ -110,14 +153,39 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 **Response:** `200 OK` → array of strings.
 
+## Status codes
+
+- `200` — Matching data returned
+- `204` — Empty result set (**not an error**)
+- `400` — Invalid query parameters, missing search filter, or malformed UUID/URL
+- `401` — Missing or invalid API key
+- `429` — Rate limit or concurrency limit exceeded
+- `500` — Database or embedder unavailable
+
 :::info
 Checkout [API reference](/api/beans) for more details.
 :::
 
 ## MCP Server
-**Server URL**: `https://api.cafecito.tech/beans/mcp`
 
-Beans endpoints are exposed as hosted MCP tools for AI agent integration. See the [MCP Integration guide](/howtos/mcp-howto) for more details.
+**Server URL**: `https://api.cafecito.tech/beans/mcp` (v0.8)
+
+Hosted MCP tools (same names as REST `operationId`s):
+
+| Tool | REST path |
+| ---- | --------- |
+| `listCategories` | `GET /beans/tags/categories` |
+| `listEntities` | `GET /beans/tags/entities` |
+| `listRegions` | `GET /beans/tags/regions` |
+| `getTopHeadlines` | `GET /beans/articles/top-headlines` |
+| `getLatestArticles` | `GET /beans/articles/latest` |
+| `getTrendingArticles` | `GET /beans/articles/trending` |
+| `searchArticles` | `GET /beans/articles/search` |
+| `getPublishers` | `GET /beans/sources` |
+| `getArticlePropagation` | `GET /beans/articles/propagation` |
+| `postArticlePropagation` | `POST /beans/articles/propagation` |
+
+See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
 
 ## Examples
 
@@ -326,7 +394,7 @@ const res = await fetch(`${BASE_URL}/beans/articles/search?${params}`, {
 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 const results = await res.json();
 results?.forEach((a) => {
-  console.log(`${a.title} [trend_score: ${a.trend_score}]`);
+  console.log(`${a.title} [related: ${a.related}]`);
   console.log(`  → ${a.source} (${a.likes} likes, ${a.shares} shares)`);
   console.log(`  URL: ${a.url}\n`);
 });
@@ -349,7 +417,7 @@ resp = requests.get(
 resp.raise_for_status()
 
 for article in resp.json() or []:
-    print(f"{article.get('title')} [trend_score: {article.get('trend_score')}]")
+    print(f"{article.get('title')} [related: {article.get('related')}]")
     print(f"  → {article.get('source')} ({article.get('likes')} likes, {article.get('shares')} shares)")
     print(f"  URL: {article.get('url')}\n")
 ```
@@ -362,7 +430,7 @@ curl -s "${BASE_URL}/beans/articles/search?q=AI+safety+risks+and+concerns&acc=0.
 
 ---
 
-### 6. Get sources metadata
+### 6. Resolve publisher source metadata
 
 Retrieve site names, descriptions, and favicon URLs for a set of publishers.
 
@@ -459,10 +527,73 @@ curl -s "${BASE_URL}/beans/tags/categories?limit=50&offset=0" \
 
 ---
 
+### 8. Article propagation — track coverage and social mentions
+
+See how a story spread across publishers and social platforms.
+
+<CodeTabs syncKey="beans-api">
+```js
+const params = new URLSearchParams();
+params.append("urls", "https://example.com/breaking-story");
+
+const res = await fetch(`${BASE_URL}/beans/articles/propagation?${params}`, {
+  headers: { Authorization: `Bearer ${API_KEY}` },
+});
+
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const results = await res.json();
+results?.forEach((r) => {
+  console.log(r.url, "→", r.coverage?.length, "coverage,", r.mentions?.length, "mentions");
+});
+```
+
+```python
+import requests
+
+resp = requests.get(
+    f"{BASE_URL}/beans/articles/propagation",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    params={"urls": ["https://example.com/breaking-story"]},
+    timeout=30,
+)
+resp.raise_for_status()
+
+for result in resp.json() or []:
+    coverage = result.get("coverage") or []
+    mentions = result.get("mentions") or []
+    print(result.get("url"), "→", len(coverage), "coverage,", len(mentions), "mentions")
+```
+
+```bash title="cURL"
+curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/breaking-story" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+For batch lookups, use POST with a JSON body:
+
+```bash
+curl -s -X POST "${BASE_URL}/beans/articles/propagation" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["https://example.com/story-a","https://example.com/story-b"]}'
+```
+
+Multi-URL GET (comma-separated):
+
+```bash
+curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/story-a,https://example.com/story-b" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+---
+
 ## Best practices
 
+- **Discover filters first** — call `listCategories`, `listEntities`, or `listRegions` before exact `categories` / `regions` / `entities` filters.
+- **Prefer feeds over search** when a time-ordered window is enough — `getLatestArticles`, `getTrendingArticles`, and `getTopHeadlines` are lighter than full-corpus `searchArticles`.
 - **Start with `acc=0.75`**, then tweak up for precision or down for recall.
-- **Use `from` parameter** to keep feeds fresh — specify YYYY-MM-DD dates (e.g., `from=2026-03-10`).
+- **Use `from` parameter** on latest/trending to keep feeds fresh — specify YYYY-MM-DD dates (e.g., `from=2026-03-10`). Do not use `from` on top-headlines (fixed 24h window).
 - **Use `full_content=true`** sparingly — requests will be slower and payload larger; great for RAG/summarization pipelines.
 - **Paginate with `offset` + `limit`** for stable ingestion pipelines and monitoring.
 - **Use `tags` parameter** (recommended) for flexible filtering across categories, regions, and entities in one parameter.

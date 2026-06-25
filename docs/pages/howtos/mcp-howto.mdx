@@ -25,7 +25,25 @@ Authorization: Bearer YOUR-API-KEY
 ```
 
 ## Beans MCP server
-**Server URL**: `https://api.cafecito.tech/beans/mcp`
+
+**Server URL**: `https://api.cafecito.tech/beans/mcp` (v0.8)
+
+Recommended agent workflow: discover tag values → search the corpus → use time-ordered feeds → resolve publisher IDs → track story propagation.
+
+| Tool | REST path | Purpose |
+| ---- | --------- | ------- |
+| `listCategories` | `GET /beans/tags/categories` | Discover exact category filter values |
+| `listEntities` | `GET /beans/tags/entities` | Discover exact entity filter values |
+| `listRegions` | `GET /beans/tags/regions` | Discover exact region filter values |
+| `searchArticles` | `GET /beans/articles/search` | Primary full-corpus search |
+| `getLatestArticles` | `GET /beans/articles/latest` | Newest articles (reverse chronological) |
+| `getTrendingArticles` | `GET /beans/articles/trending` | Trending by engagement score |
+| `getTopHeadlines` | `GET /beans/articles/top-headlines` | Top headlines from last 24 hours |
+| `getPublishers` | `GET /beans/sources` | Resolve publisher source metadata |
+| `getArticlePropagation` | `GET /beans/articles/propagation` | Track story spread (CSV URLs) |
+| `postArticlePropagation` | `POST /beans/articles/propagation` | Track story spread (JSON body) |
+
+See the [Beans howto](/howtos/beans-howto) for parameters, response shapes, and examples.
 
 ```python title="Using Beans MCP with your Agent"
 # openai-agents.HostedMCPTool (https://github.com/openai/openai-agents-python)
@@ -62,13 +80,31 @@ print("=== Final output ===")
 print(result.final_output)
 ```
 
+## Espresso MCP server
+
+**Server URL**: `https://api.cafecito.tech/espresso/mcp` (v0.1)
+
+| Tool | REST path | Purpose |
+| ---- | --------- | ------- |
+| `searchEvents` | `GET /espresso/events` | Search event-kind sips |
+| `searchSignals` | `GET /espresso/signals` | Search signal-kind sips |
+| `listTags` | `GET /espresso/tags` | List tags for filtering events and signals |
+| `getRelatedSips` | `GET /espresso/related/{relationship}` | Traverse `same_as` or `derived_from` links |
+
+Use `response_type=text` on list endpoints when feeding results directly to LLM context — same data, fewer tokens than JSON.
+
+See the [Espresso howto](/howtos/espresso-howto) for the data model, text format, and examples.
+
 ## Use cases
 
-- AI assistants and RAG workflows that need fresh news context
+- AI assistants and RAG workflows that need fresh news context (Beans)
+- Business intelligence agents monitoring events, signals, and cross-domain outlooks (Espresso)
 - AI agents that monitor trends, entities, or topics in real time
-- LLM pipelines that require enrichment-ready JSON, not raw HTML
+- LLM pipelines that require enrichment-ready JSON or token-efficient plain text, not raw HTML
 
 ## Related
+- [Beans howto](/howtos/beans-howto)
+- [Espresso howto](/howtos/espresso-howto)
 - [Cafecito](https://cafecito.tech)
 - [Pricing](/pricing)
 - [Contact](/contact)
