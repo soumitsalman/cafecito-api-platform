@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "Beans News API & MCP",
-    "description": "MCP-ready news aggregation and semantic search over RSS-sourced articles.\nAgent workflow: (1) listCategories, listEntities, listRegions \u2014 discover exact filter values; (2) searchArticles \u2014 primary search tool; (3) getLatestArticles, getTrendingArticles, getTopHeadlines \u2014 time-ordered feeds; (4) getPublishers \u2014 resolve source IDs; (5) getArticlePropagation / postArticlePropagation \u2014 track story spread.\nConventions: Auth optional (API-key header when enabled). Pagination: limit default 16 max 128, offset default 0. Empty results return HTTP 204 (not an error). Filter tips: start with fuzzy tags param; use exact categories/regions/entities after calling /tags/* list tools; q+acc enables semantic vector search.",
+    "description": "Beans is a news and blog aggregation product suite. Beans News API & MCP provides read-only access to RSS-sourced articles with semantic search, enrichment, and propagation tracking. A **bean** is the basic unit of content: an article or post keyed by its canonical URL, with inferred categories, regions, entities, sentiments, and optional social trend metrics. List and search endpoints support pagination via `limit` (default 16, max 128) and `offset` (default 0). Empty result sets return HTTP 204, not an error envelope. Filter articles with fuzzy `tags`, or use exact `categories`, `regions`, and `entities` after listing allowed values from `/tags/*`. Combine natural-language `q` with `acc` for semantic vector search. Propagation endpoints track publisher coverage and social mentions for one or more article URLs.",
     "version": "0.8",
     "contact": {
       "name": "Project Cafecito",
