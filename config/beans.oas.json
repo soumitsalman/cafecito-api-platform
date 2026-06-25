@@ -2181,16 +2181,16 @@
               "name": "cafecito-beans-mcp",
               "version": "0.8",
               "operations": [
-                "listCategories",
-                "listEntities",
-                "listRegions",
-                "getTopHeadlines",
-                "getLatestArticles",
-                "getTrendingArticles",
-                "searchArticles",
-                "getPublishers",
-                "getArticlePropagation",
-                "postArticlePropagation"
+                { "file": "./config/beans.oas.json", "id": "listCategories" },
+                { "file": "./config/beans.oas.json", "id": "listEntities" },
+                { "file": "./config/beans.oas.json", "id": "listRegions" },
+                { "file": "./config/beans.oas.json", "id": "getTopHeadlines" },
+                { "file": "./config/beans.oas.json", "id": "getLatestArticles" },
+                { "file": "./config/beans.oas.json", "id": "getTrendingArticles" },
+                { "file": "./config/beans.oas.json", "id": "searchArticles" },
+                { "file": "./config/beans.oas.json", "id": "getPublishers" },
+                { "file": "./config/beans.oas.json", "id": "getArticlePropagation" },
+                { "file": "./config/beans.oas.json", "id": "postArticlePropagation" }
               ]
             }
           },

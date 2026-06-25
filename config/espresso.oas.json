@@ -1073,10 +1073,10 @@
               "name": "cafecito-espresso-mcp",
               "version": "0.1",
               "operations": [
-                "searchEvents",
-                "searchSignals",
-                "listTags",
-                "getRelatedSips"
+                { "file": "./config/espresso.oas.json", "id": "searchEvents" },
+                { "file": "./config/espresso.oas.json", "id": "searchSignals" },
+                { "file": "./config/espresso.oas.json", "id": "listTags" },
+                { "file": "./config/espresso.oas.json", "id": "getRelatedSips" }
               ]
             }
           },
