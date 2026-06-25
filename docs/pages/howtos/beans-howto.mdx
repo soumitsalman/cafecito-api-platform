@@ -1,5 +1,5 @@
 ---
-description: Getting Started with Beans API - AI-powered news and blogs aggregator with semantic search, vector retrieval, and MCP-friendly workflows for curated content and clean JSON endpoints.
+description: Getting Started with Beans News API - MCP-ready news aggregation, semantic search, vector retrieval, and agent workflows for curated content and clean JSON endpoints.
 navigation_label: Beans
 category: "Getting Started"
 ---
@@ -8,11 +8,25 @@ import { Button } from "zudoku/ui/Button";
 
 ![Beans banner](/beans-banner.png)
 
-# Beans API & MCP
+# Beans News API & MCP
 
 <Badge variant="default">v0.8</Badge><Badge className="badge-live">Live</Badge>
 
 Beans is a news and blog aggregator. It collects data from **7 000+ sources/publishers** every day.
+
+## MCP agent workflow
+
+Recommended tool order for AI agents and MCP clients:
+
+1. **`listCategories`**, **`listEntities`**, **`listRegions`** — discover exact filter values
+2. **`searchArticles`** — primary full-corpus search
+3. **`getLatestArticles`**, **`getTrendingArticles`**, **`getTopHeadlines`** — time-ordered feeds
+4. **`getPublishers`** — resolve publisher source IDs to display metadata
+5. **`getArticlePropagation`** / **`postArticlePropagation`** — track how stories spread
+
+:::info{title="Conventions"}
+Pagination defaults: `limit=16` (max 128), `offset=0`. Empty results return **HTTP 204** (not an error). Start with fuzzy `tags`; use exact `categories` / `regions` / `entities` after calling the tag-list tools. Combine `q` + `acc` for semantic vector search.
+:::
 
 ## Key features
 
@@ -43,30 +57,36 @@ API_KEY="YOUR-API-KEY"
 
 ## Core endpoints
 
+### Health
+
+| Endpoint | Description |
+| -------- | ----------- |
+| `GET /beans/health` | Check API health (liveness probe) |
+
 ### Articles
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/articles/top-headlines` | Top trending headlines from past 24 hours, ranked by trend score |
-| `GET /beans/articles/latest` | Most recently published articles, sorted by publish date (newest first) |
-| `GET /beans/articles/trending` | Trending articles ranked by trend score (based on social engagement) |
-| `GET /beans/articles/search` | Semantic or tag-based search across all articles in the database |
-| `GET /beans/articles/propagation` | Publisher coverage and social mentions for up to 128 article URLs (CSV query) |
-| `POST /beans/articles/propagation` | Same as GET, with JSON body `{ "urls": [...] }` |
+| `GET /beans/articles/top-headlines` | Search or list top headlines from the last 24 hours |
+| `GET /beans/articles/latest` | Search or list newest articles (reverse chronological) |
+| `GET /beans/articles/trending` | Search or list trending articles by engagement score |
+| `GET /beans/articles/search` | Search all articles by topic, tags, or URL (**primary MCP tool**) |
+| `GET /beans/articles/propagation` | Track how articles spread (GET — CSV `urls` query) |
+| `POST /beans/articles/propagation` | Track how articles spread (POST — JSON `{ "urls": [...] }`) |
 
-### Sources
+### Publishers
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/sources` | Retrieves detailed metadata for sources (site name, description, favicon) |
+| `GET /beans/sources` | Resolve publisher source metadata (site name, description, favicon) |
 
 ### Tags / Metadata
 
 | Endpoint | Description |
 | -------- | ----------- |
-| `GET /beans/tags/categories` | Paginated list of unique article categories/topics |
-| `GET /beans/tags/entities` | Paginated list of named entities (persons, orgs, products, places) |
-| `GET /beans/tags/regions` | Paginated list of geographic regions mentioned in articles |
+| `GET /beans/tags/categories` | List article category topics |
+| `GET /beans/tags/entities` | List named entities |
+| `GET /beans/tags/regions` | List geographic regions |
 
 :::info{title="Pagination"}
 All metadata endpoints support `offset` (default 0) and `limit` (default 16, max 128).
@@ -76,18 +96,22 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 ### Articles
 
+:::warning{title="Search requires a filter"}
+`GET /beans/articles/search` requires **at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.
+:::
+
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `q` | string (max 512) | Optional semantic search query (natural language, triggers vector embedding) |
-| `acc` | number (0–1) | Embedding accuracy/similarity threshold — higher = stricter match (default `0.75`) |
+| `q` | string (3–512) | Optional semantic search query (natural language, triggers vector embedding) |
+| `acc` | number (0–1) | Embedding similarity threshold — `0.0` = broad, `1.0` = strict (default `0.75`) |
 | `content_type` | string | Content type filter: `news` or `blog` |
-| `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (recommended). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
-| `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive |
-| `regions` | string[] | Precise geographic region filters — inclusive OR, case/whitespace-sensitive |
-| `entities` | string[] | Precise named entity filters — inclusive OR, case/whitespace-sensitive |
+| `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (**recommended**). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
+| `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive (discover values via `listCategories`) |
+| `regions` | string[] | Precise geographic region filters — inclusive OR, case/whitespace-sensitive (discover values via `listRegions`) |
+| `entities` | string[] | Precise named entity filters — inclusive OR, case/whitespace-sensitive (discover values via `listEntities`) |
 | `sources` | string[] | Publisher/source ID filters — inclusive OR |
 | `urls` | string[] | **Search only:** Specific article URLs to fetch directly (CSV) |
-| `from` | date (YYYY-MM-DD) | **Latest, trending, or search:** Filter articles published/updated since this date (defaults to 7 days ago on latest/trending when omitted) |
+| `from` | date (YYYY-MM-DD) | **Latest / trending:** published since date (defaults to 7 days ago when omitted). **Search:** published/updated since date. **Top-headlines:** not accepted (fixed 24h window). |
 | `full_content` | boolean | Include full article text (default `false`) — large payload |
 | `limit` | integer (1–128) | Results per page (default `16`) |
 | `offset` | integer | Pagination offset — number of items to skip (default `0`) |
@@ -110,11 +134,11 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 **Response:** `200 OK` → array of `PropagationResult` objects, each with `url`, `coverage` (publisher republications), and `mentions` (social/forum mentions).
 
-### Sources
+### Publishers
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `sources` | string[] | **Required.** Source IDs to fetch metadata for (CSV, case-sensitive) |
+| `sources` | string[] | **Required.** Source IDs to fetch metadata for (CSV, e.g. `techcrunch.com,theverge.com`) |
 | `limit` | integer (1–128) | Items per page (default `16`) |
 | `offset` | integer | Pagination offset (default `0`) |
 
@@ -129,14 +153,39 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 
 **Response:** `200 OK` → array of strings.
 
+## Status codes
+
+- `200` — Matching data returned
+- `204` — Empty result set (**not an error**)
+- `400` — Invalid query parameters, missing search filter, or malformed UUID/URL
+- `401` — Missing or invalid API key
+- `429` — Rate limit or concurrency limit exceeded
+- `500` — Database or embedder unavailable
+
 :::info
 Checkout [API reference](/api/beans) for more details.
 :::
 
 ## MCP Server
-**Server URL**: `https://api.cafecito.tech/beans/mcp`
 
-Beans endpoints are exposed as hosted MCP tools for AI agent integration. See the [MCP Integration guide](/howtos/mcp-howto) for more details.
+**Server URL**: `https://api.cafecito.tech/beans/mcp` (v0.8)
+
+Hosted MCP tools (same names as REST `operationId`s):
+
+| Tool | REST path |
+| ---- | --------- |
+| `listCategories` | `GET /beans/tags/categories` |
+| `listEntities` | `GET /beans/tags/entities` |
+| `listRegions` | `GET /beans/tags/regions` |
+| `getTopHeadlines` | `GET /beans/articles/top-headlines` |
+| `getLatestArticles` | `GET /beans/articles/latest` |
+| `getTrendingArticles` | `GET /beans/articles/trending` |
+| `searchArticles` | `GET /beans/articles/search` |
+| `getPublishers` | `GET /beans/sources` |
+| `getArticlePropagation` | `GET /beans/articles/propagation` |
+| `postArticlePropagation` | `POST /beans/articles/propagation` |
+
+See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
 
 ## Examples
 
@@ -381,7 +430,7 @@ curl -s "${BASE_URL}/beans/articles/search?q=AI+safety+risks+and+concerns&acc=0.
 
 ---
 
-### 6. Get sources metadata
+### 6. Resolve publisher source metadata
 
 Retrieve site names, descriptions, and favicon URLs for a set of publishers.
 
@@ -541,8 +590,10 @@ curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/story-a
 
 ## Best practices
 
+- **Discover filters first** — call `listCategories`, `listEntities`, or `listRegions` before exact `categories` / `regions` / `entities` filters.
+- **Prefer feeds over search** when a time-ordered window is enough — `getLatestArticles`, `getTrendingArticles`, and `getTopHeadlines` are lighter than full-corpus `searchArticles`.
 - **Start with `acc=0.75`**, then tweak up for precision or down for recall.
-- **Use `from` parameter** to keep feeds fresh — specify YYYY-MM-DD dates (e.g., `from=2026-03-10`).
+- **Use `from` parameter** on latest/trending to keep feeds fresh — specify YYYY-MM-DD dates (e.g., `from=2026-03-10`). Do not use `from` on top-headlines (fixed 24h window).
 - **Use `full_content=true`** sparingly — requests will be slower and payload larger; great for RAG/summarization pipelines.
 - **Paginate with `offset` + `limit`** for stable ingestion pipelines and monitoring.
 - **Use `tags` parameter** (recommended) for flexible filtering across categories, regions, and entities in one parameter.

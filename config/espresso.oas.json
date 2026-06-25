@@ -1,18 +1,26 @@
 {
   "info": {
     "title": "Espresso API & MCP",
-    "description": "Espresso API & MCP is Cafecito's curated business intelligence service. It provides access to the pre-analyzed structured data behind Espresso market intelligence — events, signals, tags, and sip relationships. A sip is the basic unit of information: an event is a self-contained digest of micro actions, and a signal is larger derived intelligence from related events. Query by UUIDs, tags, or semantic search with fast JSON or token-efficient plain-text responses, perfect for developers building intelligence apps or integrating with MCPs and AI agents.",
-    "version": "0.1"
+    "description": "Espresso is a curated business intelligence product suite. Espresso API & MCP provides access to the underlying data store.\nA **sip** is the basic unit of information: action (micro data such as market performance for a day), event (a self-contained set of micro actions and actions), and signal (larger derived intelligence from related events and actions).\nAll sip identifiers are UUIDs (RFC 4122), for example `339366bc-464d-582f-8132-6875ccc814d2`. Pass them as strings in query parameters and path segments.\nList endpoints accept an optional `response_type` query parameter: `json` (default) or `text`. Both return the same underlying data; `text` renders it as flat plain text without JSON syntax, which reduces token cost for MCPs and AI agents.",
+    "version": "0.1",
+    "contact": {
+      "name": "Project Cafecito",
+      "url": "http://cafecito.tech",
+      "email": "soumitsrah@cafecito.tech"
+    },
+    "license": {
+      "name": "MIT"
+    }
   },
   "openapi": "3.1.0",
   "tags": [
     {
       "name": "Events",
-      "description": "Event-kind sips — self-contained digests of micro actions and developments"
+      "description": "Event-kind sips \u2014 self-contained digests of micro actions and developments"
     },
     {
       "name": "Signals",
-      "description": "Signal-kind sips — derived intelligence synthesized from related events and actions"
+      "description": "Signal-kind sips \u2014 derived intelligence synthesized from related events and actions"
     },
     {
       "name": "Related",
@@ -21,6 +29,10 @@
     {
       "name": "Tags",
       "description": "Unique tag strings for filtering events and signals"
+    },
+    {
+      "name": "Health",
+      "description": "Service health and liveness endpoints"
     },
     {
       "name": "General",
@@ -48,7 +60,7 @@
       "Event": {
         "type": "object",
         "title": "Event",
-        "description": "Flattened JSON shape returned for event-kind sips. The handler merges persisted sip metadata (`id`, `created`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
+        "description": "Flattened JSON shape returned for event-kind sips. The handler merges persisted sip metadata (`id`, `reported`, `site_name`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
         "properties": {
           "id": {
             "type": "string",
@@ -57,12 +69,18 @@
             "description": "Sip UUID (RFC 4122).",
             "example": "339366bc-464d-582f-8132-6875ccc814d2"
           },
-          "created": {
+          "reported": {
             "type": "string",
             "format": "date-time",
-            "title": "Created",
-            "description": "Creation timestamp of the sip.",
+            "title": "Reported",
+            "description": "Reported timestamp of the sip (maps from persisted created).",
             "example": "2026-05-19T06:00:00-04:00"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name",
+            "description": "Human-readable source site name when available.",
+            "example": "Example News"
           },
           "briefing": {
             "type": "string",
@@ -160,7 +178,7 @@
       "Signal": {
         "type": "object",
         "title": "Signal",
-        "description": "Flattened JSON shape returned for signal-kind sips. The handler merges persisted sip metadata (`id`, `created`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
+        "description": "Flattened JSON shape returned for signal-kind sips. The handler merges persisted sip metadata (`id`, `reported`, `site_name`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
         "properties": {
           "id": {
             "type": "string",
@@ -169,12 +187,18 @@
             "description": "Sip UUID (RFC 4122).",
             "example": "e7d7571a-13f0-56f0-8563-50863b79c781"
           },
-          "created": {
+          "reported": {
             "type": "string",
             "format": "date-time",
-            "title": "Created",
-            "description": "Creation timestamp of the sip.",
+            "title": "Reported",
+            "description": "Reported timestamp of the sip (maps from persisted created).",
             "example": "2026-06-02T14:02:00-04:00"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name",
+            "description": "Human-readable source site name when available.",
+            "example": "Example News"
           },
           "briefing": {
             "type": "string",
@@ -272,14 +296,14 @@
   "paths": {
     "/espresso/health": {
       "get": {
-        "summary": "Health check",
-        "description": "Returns service health status.",
+        "summary": "Check API health",
+        "description": "Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.",
         "tags": [
-          "General"
+          "Health"
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "status alive",
             "content": {
               "application/json": {
                 "schema": {
@@ -311,13 +335,13 @@
             ]
           }
         },
-        "operationId": "getEspressoHealth"
+        "operationId": "healthCheck"
       }
     },
     "/espresso/events": {
       "get": {
-        "summary": "List events",
-        "description": "Returns event-kind sips sorted by `created` descending (newest first). With `response_type=text`, each event is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "summary": "Search events",
+        "description": "Returns event-kind sips sorted by `created` descending (newest first).\nWith `response_type=text`, each event is rendered as a flat plain-text digest (field-per-line) instead of a JSON object \u2014 same data, fewer tokens for MCPs and AI agents.",
         "tags": [
           "Events"
         ],
@@ -336,7 +360,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Fetch specific event sips by UUID (RFC 4122), e.g. 339366bc-464d-582f-8132-6875ccc814d2"
+            "description": "fetch specific event sips by UUID (RFC 4122), e.g. 339366bc-464d-582f-8132-6875ccc814d2"
           },
           {
             "name": "tags",
@@ -351,7 +375,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Scalar tag filters (inclusive AND across supplied tags)"
+            "description": "scalar tag filters (inclusive AND across supplied tags)"
           },
           {
             "name": "q",
@@ -362,7 +386,7 @@
               "maxLength": 1024,
               "title": "Q"
             },
-            "description": "Semantic search query (max 1024 characters; requires embedder)"
+            "description": "semantic search query (max 1024 characters; requires embedder)"
           },
           {
             "name": "acc",
@@ -375,7 +399,7 @@
               "default": 0.75,
               "title": "Acc"
             },
-            "description": "Minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
+            "description": "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
           },
           {
             "name": "from",
@@ -386,7 +410,7 @@
               "format": "date",
               "title": "From"
             },
-            "description": "Include events created on or after this date (YYYY-MM-DD)"
+            "description": "include events created on or after this date (YYYY-MM-DD)"
           },
           {
             "name": "response_type",
@@ -401,7 +425,7 @@
               "default": "json",
               "title": "Response Type"
             },
-            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+            "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
           },
           {
             "name": "limit",
@@ -414,7 +438,7 @@
               "default": 16,
               "title": "Limit"
             },
-            "description": "Page size"
+            "description": "page size"
           },
           {
             "name": "offset",
@@ -425,7 +449,7 @@
               "minimum": 0,
               "title": "Offset"
             },
-            "description": "Pagination offset"
+            "description": "pagination offset"
           }
         ],
         "responses": {
@@ -448,10 +472,10 @@
             }
           },
           "204": {
-            "description": "No matching events"
+            "description": "no matching events"
           },
           "400": {
-            "description": "Invalid query parameters or malformed UUID in ids",
+            "description": "invalid query parameters or malformed UUID in ids",
             "content": {
               "application/json": {
                 "schema": {
@@ -461,7 +485,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "missing or invalid API key",
             "content": {
               "application/json": {
                 "schema": {
@@ -471,7 +495,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -481,7 +505,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder error",
+            "description": "database or embedder error",
             "content": {
               "application/json": {
                 "schema": {
@@ -509,13 +533,13 @@
             ]
           }
         },
-        "operationId": "listEspressoEvents"
+        "operationId": "searchEvents"
       }
     },
     "/espresso/signals": {
       "get": {
-        "summary": "List signals",
-        "description": "Returns signal-kind sips sorted by `created` descending (newest first). With `response_type=text`, each signal is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "summary": "Search signals",
+        "description": "Returns signal-kind sips sorted by `created` descending (newest first).\nWith `response_type=text`, each signal is rendered as a flat plain-text digest (field-per-line) instead of a JSON object \u2014 same data, fewer tokens for MCPs and AI agents.",
         "tags": [
           "Signals"
         ],
@@ -534,7 +558,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Fetch specific signal sips by UUID (RFC 4122), e.g. e7d7571a-13f0-56f0-8563-50863b79c781"
+            "description": "fetch specific signal sips by UUID (RFC 4122), e.g. e7d7571a-13f0-56f0-8563-50863b79c781"
           },
           {
             "name": "tags",
@@ -549,7 +573,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Scalar tag filters (inclusive AND across supplied tags)"
+            "description": "scalar tag filters (inclusive AND across supplied tags)"
           },
           {
             "name": "q",
@@ -560,7 +584,7 @@
               "maxLength": 1024,
               "title": "Q"
             },
-            "description": "Semantic search query (max 1024 characters; requires embedder)"
+            "description": "semantic search query (max 1024 characters; requires embedder)"
           },
           {
             "name": "acc",
@@ -573,7 +597,7 @@
               "default": 0.75,
               "title": "Acc"
             },
-            "description": "Minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
+            "description": "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)"
           },
           {
             "name": "from",
@@ -584,7 +608,7 @@
               "format": "date",
               "title": "From"
             },
-            "description": "Include signals created on or after this date (YYYY-MM-DD)"
+            "description": "include signals created on or after this date (YYYY-MM-DD)"
           },
           {
             "name": "response_type",
@@ -599,7 +623,7 @@
               "default": "json",
               "title": "Response Type"
             },
-            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+            "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
           },
           {
             "name": "limit",
@@ -612,7 +636,7 @@
               "default": 16,
               "title": "Limit"
             },
-            "description": "Page size"
+            "description": "page size"
           },
           {
             "name": "offset",
@@ -623,7 +647,7 @@
               "minimum": 0,
               "title": "Offset"
             },
-            "description": "Pagination offset"
+            "description": "pagination offset"
           }
         ],
         "responses": {
@@ -646,10 +670,10 @@
             }
           },
           "204": {
-            "description": "No matching signals"
+            "description": "no matching signals"
           },
           "400": {
-            "description": "Invalid query parameters or malformed UUID in ids",
+            "description": "invalid query parameters or malformed UUID in ids",
             "content": {
               "application/json": {
                 "schema": {
@@ -659,7 +683,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "missing or invalid API key",
             "content": {
               "application/json": {
                 "schema": {
@@ -669,7 +693,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -679,7 +703,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder error",
+            "description": "database or embedder error",
             "content": {
               "application/json": {
                 "schema": {
@@ -707,13 +731,13 @@
             ]
           }
         },
-        "operationId": "listEspressoSignals"
+        "operationId": "searchSignals"
       }
     },
     "/espresso/tags": {
       "get": {
-        "summary": "List tags",
-        "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips. Tags can be passed to `/espresso/events` and `/espresso/signals` for scalar filtering. With `response_type=text`, tags are returned as a single comma-separated plain-text string instead of a JSON array.",
+        "summary": "List tags for filtering events and signals",
+        "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips. Tags can be passed to `/espresso/events` and `/espresso/signals` for scalar filtering.\nWith `response_type=text`, tags are returned as a single comma-separated plain-text string instead of a JSON array.",
         "tags": [
           "Tags"
         ],
@@ -731,7 +755,7 @@
               "default": "json",
               "title": "Response Type"
             },
-            "description": "Output format: json (default) returns a JSON string array; text returns the same tags as comma-separated plain text (lower token cost for MCPs and AI agents)"
+            "description": "output format: json (default) returns a JSON string array; text returns the same tags as comma-separated plain text (lower token cost for MCPs and AI agents)"
           },
           {
             "name": "limit",
@@ -744,7 +768,7 @@
               "default": 16,
               "title": "Limit"
             },
-            "description": "Page limit (items per page)"
+            "description": "page limit (items per page)"
           },
           {
             "name": "offset",
@@ -755,7 +779,7 @@
               "minimum": 0,
               "title": "Offset"
             },
-            "description": "Pagination offset (number of items to skip)"
+            "description": "pagination offset (number of items to skip)"
           }
         ],
         "responses": {
@@ -778,10 +802,10 @@
             }
           },
           "204": {
-            "description": "No matching tags"
+            "description": "no matching tags"
           },
           "400": {
-            "description": "Invalid pagination parameters",
+            "description": "invalid pagination parameters",
             "content": {
               "application/json": {
                 "schema": {
@@ -791,7 +815,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "missing or invalid API key",
             "content": {
               "application/json": {
                 "schema": {
@@ -801,7 +825,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -811,7 +835,7 @@
             }
           },
           "500": {
-            "description": "Database error",
+            "description": "database error",
             "content": {
               "application/json": {
                 "schema": {
@@ -839,13 +863,13 @@
             ]
           }
         },
-        "operationId": "listEspressoTags"
+        "operationId": "listTags"
       }
     },
     "/espresso/related/{relationship}": {
       "get": {
-        "summary": "List related sips",
-        "description": "Returns sips linked to the supplied UUIDs through the requested relationship. With `response_type=text`, each related sip is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+        "summary": "Get related sips by relationship",
+        "description": "Returns sips linked to the supplied UUIDs through the requested relationship.\nWith `response_type=text`, each related sip is rendered as a flat plain-text digest (field-per-line) instead of a JSON object \u2014 same data, fewer tokens for MCPs and AI agents.",
         "tags": [
           "Related"
         ],
@@ -862,7 +886,7 @@
               ],
               "title": "Relationship"
             },
-            "description": "Relationship to traverse"
+            "description": "relationship to traverse"
           },
           {
             "name": "ids",
@@ -878,7 +902,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Source sip UUIDs (RFC 4122), e.g. b07049b5-54c0-50b0-a620-d3aea3f8a173"
+            "description": "source sip UUIDs (RFC 4122), e.g. b07049b5-54c0-50b0-a620-d3aea3f8a173"
           },
           {
             "name": "response_type",
@@ -893,7 +917,7 @@
               "default": "json",
               "title": "Response Type"
             },
-            "description": "Output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
+            "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)"
           },
           {
             "name": "limit",
@@ -906,7 +930,7 @@
               "default": 16,
               "title": "Limit"
             },
-            "description": "Page size"
+            "description": "page size"
           },
           {
             "name": "offset",
@@ -917,7 +941,7 @@
               "minimum": 0,
               "title": "Offset"
             },
-            "description": "Pagination offset"
+            "description": "pagination offset"
           }
         ],
         "responses": {
@@ -947,10 +971,10 @@
             }
           },
           "204": {
-            "description": "No related sips found"
+            "description": "no related sips found"
           },
           "400": {
-            "description": "Missing ids, invalid relationship, or malformed UUID",
+            "description": "missing ids, invalid relationship, or malformed UUID",
             "content": {
               "application/json": {
                 "schema": {
@@ -960,7 +984,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "missing or invalid API key",
             "content": {
               "application/json": {
                 "schema": {
@@ -970,7 +994,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -980,7 +1004,7 @@
             }
           },
           "500": {
-            "description": "Database error",
+            "description": "database error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1008,7 +1032,62 @@
             ]
           }
         },
-        "operationId": "listEspressoRelatedSips"
+        "operationId": "getRelatedSips"
+      }
+    },
+    "/espresso/mcp": {
+      "post": {
+        "summary": "Espresso MCP server",
+        "description": "Model Context Protocol (MCP) endpoint for the Espresso service. Exposes Espresso tools to MCP-compatible clients such as AI agents and LLM-powered applications.",
+        "tags": [
+          "General"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "mcpServerHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "name": "cafecito-espresso-mcp",
+              "version": "0.1",
+              "operations": [
+                "searchEvents",
+                "searchSignals",
+                "listTags",
+                "getRelatedSips"
+              ]
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "gate-auth"
+            ]
+          }
+        },
+        "operationId": "espressoMcp"
       }
     }
   }
