@@ -38,3 +38,36 @@ In Zuplo project → Source Control, exclude `services/**` from deploy triggers 
 ## First deploy after merge
 
 Backend workflows will not auto-run until `services/beans/**` or `services/espresso/**` changes. Use **workflow_dispatch** on `deploy-beans.yml` and `deploy-espresso.yml` for an initial smoke deploy after secrets are copied.
+
+Merge `dev` → `main` (workflows trigger on `main` only).
+
+## Archive old repositories
+
+After monorepo deploys succeed, update each old repo README and archive on GitHub:
+
+### go-beans-api README
+
+```markdown
+# go-beans-api (archived)
+
+This repository has been merged into **[cafecito-api-manager](https://github.com/soumitsalman/cafecito-api-manager)**.
+
+Beans API source: [`services/beans/`](https://github.com/soumitsalman/cafecito-api-manager/tree/main/services/beans)
+```
+
+### go-espresso-api README
+
+```markdown
+# go-espresso-api (archived)
+
+This repository has been merged into **[cafecito-api-manager](https://github.com/soumitsalman/cafecito-api-manager)**.
+
+Espresso API source: [`services/espresso/`](https://github.com/soumitsalman/cafecito-api-manager/tree/main/services/espresso)
+```
+
+### Archive commands
+
+```bash
+gh repo archive soumitsalman/go-beans-api --yes
+gh repo archive soumitsalman/go-espresso-api --yes
+```
