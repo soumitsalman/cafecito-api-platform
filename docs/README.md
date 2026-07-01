@@ -1,52 +1,65 @@
-# Developer Portal
+# Cafecito Developer Portal
 
-This is your
-[Zuplo Developer Portal](https://zuplo.com/docs/dev-portal/introduction). This
-developer portal allows you to ship a beautiful API documentation for your
-users. You can customize this portal to match your brand and style.
+Zudoku-powered developer portal for [Project Cafecito](https://cafecito.tech) APIs and MCP servers. Source lives in `docs/pages/`; navigation and OpenAPI mounting are configured in [`zudoku.config.tsx`](zudoku.config.tsx).
 
-This developer portal is configured to work with your Zuplo API. When you
-publish your API, your developer portal will be automatically published with the
-latest API documentation.
+Hosted at [developer.cafecito.tech](https://developer.cafecito.tech). Built on [Zudoku](https://zudoku.dev) and published alongside the Zuplo gateway.
 
-For more information, visit the
-[Documentation](https://zuplo.com/docs/dev-portal/introduction).
+## Portal content summary
 
-The Zuplo Developer Portal is built on top of the open source
-[Zudoku](https://zudoku.dev) project, a powerful tool for creating and managing
-API documentation. If you would like to learn more about the project, open a
-feature request, or contribute to the codebase, visit the
-[Zudoku GitHub repository](https://github.com/zuplo/zudoku).
+### Welcome — `pages/introduction.mdx`
 
-## Local Development
+Landing page for the portal. Introduces live products (**Beans** news/blog intelligence, **Espresso** market intelligence) and **Cortado** (coming soon). Quick start: create an API key, call `https://api.cafecito.tech/<product>/<path>` with `Authorization: Bearer YOUR-API-KEY`.
 
-After you have connected your Zuplo project to
-[source control](https://zuplo.com/docs/articles/source-control) you can clone
-your project locally. Running the Developer Portal locally allows you to see
-changes in real-time with live-reload.
+### Getting Started
 
-1. Clone the repository
+| Page | File | Summary |
+|------|------|---------|
+| API Keys | `howtos/api-keys.mdx` | Create keys in the portal; one key works across all products and MCPs. Bearer auth on every request. |
+| Beans | `howtos/beans-howto.mdx` | News/blog aggregator (7,000+ sources). Semantic search, trends, propagation, tag filters. MCP tool order and REST examples. |
+| Espresso | `howtos/espresso-howto.mdx` | Business intelligence **sips** (events, signals). UUID IDs, tag filtering, relationships (`same_as`, `derived_from`), `response_type=text` for agents. |
+| Cortado | `howtos/cortado-howto.mdx` | Social media automation — placeholder; scheduling, posting, analytics planned. |
 
-   ```bash
-   git clone https://github.com/my-org/my-repo
-   cd my-repo
-   ```
+### MCP — `pages/howtos/mcp-howto.mdx`
 
-2. Install dependencies
+Each product exposes an MCP server at `https://api.cafecito.tech/<product>/mcp` with the same API key. Documents Beans and Espresso tools mapped to REST paths.
 
-   ```bash
-   npm install
-   ```
+### API Reference — `pages/api-overview.mdx`
 
-3. Start the development server
+Interactive OpenAPI reference for **Beans** (`/api/beans`) and **Espresso** (`/api/espresso`), mounted from `../config/*.oas.json`.
 
-   ```bash
-   npm run docs
-   ```
+### Pricing — `pages/pricing.mdx`
 
-## Clerk auth notes (API key creation)
+Free launch preview until June 30, 2026. Beans: 100 req/min, 50k req/month. Metering is per API call (MCP counts the same). Unlimited keys share one meter.
 
-If API key `createKey` is not being invoked, the user is typically not authenticated in the portal.
+### Contact — `pages/contact.mdx`
+
+Bug reports and feature requests via GitHub issue templates on `cafecito-api-manager`.
+
+### Company & Policies
+
+| Page | File | Summary |
+|------|------|---------|
+| About Us | `company/about-us.md` | Founders, mission, product lineup (Beans live, Espresso, Cortado, MediCafe). |
+| Privacy Policy | `company/privacy-policy.md` | Data collection, usage, cookies, retention (effective Sep 16, 2024). |
+| Terms of Use | `company/terms-of-use.md` | Acceptable use, service terms for Beans/Espresso/Cortado (effective Sep 16, 2024). |
+
+## Local development
+
+From the repo root:
+
+```bash
+cd docs
+npm install
+npm run dev
+```
+
+Or from the gateway root: `npm run docs` (Zuplo docs integration).
+
+Production build: `cd docs && npm run build`
+
+## Clerk auth (API key creation)
+
+If API key `createKey` is not invoked, the user is typically not authenticated in the portal.
 
 Set these environment variables before starting docs:
 
@@ -55,9 +68,14 @@ Set these environment variables before starting docs:
 - `CLERK_PUBLISHABLE_KEY` and `CLERK_JWT_TEMPLATE_NAME` are also supported as fallback names.
 - `ZUDOKU_FAIL_ON_DEMO_CLERK_KEY` (default: `true`) fails fast in non-production if the demo key is still in use.
 
-In Clerk, ensure your application allows the Developer Portal callback URL:
+In Clerk, allow the Developer Portal callback URL:
 
 - Local: `http://localhost:3000/oauth/callback`
 - Hosted: `https://<your-docs-domain>/oauth/callback`
 
-Also ensure the JWT template name in Clerk matches `CLERK_JWT_TEMPLATE_NAME`.
+Ensure the JWT template name in Clerk matches `CLERK_JWT_TEMPLATE_NAME`.
+
+## Learn more
+
+- [Zuplo Developer Portal docs](https://zuplo.com/docs/dev-portal/introduction)
+- [Zudoku GitHub repository](https://github.com/zuplo/zudoku)
