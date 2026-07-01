@@ -1,0 +1,1624 @@
+{
+    "schemes": [
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "MCP-ready news aggregation and semantic search over RSS-sourced articles.\nAgent workflow: (1) listCategories, listEntities, listRegions — discover exact filter values; (2) searchArticles — primary search tool; (3) getLatestArticles, getTrendingArticles, getTopHeadlines — time-ordered feeds; (4) getPublishers — resolve source IDs; (5) getArticlePropagation / postArticlePropagation — track story spread.\nConventions: Auth optional (API-key header when enabled). Pagination: limit default 16 max 128, offset default 0. Empty results return HTTP 204 (not an error). Filter tips: start with fuzzy tags param; use exact categories/regions/entities after calling /tags/* list tools; q+acc enables semantic vector search.",
+        "title": "Beans News API \u0026 MCP",
+        "contact": {
+            "name": "Project Cafecito",
+            "url": "http://cafecito.tech",
+            "email": "soumitsrah@cafecito.tech"
+        },
+        "license": {
+            "name": "MIT"
+        },
+        "version": "0.8"
+    },
+    "paths": {
+        "/articles/latest": {
+            "get": {
+                "description": "Returns recently published articles sorted by publish date (newest first).\n**Time window**: if `from` is omitted, defaults to the last 7 days.\n**Filters** (all optional): same semantics as searchArticles — `q` for semantic search, `tags` for fuzzy match, or exact `categories`/`regions`/`entities`/`sources`.\n**When to use**: monitoring recent news in a topic without full-corpus search cost. Lighter than searchArticles.\n**Related tools**: listCategories, listEntities, listRegions, searchArticles, getTrendingArticles.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Search or list newest articles (reverse chronological)",
+                "operationId": "getLatestArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Optional semantic search query (3–512 chars). Narrows results by embedding similarity.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.75,
+                        "description": "Match strictness when q is set. Default 0.75.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "news",
+                            "blog"
+                        ],
+                        "type": "string",
+                        "description": "Restrict to content kind: news or blog.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact topic filter (OR). Use listCategories for valid values.",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact region filter (OR). Use listRegions for valid values.",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact entity filter (OR). Use listEntities for valid values.",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Publisher source ID filter (OR).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Published on/after this date (YYYY-MM-DD). Defaults to 7 days ago when omitted.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include full article body. Default false.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Skip N results. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Latest articles sorted by published_at descending",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.Bean"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No articles in window (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/propagation": {
+            "get": {
+                "description": "For each seed article URL, returns cross-outlet republication (`coverage`) and social/forum mentions (`mentions`).\n**Input**: pass up to 128 article URLs as comma-separated query param `urls`.\n**When to use**: after searchArticles — measure whether a story was picked up elsewhere or discussed on social platforms.\n**Returns**: one PropagationResult per input URL (always HTTP 200; empty arrays when no propagation found).\n**Related tools**: searchArticles, getTrendingArticles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Track how articles spread (GET)",
+                "operationId": "getArticlePropagation",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Seed article URLs to analyze (CSV, 1–128 valid HTTP(S) URLs)",
+                        "name": "urls",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One result object per input URL with coverage and mentions arrays",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.PropagationResult"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing urls, too many urls (\u003e128), or invalid URL format",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Same as getArticlePropagation but accepts a JSON body — preferred when URLs contain characters awkward in query strings.\n**Input**: JSON body `{ \"urls\": [\"https://...\", ...] }` with 1–128 valid HTTP(S) URLs.\n**When to use**: batch propagation lookup from agent workflows that already hold URL lists in JSON.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Track how articles spread (POST)",
+                "operationId": "postArticlePropagation",
+                "parameters": [
+                    {
+                        "description": "JSON object with urls array (1–128 seed article URLs)",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/router.PropagationInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One result object per input URL with coverage and mentions arrays",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.PropagationResult"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing urls, too many urls (\u003e128), or invalid URL format",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/search": {
+            "get": {
+                "description": "**Primary MCP tool** — full-corpus search sorted by relevance.\n**Requires at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.\n**Search modes** (combinable with filters):\n- `q` + `acc`: semantic vector search over article embeddings (natural language, 3–512 chars).\n- `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).\n- `urls`: fetch specific articles by canonical URL (CSV).\n**Performance**: scans the full index; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Search all articles by topic, tags, or URL",
+                "operationId": "searchArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Semantic search query in natural language (3–512 chars). Ranks by embedding similarity.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.75,
+                        "description": "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.75.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "news",
+                            "blog"
+                        ],
+                        "type": "string",
+                        "description": "Restrict to content kind: news or blog.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Fetch articles by exact URL (CSV). Satisfies the required-search-param rule on its own.",
+                        "name": "urls",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Fuzzy filter across categories+regions+entities (AND between values). Good when exact tag spelling is unknown.",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact topic filter (OR). Case sensitive — use listCategories first.",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact region filter (OR). Case sensitive — use listRegions first.",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact entity filter (OR). Case sensitive — use listEntities first.",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Publisher source ID filter (OR). Resolve names via getPublishers.",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Only articles published or updated on/after this date (YYYY-MM-DD).",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include full article body. Default false (summary only).",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Skip N results for pagination. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Articles with publisher info, engagement metrics, and trend_score",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.BeanAggregate"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No matching articles (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Missing required search param or invalid input",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/top-headlines": {
+            "get": {
+                "description": "Returns the highest trend_score articles from the past 24 hours — a narrow window on getTrendingArticles.\n**When to use**: breaking news, daily briefings, or \"what is hot today\" without a custom date range.\n**Note**: `from` is not accepted; the 24h window is fixed server-side.\n**Filters** (all optional): same semantics as getTrendingArticles except no date override.\n**Related tools**: getTrendingArticles (7-day window), searchArticles.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Search or list top headlines from the last 24 hours",
+                "operationId": "getTopHeadlines",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Optional semantic search query (3–512 chars).",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.75,
+                        "description": "Match strictness when q is set. Default 0.75.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "news",
+                            "blog"
+                        ],
+                        "type": "string",
+                        "description": "Restrict to content kind: news or blog.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact topic filter (OR).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact region filter (OR).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact entity filter (OR).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Publisher source ID filter (OR).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include full article body. Default false.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Skip N results. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Top headlines from last 24h sorted by trend_score descending",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.BeanTrend"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No headlines in last 24h (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/trending": {
+            "get": {
+                "description": "Returns articles ranked by `trend_score` (highest first). Trend score blends social engagement (likes, comments, shares), cross-outlet coverage, and recency.\n**Time window**: if `from` is omitted, defaults to the last 7 days of trending activity.\n**Filters** (all optional): same semantics as searchArticles.\n**When to use**: surface what is gaining traction now — prefer over getLatestArticles when popularity matters more than recency alone.\n**Related tools**: getTopHeadlines (24h subset), searchArticles, getArticlePropagation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Search or list trending articles by engagement score",
+                "operationId": "getTrendingArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Optional semantic search query (3–512 chars).",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.75,
+                        "description": "Match strictness when q is set. Default 0.75.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "news",
+                            "blog"
+                        ],
+                        "type": "string",
+                        "description": "Restrict to content kind: news or blog.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact topic filter (OR).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact region filter (OR).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact entity filter (OR).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Publisher source ID filter (OR).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Trending activity since this date (YYYY-MM-DD). Defaults to 7 days ago when omitted.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include full article body. Default false.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Skip N results. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Articles with engagement metrics and trend_score, sorted descending",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.BeanTrend"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No trending articles in window (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Check API health",
+                "operationId": "healthCheck",
+                "responses": {
+                    "200": {
+                        "description": "status alive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sources": {
+            "get": {
+                "description": "Look up display metadata for one or more publisher source IDs found on article `source` fields.\nReturns site name, base URL, description, and favicon for each requested source ID.\n**When to use**: after searchArticles or feed endpoints to humanize source IDs in UI or agent responses.\n**Required**: at least one value in `sources` (comma-separated source IDs, e.g. techcrunch.com).\n**Related tools**: searchArticles, getLatestArticles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Publishers"
+                ],
+                "summary": "Resolve publisher source metadata",
+                "operationId": "getPublishers",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Publisher source IDs to resolve (CSV). Example: techcrunch.com,theverge.com",
+                        "name": "sources",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Number of items to skip. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Publisher metadata objects keyed by source ID",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/beansack.Publisher"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No matching publishers (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Missing sources or invalid pagination",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tags/categories": {
+            "get": {
+                "description": "Discover valid values for the `categories` filter on article endpoints.\nReturns a paginated array of unique topic labels extracted from indexed articles (e.g. \"Artificial Intelligence\", \"Cybersecurity\", \"Politics\").\n**When to use**: call before searchArticles or feed endpoints when you need exact, case-sensitive category strings.\n**Related tools**: listEntities, listRegions, searchArticles.\n**Pagination**: use `offset` to walk the full catalog when `limit` \u003c total count.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "List article category topics",
+                "operationId": "listCategories",
+                "parameters": [
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Number of items to skip. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JSON array of category label strings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No categories in index (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid limit or offset",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tags/entities": {
+            "get": {
+                "description": "Discover valid values for the `entities` filter on article endpoints.\nReturns a paginated array of unique named entities (people, organizations, products, places) extracted via NLP from article text.\n**When to use**: call before searchArticles when filtering by specific people, companies, or places with exact spelling.\n**Related tools**: listCategories, listRegions, searchArticles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "List named entities",
+                "operationId": "listEntities",
+                "parameters": [
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Number of items to skip. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JSON array of entity label strings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No entities in index (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid limit or offset",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tags/regions": {
+            "get": {
+                "description": "Discover valid values for the `regions` filter on article endpoints.\nReturns a paginated array of unique geographic region labels (e.g. \"North America\", \"Europe\", \"India\", \"Middle East\").\n**When to use**: call before searchArticles when filtering by geography with exact, case-sensitive region strings.\n**Related tools**: listCategories, listEntities, searchArticles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "List geographic regions",
+                "operationId": "listRegions",
+                "parameters": [
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "description": "Number of items to skip. Default 0.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JSON array of region label strings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No regions in index (empty result, not an error)"
+                    },
+                    "400": {
+                        "description": "Invalid limit or offset",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "beansack.Bean": {
+            "description": "Bean is the main content model returned by article endpoints. It contains",
+            "type": "object",
+            "properties": {
+                "author": {
+                    "description": "Author is the byline or attributed creator when available from the source.",
+                    "type": "string"
+                },
+                "categories": {
+                    "description": "Categories lists the inferred topics assigned to the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "content": {
+                    "description": "Content is the full body text when the source content is available.",
+                    "type": "string"
+                },
+                "content_type": {
+                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
+                    "type": "string"
+                },
+                "entities": {
+                    "description": "Entities lists named entities such as people, places, organizations, or products.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "image_url": {
+                    "description": "ImageUrl is the featured image or preview image associated with the content.",
+                    "type": "string"
+                },
+                "published_at": {
+                    "description": "Created is the original publish timestamp of the article or post.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "regions": {
+                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sentiments": {
+                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source": {
+                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
+                    "type": "string"
+                },
+                "summary": {
+                    "description": "Summary is a short abstract or teaser used in listings and previews.",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "Computed tags merged from categories/regions/entities for display",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "description": "Title is the human-readable headline or title of the content.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "URL is the canonical URL of the article or post.",
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.BeanAggregate": {
+            "description": "BeanAggregate composes a `BeanTrend` with the publisher's display fields",
+            "type": "object",
+            "properties": {
+                "author": {
+                    "description": "Author is the byline or attributed creator when available from the source.",
+                    "type": "string"
+                },
+                "categories": {
+                    "description": "Categories lists the inferred topics assigned to the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "comments": {
+                    "description": "Comments is the aggregate number of replies or comments associated with this Bean.",
+                    "type": "integer"
+                },
+                "content": {
+                    "description": "Content is the full body text when the source content is available.",
+                    "type": "string"
+                },
+                "content_type": {
+                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
+                    "type": "string"
+                },
+                "entities": {
+                    "description": "Entities lists named entities such as people, places, organizations, or products.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "image_url": {
+                    "description": "ImageUrl is the featured image or preview image associated with the content.",
+                    "type": "string"
+                },
+                "likes": {
+                    "description": "Likes is the aggregate number of likes or upvotes associated with this Bean.",
+                    "type": "integer"
+                },
+                "published_at": {
+                    "description": "Created is the original publish timestamp of the article or post.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "regions": {
+                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "related": {
+                    "description": "Related lists URLs of semantically or editorially related Beans.",
+                    "type": "integer"
+                },
+                "sentiments": {
+                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "shares": {
+                    "description": "Shares is the aggregate number of reposts or share-like actions associated with this Bean.",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
+                    "type": "string"
+                },
+                "source_base_url": {
+                    "description": "BaseURL is the publisher's primary site URL copied onto aggregate results for convenience.",
+                    "type": "string"
+                },
+                "source_description": {
+                    "description": "Description is the publisher description copied onto aggregate results.",
+                    "type": "string"
+                },
+                "source_favicon": {
+                    "description": "Favicon is the publisher favicon URL copied onto aggregate results.",
+                    "type": "string"
+                },
+                "source_site_name": {
+                    "description": "SiteName is the human-readable name of the publisher copied onto aggregate results.",
+                    "type": "string"
+                },
+                "subscribers": {
+                    "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
+                    "type": "integer"
+                },
+                "summary": {
+                    "description": "Summary is a short abstract or teaser used in listings and previews.",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "Computed tags merged from categories/regions/entities for display",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "description": "Title is the human-readable headline or title of the content.",
+                    "type": "string"
+                },
+                "trend_score": {
+                    "description": "TrendScore is the computed ranking score used to order trending results.",
+                    "type": "number"
+                },
+                "url": {
+                    "description": "URL is the canonical URL of the article or post.",
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.BeanTrend": {
+            "description": "BeanTrend composes a `Bean` with aggregated social metrics (Likes, Comments, Subscribers, Shares, Related, Updated timestamp, TrendScore).",
+            "type": "object",
+            "properties": {
+                "author": {
+                    "description": "Author is the byline or attributed creator when available from the source.",
+                    "type": "string"
+                },
+                "categories": {
+                    "description": "Categories lists the inferred topics assigned to the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "comments": {
+                    "description": "Comments is the aggregate number of replies or comments associated with this Bean.",
+                    "type": "integer"
+                },
+                "content": {
+                    "description": "Content is the full body text when the source content is available.",
+                    "type": "string"
+                },
+                "content_type": {
+                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
+                    "type": "string"
+                },
+                "entities": {
+                    "description": "Entities lists named entities such as people, places, organizations, or products.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "image_url": {
+                    "description": "ImageUrl is the featured image or preview image associated with the content.",
+                    "type": "string"
+                },
+                "likes": {
+                    "description": "Likes is the aggregate number of likes or upvotes associated with this Bean.",
+                    "type": "integer"
+                },
+                "published_at": {
+                    "description": "Created is the original publish timestamp of the article or post.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "regions": {
+                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "related": {
+                    "description": "Related lists URLs of semantically or editorially related Beans.",
+                    "type": "integer"
+                },
+                "sentiments": {
+                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "shares": {
+                    "description": "Shares is the aggregate number of reposts or share-like actions associated with this Bean.",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
+                    "type": "string"
+                },
+                "subscribers": {
+                    "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
+                    "type": "integer"
+                },
+                "summary": {
+                    "description": "Summary is a short abstract or teaser used in listings and previews.",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "Computed tags merged from categories/regions/entities for display",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "description": "Title is the human-readable headline or title of the content.",
+                    "type": "string"
+                },
+                "trend_score": {
+                    "description": "TrendScore is the computed ranking score used to order trending results.",
+                    "type": "number"
+                },
+                "url": {
+                    "description": "URL is the canonical URL of the article or post.",
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.PropagationCoverage": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "site_name": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.PropagationMention": {
+            "type": "object",
+            "properties": {
+                "comments": {
+                    "type": "integer"
+                },
+                "forum": {
+                    "type": "string"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "observed": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "share_url": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.PropagationResult": {
+            "type": "object",
+            "properties": {
+                "coverage": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/beansack.PropagationCoverage"
+                    }
+                },
+                "mentions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/beansack.PropagationMention"
+                    }
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "beansack.Publisher": {
+            "description": "Publisher contains identifying and descriptive information about a publisher",
+            "type": "object",
+            "properties": {
+                "source": {
+                    "description": "Source is the canonical publisher identifier and matches Bean.Source values.",
+                    "type": "string"
+                },
+                "source_base_url": {
+                    "description": "BaseURL is the publisher's primary site URL.",
+                    "type": "string"
+                },
+                "source_description": {
+                    "description": "Description is a short description of the publisher or content source.",
+                    "type": "string"
+                },
+                "source_favicon": {
+                    "description": "Favicon is the URL of the publisher favicon or brand icon.",
+                    "type": "string"
+                },
+                "source_site_name": {
+                    "description": "SiteName is the human-readable display name of the publisher.",
+                    "type": "string"
+                }
+            }
+        },
+        "router.PropagationInput": {
+            "type": "object",
+            "required": [
+                "urls"
+            ],
+            "properties": {
+                "urls": {
+                    "description": "URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1–128 items).",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

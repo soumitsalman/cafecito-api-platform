@@ -1,0 +1,98 @@
+// @title 			Beans News API & MCP
+// @version 		0.8
+// @description 	MCP-ready news aggregation and semantic search over RSS-sourced articles.
+// @description 	Agent workflow: (1) listCategories, listEntities, listRegions — discover exact filter values; (2) searchArticles — primary search tool; (3) getLatestArticles, getTrendingArticles, getTopHeadlines — time-ordered feeds; (4) getPublishers — resolve source IDs; (5) getArticlePropagation / postArticlePropagation — track story spread.
+// @description 	Conventions: Auth optional (API-key header when enabled). Pagination: limit default 16 max 128, offset default 0. Empty results return HTTP 204 (not an error). Filter tips: start with fuzzy tags param; use exact categories/regions/entities after calling /tags/* list tools; q+acc enables semantic vector search.
+// @schemes 		https
+// @license.name 	MIT
+// @contact.name 	Project Cafecito
+// @contact.url  	http://cafecito.tech
+// @contact.email 	soumitsrah@cafecito.tech
+package main
+
+import (
+	"context"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
+	bs "github.com/soumitsalman/beansapi/beansack"
+	_ "github.com/soumitsalman/beansapi/docs"
+	"github.com/soumitsalman/beansapi/nlp"
+	r "github.com/soumitsalman/beansapi/router"
+)
+
+const (
+	DEFAULT_PORT = "8080"
+)
+
+func main() {
+	_ = godotenv.Load()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	connStr := getEnv("PG_CONNECTION_STRING", "", true)
+	db := bs.NewPGSack(ctx, connStr)
+	defer db.Close()
+
+	// determine concurrency limit from environment
+	maxStr := getEnv("MAX_CONCURRENT_REQUESTS", "", false)
+	max_requests, err := strconv.Atoi(maxStr)
+	if err != nil && max_requests < 0 {
+		max_requests = 0
+	}
+
+	api := r.NewRouter(
+		db,
+		nlp.NewRemoteEmbedder(getEnv("EMBEDDER_BASE_URL", "", true), getEnv("EMBEDDER_API_KEY", "", false), getEnv("EMBEDDER_MODEL", "", false)),
+		parseAPIKeys(os.Getenv("API_KEYS")),
+		max_requests,
+	)
+
+	port := getEnv("PORT", DEFAULT_PORT, false)
+	addr := "0.0.0.0:" + port
+	log.Info().Str("module", "MAIN").Str("addr", addr).Msg("Routes Initialized. Server starting")
+
+	if err := api.Run(addr); err != nil {
+		log.Fatal().Str("module", "MAIN").Err(err).Msg("server error")
+	}
+}
+
+func getEnv(name, fallback string, must_exist bool) string {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		return v
+	}
+	if must_exist {
+		log.Fatal().Str("module", "MAIN").Msgf("%s is required", name)
+	}
+	return fallback
+}
+
+func parseAPIKeys(raw string) map[string]string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	result := map[string]string{}
+	for _, pair := range strings.Split(raw, ";") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		header := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if header != "" && value != "" {
+			result[header] = value
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}

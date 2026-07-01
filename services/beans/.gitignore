@@ -1,0 +1,11 @@
+*.env
+*.out
+*.log
+.logs
+.cache
+.db
+.ducklake
+.beansack
+.tools
+nlp/.proto
+beansapi

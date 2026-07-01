@@ -5,6 +5,21 @@ node_modules/
 .env
 .env.zuplo
 
+# Go services
+services/beans/.beansack
+services/beans/.tools
+services/espresso/.espresso
+services/espresso/.tools
+services/beans/.env
+services/espresso/.env
+*.out
+*.log
+.logs
+.db
+
+# Azure deploy render output
+.github/containerapp/*.rendered.yaml
+
 # OS Stuff
 
 .DS_Store

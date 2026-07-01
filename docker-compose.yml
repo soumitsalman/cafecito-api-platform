@@ -1,0 +1,50 @@
+services:
+  tei:
+    build:
+      context: ./services
+      dockerfile: TEI-Dockerfile
+    image: tei:local
+    ports:
+      - "10000:10000"
+    networks:
+      - cafecito-net
+
+  beansapi:
+    build:
+      context: ./services/beans
+      dockerfile: Dockerfile
+    image: beans-api:local
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./services/beans/.beansack:/app/data
+    environment:
+      PORT: "8080"
+      EMBEDDER_BASE_URL: tei:10000
+    env_file:
+      - ./services/beans/.env
+    depends_on:
+      - tei
+    networks:
+      - cafecito-net
+
+  espressoapi:
+    build:
+      context: ./services/espresso
+      dockerfile: Dockerfile
+    image: espresso-api:local
+    ports:
+      - "8081:8080"
+    environment:
+      PORT: "8080"
+      EMBEDDER_BASE_URL: tei:10000
+    env_file:
+      - ./services/espresso/.env
+    depends_on:
+      - tei
+    networks:
+      - cafecito-net
+
+networks:
+  cafecito-net:
+    driver: bridge
