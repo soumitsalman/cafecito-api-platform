@@ -4,7 +4,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Espresso is a curated business intelligence product suite. Espresso API \u0026 MCP provides access to the underlying data store.\nA **sip** is the basic unit of information: action (micro data such as market performance for a day), event (a self-contained set of micro actions and actions), and signal (larger derived intelligence from related events and actions).\nAll sip identifiers are UUIDs (RFC 4122), for example `339366bc-464d-582f-8132-6875ccc814d2`. Pass them as strings in query parameters and path segments.\nList endpoints accept an optional `response_type` query parameter: `json` (default) or `text`. Both return the same underlying data; `text` renders it as flat plain text without JSON syntax, which reduces token cost for MCPs and AI agents.",
+        "description": "MCP-ready business intelligence over curated \"sips\" for agents, dashboards, and automated research workflows.\nA **sip** is one unit of intelligence. `event` records describe observed business or market developments. `signal` records synthesize higher-level implications from related events and actions. `action` records are lower-level source facts used by the ingestion pipeline.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for time-ordered developments; (3) searchSignals for synthesized implications; (4) getRelatedSips to follow `same_as` duplicates or `derived_from` intelligence chains.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. All sip IDs are UUID strings such as `339366bc-464d-582f-8132-6875ccc814d2`.\nResponse formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same underlying records as compact field-per-line plain text with lower token overhead.",
         "title": "Espresso API \u0026 MCP",
         "contact": {
             "name": "Project Cafecito",
@@ -19,7 +19,7 @@
     "paths": {
         "/events": {
             "get": {
-                "description": "Returns event-kind sips sorted by `created` descending (newest first).\nWith `response_type=text`, each event is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+                "description": "Returns event-kind sips sorted by `created` descending, newest first.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -27,7 +27,7 @@
                 "tags": [
                     "Events"
                 ],
-                "summary": "Search events",
+                "summary": "Search event intelligence",
                 "operationId": "searchEvents",
                 "parameters": [
                     {
@@ -36,7 +36,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "fetch specific event sips by UUID (RFC 4122), e.g. 339366bc-464d-582f-8132-6875ccc814d2",
+                        "description": "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records.",
                         "name": "ids",
                         "in": "query"
                     },
@@ -46,14 +46,14 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "scalar tag filters (inclusive AND across supplied tags)",
+                        "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match.",
                         "name": "tags",
                         "in": "query"
                     },
                     {
                         "maxLength": 1024,
                         "type": "string",
-                        "description": "semantic search query (max 1024 characters; requires embedder)",
+                        "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder.",
                         "name": "q",
                         "in": "query"
                     },
@@ -62,14 +62,14 @@
                         "minimum": 0,
                         "type": "number",
                         "default": 0.75,
-                        "description": "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)",
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.",
                         "name": "acc",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "format": "date",
-                        "description": "include events created on or after this date (YYYY-MM-DD)",
+                        "description": "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted.",
                         "name": "from",
                         "in": "query"
                     },
@@ -80,7 +80,7 @@
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)",
+                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -89,48 +89,51 @@
                         "minimum": 1,
                         "type": "integer",
                         "default": 16,
-                        "description": "page size",
+                        "description": "Page size. Default 16, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "minimum": 0,
                         "type": "integer",
-                        "description": "pagination offset",
+                        "description": "Number of events to skip. Default 0.",
                         "name": "offset",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "plain-text event digests (one record per block) when response_type=text",
+                        "description": "Event digests when response_type=json; plain-text event blocks when response_type=text",
                         "schema": {
-                            "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/router.Event"
+                            }
                         }
                     },
                     "204": {
-                        "description": "no matching events"
+                        "description": "No matching events (empty result, not an error)"
                     },
                     "400": {
-                        "description": "invalid query parameters or malformed UUID in ids",
+                        "description": "Invalid query parameters or malformed UUID in ids",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "missing or invalid API key",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "rate limit exceeded",
+                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "database or embedder error",
+                        "description": "Database or embedder unavailable; retry",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -138,9 +141,33 @@
                 }
             }
         },
+        "/health": {
+            "get": {
+                "description": "Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable. This endpoint does not require query parameters and returns only service status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Check API health",
+                "operationId": "healthCheck",
+                "responses": {
+                    "200": {
+                        "description": "Service is alive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/related/{relationship}": {
             "get": {
-                "description": "Returns sips linked to the supplied UUIDs through the requested relationship.\nWith `response_type=text`, each related sip is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+                "description": "Returns sips linked to one or more source UUIDs through the requested relationship.\n**When to use**: after searchEvents or searchSignals, call this endpoint to expand context around a known sip, deduplicate equivalent records, or trace derived intelligence.\n**Relationships**: `same_as` returns equivalent or duplicate records. `derived_from` returns downstream records generated from, or based on, the supplied source sip IDs.\n**Input**: `ids` is required and must contain one or more RFC 4122 UUID strings. The `relationship` path value must be exactly `same_as` or `derived_from`.\n**Response shape**: each result is a flattened event or signal digest with `id` and `reported` added by the router. Additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line related records; use JSON when the caller needs structured parsing.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -148,7 +175,7 @@
                 "tags": [
                     "Related"
                 ],
-                "summary": "Get related sips by relationship",
+                "summary": "Follow related intelligence records",
                 "operationId": "getRelatedSips",
                 "parameters": [
                     {
@@ -157,7 +184,7 @@
                             "derived_from"
                         ],
                         "type": "string",
-                        "description": "relationship to traverse",
+                        "description": "Relationship to traverse. same_as finds equivalent records; derived_from follows generated intelligence.",
                         "name": "relationship",
                         "in": "path",
                         "required": true
@@ -168,7 +195,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "source sip UUIDs (RFC 4122), e.g. b07049b5-54c0-50b0-a620-d3aea3f8a173",
+                        "description": "Source sip UUIDs (CSV). Example: b07049b5-54c0-50b0-a620-d3aea3f8a173",
                         "name": "ids",
                         "in": "query",
                         "required": true
@@ -180,7 +207,7 @@
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)",
+                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -189,48 +216,51 @@
                         "minimum": 1,
                         "type": "integer",
                         "default": 16,
-                        "description": "page size",
+                        "description": "Page size. Default 16, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "minimum": 0,
                         "type": "integer",
-                        "description": "pagination offset",
+                        "description": "Number of related records to skip. Default 0.",
                         "name": "offset",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "plain-text related-sip digests (one record per block) when response_type=text",
+                        "description": "Related event/signal digests when response_type=json; plain-text related record blocks when response_type=text",
                         "schema": {
-                            "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/router.Event"
+                            }
                         }
                     },
                     "204": {
-                        "description": "no related sips found"
+                        "description": "No related sips found (empty result, not an error)"
                     },
                     "400": {
-                        "description": "missing ids, invalid relationship, or malformed UUID",
+                        "description": "Missing ids, invalid relationship, invalid response_type, or malformed UUID",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "missing or invalid API key",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "rate limit exceeded",
+                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "database error",
+                        "description": "Database unavailable; retry",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -240,7 +270,7 @@
         },
         "/signals": {
             "get": {
-                "description": "Returns signal-kind sips sorted by `created` descending (newest first).\nWith `response_type=text`, each signal is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.",
+                "description": "Returns signal-kind sips sorted by `created` descending, newest first.\n**When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -248,7 +278,7 @@
                 "tags": [
                     "Signals"
                 ],
-                "summary": "Search signals",
+                "summary": "Search synthesized signals",
                 "operationId": "searchSignals",
                 "parameters": [
                     {
@@ -257,7 +287,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "fetch specific signal sips by UUID (RFC 4122), e.g. e7d7571a-13f0-56f0-8563-50863b79c781",
+                        "description": "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records.",
                         "name": "ids",
                         "in": "query"
                     },
@@ -267,14 +297,14 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "scalar tag filters (inclusive AND across supplied tags)",
+                        "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match.",
                         "name": "tags",
                         "in": "query"
                     },
                     {
                         "maxLength": 1024,
                         "type": "string",
-                        "description": "semantic search query (max 1024 characters; requires embedder)",
+                        "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder.",
                         "name": "q",
                         "in": "query"
                     },
@@ -283,14 +313,14 @@
                         "minimum": 0,
                         "type": "number",
                         "default": 0.75,
-                        "description": "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)",
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.",
                         "name": "acc",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "format": "date",
-                        "description": "include signals created on or after this date (YYYY-MM-DD)",
+                        "description": "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted.",
                         "name": "from",
                         "in": "query"
                     },
@@ -301,7 +331,7 @@
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)",
+                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -310,48 +340,51 @@
                         "minimum": 1,
                         "type": "integer",
                         "default": 16,
-                        "description": "page size",
+                        "description": "Page size. Default 16, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "minimum": 0,
                         "type": "integer",
-                        "description": "pagination offset",
+                        "description": "Number of signals to skip. Default 0.",
                         "name": "offset",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "plain-text signal digests (one record per block) when response_type=text",
+                        "description": "Signal digests when response_type=json; plain-text signal blocks when response_type=text",
                         "schema": {
-                            "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/router.Signal"
+                            }
                         }
                     },
                     "204": {
-                        "description": "no matching signals"
+                        "description": "No matching signals (empty result, not an error)"
                     },
                     "400": {
-                        "description": "invalid query parameters or malformed UUID in ids",
+                        "description": "Invalid query parameters or malformed UUID in ids",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "missing or invalid API key",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "rate limit exceeded",
+                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "database or embedder error",
+                        "description": "Database or embedder unavailable; retry",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -361,7 +394,7 @@
         },
         "/tags": {
             "get": {
-                "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips. Tags can be passed to `/events` and `/signals` for scalar filtering.\nWith `response_type=text`, tags are returned as a single comma-separated plain-text string instead of a JSON array.",
+                "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; multiple tag values are treated as an inclusive AND by those search endpoints.\n**Response formats**: `response_type=json` returns a JSON string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: use `offset` to walk the full vocabulary when `limit` is smaller than the total number of tags.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -369,7 +402,7 @@
                 "tags": [
                     "Tags"
                 ],
-                "summary": "List tags for filtering events and signals",
+                "summary": "Discover tag filters for Espresso intelligence",
                 "operationId": "listTags",
                 "parameters": [
                     {
@@ -379,7 +412,7 @@
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "output format: json (default) returns a JSON string array; text returns the same tags as comma-separated plain text (lower token cost for MCPs and AI agents)",
+                        "description": "Output format. json returns a JSON string array; text returns the same tags as comma-separated plain text for lower token cost.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -388,48 +421,51 @@
                         "minimum": 1,
                         "type": "integer",
                         "default": 16,
-                        "description": "page limit (items per page)",
+                        "description": "Page size. Default 16, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "minimum": 0,
                         "type": "integer",
-                        "description": "pagination offset (number of items to skip)",
+                        "description": "Number of tags to skip. Default 0.",
                         "name": "offset",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "comma-separated tags when response_type=text",
+                        "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
                         "schema": {
-                            "type": "string"
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
                         }
                     },
                     "204": {
-                        "description": "no matching tags"
+                        "description": "No tags found (empty result, not an error)"
                     },
                     "400": {
-                        "description": "invalid pagination parameters",
+                        "description": "Invalid limit, offset, or response_type",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "missing or invalid API key",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "rate limit exceeded",
+                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "database error",
+                        "description": "Database unavailable; retry",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }

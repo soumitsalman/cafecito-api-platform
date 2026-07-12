@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "Beans News API & MCP",
-    "description": "Beans is a news and blog aggregation product suite. Beans News API & MCP provides read-only access to RSS-sourced articles with semantic search, enrichment, and propagation tracking. A **bean** is the basic unit of content: an article or post keyed by its canonical URL, with inferred categories, regions, entities, sentiments, and optional social trend metrics. List and search endpoints support pagination via `limit` (default 16, max 128) and `offset` (default 0). Empty result sets return HTTP 204, not an error envelope. Filter articles with fuzzy `tags`, or use exact `categories`, `regions`, and `entities` after listing allowed values from `/tags/*`. Combine natural-language `q` with `acc` for semantic vector search. Propagation endpoints track publisher coverage and social mentions for one or more article URLs.",
+    "description": "MCP-ready news and blog intelligence over RSS-sourced articles, semantic enrichment, and propagation tracking.\nA **bean** is one article or post keyed by canonical URL. Records include publisher metadata, summary/full text, publish timestamp, inferred categories, regions, entities, sentiments, and optional social trend metrics.\nAgent workflow: (1) listCategories, listEntities, listRegions to discover exact filter values; (2) searchArticles for full-corpus retrieval; (3) getLatestArticles, getTrendingArticles, or getTopHeadlines for feed-style monitoring; (4) getPublishers to resolve source IDs; (5) getArticlePropagation or postArticlePropagation to check story spread.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. Use fuzzy `tags` when spelling is uncertain, exact `categories`/`regions`/`entities` after discovery, and `q` + `acc` for semantic vector search.",
     "version": "0.8",
     "contact": {
       "name": "Project Cafecito",
@@ -40,7 +40,7 @@
       "Bean": {
         "type": "object",
         "title": "Bean",
-        "description": "Bean is the main content model returned by article endpoints.",
+        "description": "Primary article/post object returned by Beans article endpoints. Agents should treat `url` as the stable identifier, `source` as the publisher id, `summary` as the compact context field, and `content` as optional full text only present when requested. `categories`, `regions`, `entities`, `sentiments`, and `tags` are inferred enrichment fields for filtering and grounding responses. Internal embedding and gist fields are used for search but omitted from JSON.",
         "properties": {
           "url": {
             "type": "string",
@@ -118,7 +118,7 @@
       },
       "BeanTrend": {
         "type": "object",
-        "description": "BeanTrend composes a `Bean` with aggregated social metrics (Likes, Comments, Subscribers, Shares, Related, Updated timestamp, TrendScore).",
+        "description": "Article/post object plus trend analytics. Returned by trending and top-headline endpoints when an agent needs both article context and engagement ranking fields such as likes, comments, shares, related count, and trend_score.",
         "properties": {
           "url": {
             "description": "URL is the canonical URL of the article or post.",
@@ -198,7 +198,7 @@
             "type": "integer"
           },
           "subscribers": {
-            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter. Not populated on current list endpoints.",
+            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
             "type": "integer"
           },
           "related": {
@@ -206,7 +206,7 @@
             "type": "integer"
           },
           "trend_score": {
-            "description": "TrendScore is the computed ranking score used to order trending results. Returned by top-headlines and trending; not returned by search.",
+            "description": "TrendScore is the computed ranking score used to order trending results.",
             "type": "number"
           },
           "sentiments": {
@@ -220,7 +220,7 @@
       },
       "BeanAggregate": {
         "type": "object",
-        "description": "BeanAggregate composes a `BeanTrend` with the publisher's display fields",
+        "description": "Search result object that combines article content, social/trend metrics, and publisher display fields. Returned by searchArticles so agents can cite the article and identify the source without making a separate publisher lookup.",
         "properties": {
           "url": {
             "description": "URL is the canonical URL of the article or post.",
@@ -316,7 +316,7 @@
             "type": "integer"
           },
           "subscribers": {
-            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter. Not populated on current list endpoints.",
+            "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
             "type": "integer"
           },
           "related": {
@@ -324,7 +324,7 @@
             "type": "integer"
           },
           "trend_score": {
-            "description": "TrendScore is the computed ranking score used to order trending results. Returned by top-headlines and trending; not returned by search.",
+            "description": "TrendScore is the computed ranking score used to order trending results.",
             "type": "number"
           },
           "sentiments": {
@@ -352,7 +352,8 @@
           "site_name": {
             "type": "string"
           }
-        }
+        },
+        "description": "One cross-publisher coverage hit for a seed article URL. Use it to see whether a story was republished or covered by another source."
       },
       "PropagationMention": {
         "type": "object",
@@ -376,7 +377,8 @@
           "likes": {
             "type": "integer"
           }
-        }
+        },
+        "description": "One social or forum mention for a seed article URL, including where it appeared and any available engagement counts."
       },
       "PropagationResult": {
         "type": "object",
@@ -396,7 +398,8 @@
               "$ref": "#/components/schemas/PropagationMention"
             }
           }
-        }
+        },
+        "description": "Propagation result for one input article URL. `coverage` shows related publisher articles; `mentions` shows social/forum discussion. Empty arrays mean no propagation was found for that URL."
       },
       "PropagationInput": {
         "type": "object",
@@ -410,7 +413,7 @@
             "items": {
               "type": "string"
             },
-            "description": "URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1\u2013128 items).",
+            "description": "URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1–128 items).",
             "maxItems": 128
           }
         }
@@ -448,7 +451,7 @@
           "source"
         ],
         "title": "Publisher",
-        "description": "Publisher contains identifying and descriptive information about a publisher"
+        "description": "Publisher/source metadata used to turn article `source` ids into human-readable site details. Use getPublishers when an agent needs display names, base URLs, descriptions, or favicons for sources returned by article endpoints."
       },
       "ErrorResponse": {
         "type": "object",
@@ -840,7 +843,7 @@
     "/beans/articles/top-headlines": {
       "get": {
         "summary": "Search or list top headlines from the last 24 hours",
-        "description": "Returns the highest trend_score articles from the past 24 hours \u2014 a narrow window on getTrendingArticles.\n**When to use**: breaking news, daily briefings, or \"what is hot today\" without a custom date range.\n**Note**: `from` is not accepted; the 24h window is fixed server-side.\n**Filters** (all optional): same semantics as getTrendingArticles except no date override.\n**Related tools**: getTrendingArticles (7-day window), searchArticles.",
+        "description": "Returns the highest trend_score articles from the past 24 hours — a narrow window on getTrendingArticles.\n**When to use**: breaking news, daily briefings, or \"what is hot today\" without a custom date range.\n**Note**: `from` is not accepted; the 24h window is fixed server-side.\n**Filters** (all optional): same semantics as getTrendingArticles except no date override.\n**Related tools**: getTrendingArticles (7-day window), searchArticles.",
         "tags": [
           "Articles"
         ],
@@ -853,7 +856,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "Optional semantic search query (3\u2013512 chars)."
+            "description": "Optional semantic search query (3–512 chars)."
           },
           {
             "name": "acc",
@@ -1075,7 +1078,7 @@
     "/beans/articles/latest": {
       "get": {
         "summary": "Search or list newest articles (reverse chronological)",
-        "description": "Returns recently published articles sorted by publish date (newest first).\n**Time window**: if `from` is omitted, defaults to the last 7 days.\n**Filters** (all optional): same semantics as searchArticles \u2014 `q` for semantic search, `tags` for fuzzy match, or exact `categories`/`regions`/`entities`/`sources`.\n**When to use**: monitoring recent news in a topic without full-corpus search cost. Lighter than searchArticles.\n**Related tools**: listCategories, listEntities, listRegions, searchArticles, getTrendingArticles.",
+        "description": "Returns recently published articles sorted by publish date (newest first).\n**Time window**: if `from` is omitted, defaults to the last 7 days.\n**Filters** (all optional): same semantics as searchArticles — `q` for semantic search, `tags` for fuzzy match, or exact `categories`/`regions`/`entities`/`sources`.\n**When to use**: monitoring recent news in a topic without full-corpus search cost. Lighter than searchArticles.\n**Related tools**: listCategories, listEntities, listRegions, searchArticles, getTrendingArticles.",
         "tags": [
           "Articles"
         ],
@@ -1088,7 +1091,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "Optional semantic search query (3\u2013512 chars). Narrows results by embedding similarity."
+            "description": "Optional semantic search query (3–512 chars). Narrows results by embedding similarity."
           },
           {
             "name": "acc",
@@ -1321,7 +1324,7 @@
     "/beans/articles/trending": {
       "get": {
         "summary": "Search or list trending articles by engagement score",
-        "description": "Returns articles ranked by `trend_score` (highest first). Trend score blends social engagement (likes, comments, shares), cross-outlet coverage, and recency.\n**Time window**: if `from` is omitted, defaults to the last 7 days of trending activity.\n**Filters** (all optional): same semantics as searchArticles.\n**When to use**: surface what is gaining traction now \u2014 prefer over getLatestArticles when popularity matters more than recency alone.\n**Related tools**: getTopHeadlines (24h subset), searchArticles, getArticlePropagation.",
+        "description": "Returns articles ranked by `trend_score` (highest first). Trend score blends social engagement (likes, comments, shares), cross-outlet coverage, and recency.\n**Time window**: if `from` is omitted, defaults to the last 7 days of trending activity.\n**Filters** (all optional): same semantics as searchArticles.\n**When to use**: surface what is gaining traction now — prefer over getLatestArticles when popularity matters more than recency alone.\n**Related tools**: getTopHeadlines (24h subset), searchArticles, getArticlePropagation.",
         "tags": [
           "Articles"
         ],
@@ -1334,7 +1337,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "Optional semantic search query (3\u2013512 chars)."
+            "description": "Optional semantic search query (3–512 chars)."
           },
           {
             "name": "acc",
@@ -1567,7 +1570,7 @@
     "/beans/articles/search": {
       "get": {
         "summary": "Search all articles by topic, tags, or URL",
-        "description": "**Primary MCP tool** \u2014 full-corpus search sorted by relevance.\n**Requires at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.\n**Search modes** (combinable with filters):\n- `q` + `acc`: semantic vector search over article embeddings (natural language, 3\u2013512 chars).\n- `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive \u2014 discover values via listCategories, listEntities, listRegions).\n- `urls`: fetch specific articles by canonical URL (CSV).\n**Performance**: scans the full index; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
+        "description": "**Primary MCP tool** — full-corpus search sorted by relevance.\n**Requires at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.\n**Search modes** (combinable with filters):\n- `q` + `acc`: semantic vector search over article embeddings (natural language, 3–512 chars).\n- `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).\n- `urls`: fetch specific articles by canonical URL (CSV).\n**Performance**: scans the full index; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
         "tags": [
           "Articles"
         ],
@@ -1580,7 +1583,7 @@
               "type": "string",
               "title": "Q"
             },
-            "description": "Semantic search query in natural language (3\u2013512 chars). Ranks by embedding similarity."
+            "description": "Semantic search query in natural language (3–512 chars). Ranks by embedding similarity."
           },
           {
             "name": "acc",
@@ -1652,7 +1655,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Exact topic filter (OR). Case sensitive \u2014 use listCategories first."
+            "description": "Exact topic filter (OR). Case sensitive — use listCategories first."
           },
           {
             "name": "regions",
@@ -1667,7 +1670,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Exact region filter (OR). Case sensitive \u2014 use listRegions first."
+            "description": "Exact region filter (OR). Case sensitive — use listRegions first."
           },
           {
             "name": "entities",
@@ -1682,7 +1685,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Exact entity filter (OR). Case sensitive \u2014 use listEntities first."
+            "description": "Exact entity filter (OR). Case sensitive — use listEntities first."
           },
           {
             "name": "sources",
@@ -1748,7 +1751,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Articles with publisher info and engagement metrics (likes, comments, shares, related); does not include trend_score",
+            "description": "Articles with publisher info, engagement metrics, and trend_score",
             "content": {
               "application/json": {
                 "schema": {
@@ -1828,7 +1831,7 @@
     "/beans/articles/propagation": {
       "get": {
         "summary": "Track how articles spread (GET)",
-        "description": "For each seed article URL, returns cross-outlet republication (`coverage`) and social/forum mentions (`mentions`).\n**Input**: pass up to 128 article URLs as comma-separated query param `urls`.\n**When to use**: after searchArticles \u2014 measure whether a story was picked up elsewhere or discussed on social platforms.\n**Returns**: one PropagationResult per input URL (always HTTP 200; empty arrays when no propagation found).\n**Related tools**: searchArticles, getTrendingArticles.",
+        "description": "For each seed article URL, returns cross-outlet republication (`coverage`) and social/forum mentions (`mentions`).\n**Input**: pass up to 128 article URLs as comma-separated query param `urls`.\n**When to use**: after searchArticles — measure whether a story was picked up elsewhere or discussed on social platforms.\n**Returns**: one PropagationResult per input URL (always HTTP 200; empty arrays when no propagation found).\n**Related tools**: searchArticles, getTrendingArticles.",
         "tags": [
           "Articles"
         ],
@@ -1846,7 +1849,7 @@
             },
             "style": "form",
             "explode": false,
-            "description": "Seed article URLs to analyze (CSV, 1\u2013128 valid HTTP(S) URLs)"
+            "description": "Seed article URLs to analyze (CSV, 1–128 valid HTTP(S) URLs)"
           }
         ],
         "responses": {
@@ -1926,7 +1929,7 @@
       },
       "post": {
         "summary": "Track how articles spread (POST)",
-        "description": "Same as getArticlePropagation but accepts a JSON body \u2014 preferred when URLs contain characters awkward in query strings.\n**Input**: JSON body `{ \"urls\": [\"https://...\", ...] }` with 1\u2013128 valid HTTP(S) URLs.\n**When to use**: batch propagation lookup from agent workflows that already hold URL lists in JSON.",
+        "description": "Same as getArticlePropagation but accepts a JSON body — preferred when URLs contain characters awkward in query strings.\n**Input**: JSON body `{ \"urls\": [\"https://...\", ...] }` with 1–128 valid HTTP(S) URLs.\n**When to use**: batch propagation lookup from agent workflows that already hold URL lists in JSON.",
         "tags": [
           "Articles"
         ],
@@ -2181,16 +2184,46 @@
               "name": "cafecito-beans-mcp",
               "version": "0.8",
               "operations": [
-                { "file": "./config/beans.oas.json", "id": "listCategories" },
-                { "file": "./config/beans.oas.json", "id": "listEntities" },
-                { "file": "./config/beans.oas.json", "id": "listRegions" },
-                { "file": "./config/beans.oas.json", "id": "getTopHeadlines" },
-                { "file": "./config/beans.oas.json", "id": "getLatestArticles" },
-                { "file": "./config/beans.oas.json", "id": "getTrendingArticles" },
-                { "file": "./config/beans.oas.json", "id": "searchArticles" },
-                { "file": "./config/beans.oas.json", "id": "getPublishers" },
-                { "file": "./config/beans.oas.json", "id": "getArticlePropagation" },
-                { "file": "./config/beans.oas.json", "id": "postArticlePropagation" }
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "listCategories"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "listEntities"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "listRegions"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getTopHeadlines"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getLatestArticles"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getTrendingArticles"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "searchArticles"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getPublishers"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getArticlePropagation"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "postArticlePropagation"
+                }
               ]
             }
           },

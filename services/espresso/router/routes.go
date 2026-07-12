@@ -1,9 +1,10 @@
 // @title 			Espresso API & MCP
 // @version 		0.1
-// @description 	Espresso is a curated business intelligence product suite. Espresso API & MCP provides access to the underlying data store.
-// @description 	A **sip** is the basic unit of information: action (micro data such as market performance for a day), event (a self-contained set of micro actions and actions), and signal (larger derived intelligence from related events and actions).
-// @description 	All sip identifiers are UUIDs (RFC 4122), for example `339366bc-464d-582f-8132-6875ccc814d2`. Pass them as strings in query parameters and path segments.
-// @description 	List endpoints accept an optional `response_type` query parameter: `json` (default) or `text`. Both return the same underlying data; `text` renders it as flat plain text without JSON syntax, which reduces token cost for MCPs and AI agents.
+// @description 	MCP-ready business intelligence over curated "sips" for agents, dashboards, and automated research workflows.
+// @description 	A **sip** is one unit of intelligence. `event` records describe observed business or market developments. `signal` records synthesize higher-level implications from related events and actions. `action` records are lower-level source facts used by the ingestion pipeline.
+// @description 	Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for time-ordered developments; (3) searchSignals for synthesized implications; (4) getRelatedSips to follow `same_as` duplicates or `derived_from` intelligence chains.
+// @description 	Conventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. All sip IDs are UUID strings such as `339366bc-464d-582f-8132-6875ccc814d2`.
+// @description 	Response formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same underlying records as compact field-per-line plain text with lower token overhead.
 // @schemes 		https
 // @license.name 	MIT
 // @contact.name 	Project Cafecito
@@ -86,28 +87,37 @@ type Configuration struct {
 	cache    *otter.Cache[string, []float32]
 }
 
-// health
+// health godoc
+// @Summary Check API health
+// @Description Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable. This endpoint does not require query parameters and returns only service status.
+// @Tags Health
+// @Produce json
+// @Success 200 {object} map[string]string "Service is alive"
+// @ID healthCheck
+// @Router /health [get]
 func (r *Configuration) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "alive"})
 }
 
 // getTags godoc
-// @Summary List tags for filtering events and signals
-// @Description Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips. Tags can be passed to `/events` and `/signals` for scalar filtering.
-// @Description With `response_type=text`, tags are returned as a single comma-separated plain-text string instead of a JSON array.
+// @Summary Discover tag filters for Espresso intelligence
+// @Description Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips.
+// @Description **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
+// @Description **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; multiple tag values are treated as an inclusive AND by those search endpoints.
+// @Description **Response formats**: `response_type=json` returns a JSON string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.
+// @Description **Pagination**: use `offset` to walk the full vocabulary when `limit` is smaller than the total number of tags.
 // @Tags Tags
 // @Produce json
 // @Produce plain
-// @Param response_type query string false "output format: json (default) returns a JSON string array; text returns the same tags as comma-separated plain text (lower token cost for MCPs and AI agents)" Enums(json, text) default(json)
-// @Param limit query int false "page limit (items per page)" default(16) minimum(1) maximum(128)
-// @Param offset query int false "pagination offset (number of items to skip)" minimum(0)
-// @Success 200 {array} string "JSON string array when response_type=json (default)"
-// @Success 200 {string} string "comma-separated tags when response_type=text"
-// @Success 204 "no matching tags"
-// @Failure 400 {object} ErrorResponse "invalid pagination parameters"
-// @Failure 401 {object} ErrorResponse "missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "rate limit exceeded"
-// @Failure 500 {object} ErrorResponse "database error"
+// @Param response_type query string false "Output format. json returns a JSON string array; text returns the same tags as comma-separated plain text for lower token cost." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param offset query int false "Number of tags to skip. Default 0." minimum(0)
+// @Success 200 {array} string "Tag strings when response_type=json; comma-separated tags when response_type=text"
+// @Success 204 "No tags found (empty result, not an error)"
+// @Failure 400 {object} ErrorResponse "Invalid limit, offset, or response_type"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listTags
 // @Router /tags [get]
 func (r *Configuration) getTags(c *gin.Context) {
@@ -167,31 +177,30 @@ func (config *Configuration) extractSipsParams(c *gin.Context) (*cupboard.Condit
 }
 
 // getEvents godoc
-// @Summary Search events
-// @Description Returns event-kind sips sorted by `created` descending (newest first).
-// Each item is a flattened digest: the router merges `id` (UUID) and `created` into the digest before responding.
-// Documented fields include `briefing`, `event_type`, `key_events`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`.
-// Individual events may also carry additional pipeline-specific keys not listed in the schema.
-// Filter by exact sip UUIDs (`ids`), tag intersection (`tags`), or semantic search (`q` + `acc`). When `from` is omitted, results are limited to roughly the last 7 days.
-// @Description With `response_type=text`, each event is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.
+// @Summary Search event intelligence
+// @Description Returns event-kind sips sorted by `created` descending, newest first.
+// @Description **When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.
+// @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
+// @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
+// @Description **Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.
+// @Description **Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.
 // @Tags Events
 // @Produce json
 // @Produce plain
-// @Param ids query []string false "fetch specific event sips by UUID (RFC 4122), e.g. 339366bc-464d-582f-8132-6875ccc814d2" collectionFormat(csv)
-// @Param tags query []string false "scalar tag filters (inclusive AND across supplied tags)" collectionFormat(csv)
-// @Param q query string false "semantic search query (max 1024 characters; requires embedder)" maxlength(1024)
-// @Param acc query number false "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)" default(0.75) minimum(0) maximum(1)
-// @Param from query string false "include events created on or after this date (YYYY-MM-DD)" format(date)
-// @Param response_type query string false "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)" Enums(json, text) default(json)
-// @Param limit query int false "page size" default(16) minimum(1) maximum(128)
-// @Param offset query int false "pagination offset" minimum(0)
-// @Success 200 {array} Event "JSON array of flattened event digests when response_type=json (default)"
-// @Success 200 {string} string "plain-text event digests (one record per block) when response_type=text"
-// @Success 204 "no matching events"
-// @Failure 400 {object} ErrorResponse "invalid query parameters or malformed UUID in ids"
-// @Failure 401 {object} ErrorResponse "missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "rate limit exceeded"
-// @Failure 500 {object} ErrorResponse "database or embedder error"
+// @Param ids query []string false "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
+// @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
+// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param from query string false "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
+// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param offset query int false "Number of events to skip. Default 0." minimum(0)
+// @Success 200 {array} Event "Event digests when response_type=json; plain-text event blocks when response_type=text"
+// @Success 204 "No matching events (empty result, not an error)"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters or malformed UUID in ids"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID searchEvents
 // @Router /events [get]
 func (r *Configuration) getEvents(c *gin.Context) {
@@ -205,32 +214,30 @@ func (r *Configuration) getEvents(c *gin.Context) {
 }
 
 // getSignals godoc
-// @Summary Search signals
-// @Description Returns signal-kind sips sorted by `created` descending (newest first).
-// Signals are derived intelligence synthesized from related events and actions.
-// Each item is a flattened digest: the router merges `id` (UUID) and `created` into the digest before responding.
-// Documented fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`.
-// Individual signals may also carry additional pipeline-specific keys not listed in the schema.
-// Filter by exact sip UUIDs (`ids`), tag intersection (`tags`), or semantic search (`q` + `acc`). When `from` is omitted, results are limited to roughly the last 7 days.
-// @Description With `response_type=text`, each signal is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.
+// @Summary Search synthesized signals
+// @Description Returns signal-kind sips sorted by `created` descending, newest first.
+// @Description **When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.
+// @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
+// @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
+// @Description **Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.
+// @Description **Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.
 // @Tags Signals
 // @Produce json
 // @Produce plain
-// @Param ids query []string false "fetch specific signal sips by UUID (RFC 4122), e.g. e7d7571a-13f0-56f0-8563-50863b79c781" collectionFormat(csv)
-// @Param tags query []string false "scalar tag filters (inclusive AND across supplied tags)" collectionFormat(csv)
-// @Param q query string false "semantic search query (max 1024 characters; requires embedder)" maxlength(1024)
-// @Param acc query number false "minimum embedding similarity for `q` (0.0-1.0, higher = stricter)" default(0.75) minimum(0) maximum(1)
-// @Param from query string false "include signals created on or after this date (YYYY-MM-DD)" format(date)
-// @Param response_type query string false "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)" Enums(json, text) default(json)
-// @Param limit query int false "page size" default(16) minimum(1) maximum(128)
-// @Param offset query int false "pagination offset" minimum(0)
-// @Success 200 {array} Signal "JSON array of flattened signal digests when response_type=json (default)"
-// @Success 200 {string} string "plain-text signal digests (one record per block) when response_type=text"
-// @Success 204 "no matching signals"
-// @Failure 400 {object} ErrorResponse "invalid query parameters or malformed UUID in ids"
-// @Failure 401 {object} ErrorResponse "missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "rate limit exceeded"
-// @Failure 500 {object} ErrorResponse "database or embedder error"
+// @Param ids query []string false "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
+// @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
+// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param from query string false "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
+// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param offset query int false "Number of signals to skip. Default 0." minimum(0)
+// @Success 200 {array} Signal "Signal digests when response_type=json; plain-text signal blocks when response_type=text"
+// @Success 204 "No matching signals (empty result, not an error)"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters or malformed UUID in ids"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID searchSignals
 // @Router /signals [get]
 func (r *Configuration) getSignals(c *gin.Context) {
@@ -244,27 +251,27 @@ func (r *Configuration) getSignals(c *gin.Context) {
 }
 
 // getRelated godoc
-// @Summary Get related sips by relationship
-// @Description Returns sips linked to the supplied UUIDs through the requested relationship.
-// `same_as` finds equivalent or duplicate records; `derived_from` finds downstream records generated from the source sip.
-// Each result is a flattened digest with `id` (UUID) and `created` merged in.
-// Remaining fields follow the Event or Signal response shape depending on the related record's kind; additional digest keys may be present.
-// @Description With `response_type=text`, each related sip is rendered as a flat plain-text digest (field-per-line) instead of a JSON object — same data, fewer tokens for MCPs and AI agents.
+// @Summary Follow related intelligence records
+// @Description Returns sips linked to one or more source UUIDs through the requested relationship.
+// @Description **When to use**: after searchEvents or searchSignals, call this endpoint to expand context around a known sip, deduplicate equivalent records, or trace derived intelligence.
+// @Description **Relationships**: `same_as` returns equivalent or duplicate records. `derived_from` returns downstream records generated from, or based on, the supplied source sip IDs.
+// @Description **Input**: `ids` is required and must contain one or more RFC 4122 UUID strings. The `relationship` path value must be exactly `same_as` or `derived_from`.
+// @Description **Response shape**: each result is a flattened event or signal digest with `id` and `reported` added by the router. Additional pipeline-specific keys may appear.
+// @Description **Agent format**: use `response_type=text` for compact field-per-line related records; use JSON when the caller needs structured parsing.
 // @Tags Related
 // @Produce json
 // @Produce plain
-// @Param relationship path string true "relationship to traverse" Enums(same_as, derived_from)
-// @Param ids query []string true "source sip UUIDs (RFC 4122), e.g. b07049b5-54c0-50b0-a620-d3aea3f8a173" collectionFormat(csv)
-// @Param response_type query string false "output format: json (default) returns a JSON array of flattened digests; text returns the same data as flat plain text without JSON syntax (lower token cost for MCPs and AI agents)" Enums(json, text) default(json)
-// @Param limit query int false "page size" default(16) minimum(1) maximum(128)
-// @Param offset query int false "pagination offset" minimum(0)
-// @Success 200 {array} Event "JSON array of flattened related-sip digests when response_type=json (default)"
-// @Success 200 {string} string "plain-text related-sip digests (one record per block) when response_type=text"
-// @Success 204 "no related sips found"
-// @Failure 400 {object} ErrorResponse "missing ids, invalid relationship, or malformed UUID"
-// @Failure 401 {object} ErrorResponse "missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "rate limit exceeded"
-// @Failure 500 {object} ErrorResponse "database error"
+// @Param relationship path string true "Relationship to traverse. same_as finds equivalent records; derived_from follows generated intelligence." Enums(same_as, derived_from)
+// @Param ids query []string true "Source sip UUIDs (CSV). Example: b07049b5-54c0-50b0-a620-d3aea3f8a173" collectionFormat(csv)
+// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param offset query int false "Number of related records to skip. Default 0." minimum(0)
+// @Success 200 {array} Event "Related event/signal digests when response_type=json; plain-text related record blocks when response_type=text"
+// @Success 204 "No related sips found (empty result, not an error)"
+// @Failure 400 {object} ErrorResponse "Missing ids, invalid relationship, invalid response_type, or malformed UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID getRelatedSips
 // @Router /related/{relationship} [get]
 func (r *Configuration) getRelated(c *gin.Context) {

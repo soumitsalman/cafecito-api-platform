@@ -1224,7 +1224,7 @@ const docTemplate = `{
     },
     "definitions": {
         "beansack.Bean": {
-            "description": "Bean is the main content model returned by article endpoints. It contains",
+            "description": "Primary article/post object returned by Beans article endpoints. Agents should treat ` + "`" + `url` + "`" + ` as the stable identifier, ` + "`" + `source` + "`" + ` as the publisher id, ` + "`" + `summary` + "`" + ` as the compact context field, and ` + "`" + `content` + "`" + ` as optional full text only present when requested. ` + "`" + `categories` + "`" + `, ` + "`" + `regions` + "`" + `, ` + "`" + `entities` + "`" + `, ` + "`" + `sentiments` + "`" + `, and ` + "`" + `tags` + "`" + ` are inferred enrichment fields for filtering and grounding responses. Internal embedding and gist fields are used for search but omitted from JSON.",
             "type": "object",
             "properties": {
                 "author": {
@@ -1302,7 +1302,7 @@ const docTemplate = `{
             }
         },
         "beansack.BeanAggregate": {
-            "description": "BeanAggregate composes a ` + "`" + `BeanTrend` + "`" + ` with the publisher's display fields",
+            "description": "Search result object that combines article content, social/trend metrics, and publisher display fields. Returned by searchArticles so agents can cite the article and identify the source without making a separate publisher lookup.",
             "type": "object",
             "properties": {
                 "author": {
@@ -1356,7 +1356,7 @@ const docTemplate = `{
                     }
                 },
                 "related": {
-                    "description": "Related lists URLs of semantically or editorially related Beans.",
+                    "description": "Related is the count of semantically or editorially related Beans.",
                     "type": "integer"
                 },
                 "sentiments": {
@@ -1420,7 +1420,7 @@ const docTemplate = `{
             }
         },
         "beansack.BeanTrend": {
-            "description": "BeanTrend composes a ` + "`" + `Bean` + "`" + ` with aggregated social metrics (Likes, Comments, Subscribers, Shares, Related, Updated timestamp, TrendScore).",
+            "description": "Article/post object plus trend analytics. Returned by trending and top-headline endpoints when an agent needs both article context and engagement ranking fields such as likes, comments, shares, related count, and trend_score.",
             "type": "object",
             "properties": {
                 "author": {
@@ -1474,7 +1474,7 @@ const docTemplate = `{
                     }
                 },
                 "related": {
-                    "description": "Related lists URLs of semantically or editorially related Beans.",
+                    "description": "Related is the count of semantically or editorially related Beans.",
                     "type": "integer"
                 },
                 "sentiments": {
@@ -1522,6 +1522,7 @@ const docTemplate = `{
             }
         },
         "beansack.PropagationCoverage": {
+            "description": "One cross-publisher coverage hit for a seed article URL. Use it to see whether a story was republished or covered by another source.",
             "type": "object",
             "properties": {
                 "created": {
@@ -1540,6 +1541,7 @@ const docTemplate = `{
             }
         },
         "beansack.PropagationMention": {
+            "description": "One social or forum mention for a seed article URL, including where it appeared and any available engagement counts.",
             "type": "object",
             "properties": {
                 "comments": {
@@ -1564,6 +1566,7 @@ const docTemplate = `{
             }
         },
         "beansack.PropagationResult": {
+            "description": "Propagation result for one input article URL. ` + "`" + `coverage` + "`" + ` shows related publisher articles; ` + "`" + `mentions` + "`" + ` shows social/forum discussion. Empty arrays mean no propagation was found for that URL.",
             "type": "object",
             "properties": {
                 "coverage": {
@@ -1584,7 +1587,7 @@ const docTemplate = `{
             }
         },
         "beansack.Publisher": {
-            "description": "Publisher contains identifying and descriptive information about a publisher",
+            "description": "Publisher/source metadata used to turn article ` + "`" + `source` + "`" + ` ids into human-readable site details. Use getPublishers when an agent needs display names, base URLs, descriptions, or favicons for sources returned by article endpoints.",
             "type": "object",
             "properties": {
                 "source": {
@@ -1635,7 +1638,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Beans News API & MCP",
-	Description:      "MCP-ready news aggregation and semantic search over RSS-sourced articles.\nAgent workflow: (1) listCategories, listEntities, listRegions — discover exact filter values; (2) searchArticles — primary search tool; (3) getLatestArticles, getTrendingArticles, getTopHeadlines — time-ordered feeds; (4) getPublishers — resolve source IDs; (5) getArticlePropagation / postArticlePropagation — track story spread.\nConventions: Auth optional (API-key header when enabled). Pagination: limit default 16 max 128, offset default 0. Empty results return HTTP 204 (not an error). Filter tips: start with fuzzy tags param; use exact categories/regions/entities after calling /tags/* list tools; q+acc enables semantic vector search.",
+	Description:      "MCP-ready news and blog intelligence over RSS-sourced articles, semantic enrichment, and propagation tracking.\nA **bean** is one article or post keyed by canonical URL. Records include publisher metadata, summary/full text, publish timestamp, inferred categories, regions, entities, sentiments, and optional social trend metrics.\nAgent workflow: (1) listCategories, listEntities, listRegions to discover exact filter values; (2) searchArticles for full-corpus retrieval; (3) getLatestArticles, getTrendingArticles, or getTopHeadlines for feed-style monitoring; (4) getPublishers to resolve source IDs; (5) getArticlePropagation or postArticlePropagation to check story spread.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. Use fuzzy `tags` when spelling is uncertain, exact `categories`/`regions`/`entities` after discovery, and `q` + `acc` for semantic vector search.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

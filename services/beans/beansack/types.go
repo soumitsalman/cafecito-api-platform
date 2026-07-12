@@ -39,15 +39,7 @@ const (
 )
 
 // Bean represents a single article or post indexed by Beansack.
-// @Description Bean is the main content model returned by article endpoints. It contains
-// identifying metadata (URL, Source), human-friendly fields (Title, Summary, Author),
-// optional full `Content`, publishing timestamp (`Created`), and derived LLM fields
-// used for search and classification: `Embedding` (vector), `Gist`, `Categories`,
-// `Sentiments`, `Regions`, and `Entities`.
-//
-// Notes:
-// - `Embedding` is a numeric vector used for semantic search and is omitted from JSON responses.
-// - `Created` is encoded as a date-time string by the Swagger generator.
+// @Description Primary article/post object returned by Beans article endpoints. Agents should treat `url` as the stable identifier, `source` as the publisher id, `summary` as the compact context field, and `content` as optional full text only present when requested. `categories`, `regions`, `entities`, `sentiments`, and `tags` are inferred enrichment fields for filtering and grounding responses. Internal embedding and gist fields are used for search but omitted from JSON.
 type Bean struct {
 	// URL is the canonical URL of the article or post.
 	URL string `db:"url" json:"url,omitempty"`
@@ -84,11 +76,7 @@ type Bean struct {
 }
 
 // Chatter represents short-form discussion metadata associated with a Bean.
-// @Description Chatter models a single social/forum mention of a Bean's URL and includes
-// the mention URL (`ChatterURL`), the referenced `URL` (Bean URL), the `Source`/platform,
-// optional `Forum`/group, collection timestamp (`Collected`), and engagement metrics
-// (`Likes`, `Comments`, `Subscribers`). Engagement counts represent cumulative lower-bound
-// totals observed at collection time.
+// @Description Single social or forum mention of a bean URL. Propagation responses use chatter-derived fields to show where an article was discussed and the lower-bound engagement observed at collection time.
 type Chatter struct {
 	// ChatterURL is the URL of the social post, comment, or discussion item that mentions the Bean URL.
 	ChatterURL string `db:"chatter_url" bson:"chatter_url" json:"chatter_url"`
@@ -109,10 +97,7 @@ type Chatter struct {
 }
 
 // Publisher holds metadata about a content source (publisher).
-// @Description Publisher contains identifying and descriptive information about a publisher
-// or content source. It exposes the canonical `Source` id, `BaseURL`, optional `SiteName`,
-// a human-friendly `Description`, and `Favicon`. `RSSFeed` and `Collected` are stored but
-// not returned in JSON responses by default.
+// @Description Publisher/source metadata used to turn article `source` ids into human-readable site details. Use getPublishers when an agent needs display names, base URLs, descriptions, or favicons for sources returned by article endpoints.
 type Publisher struct {
 	// Source is the canonical publisher identifier and matches Bean.Source values.
 	Source string `db:"source" json:"source,omitempty"`
@@ -131,10 +116,7 @@ type Publisher struct {
 }
 
 // ChatterAggregate represents aggregated social engagement metrics for a Bean URL.
-// @Description ChatterAggregate provides a summary of social traction for a Bean: the
-// Bean `URL`, last `Collected` timestamp, and aggregate metrics `Likes`, `Comments`,
-// `Subscribers`, and `Shares`. These fields are used to compute trend scores and
-// to surface engagement in list APIs.
+// @Description Aggregated social traction for one bean URL. These metrics help rank trending/top-headline results and expose engagement context such as likes, comments, audience size, and shares.
 type ChatterAggregate struct {
 	// URL is the Bean URL for which aggregate chatter metrics were computed.
 	URL string `db:"url" json:"url,omitempty"`
@@ -151,10 +133,7 @@ type ChatterAggregate struct {
 }
 
 // BeanTrend contains a `Bean` plus trend analytics.
-// @Description BeanTrend composes a `Bean` with aggregated social metrics (Likes, Comments, Subscribers, Shares, Related, Updated timestamp, TrendScore).
-//
-// Notes:
-// - `MergedTags` is a computed field (db:"-") that consolidates tag-like fields for UI display.
+// @Description Article/post object plus trend analytics. Returned by trending and top-headline endpoints when an agent needs both article context and engagement ranking fields such as likes, comments, shares, related count, and trend_score.
 type BeanTrend struct {
 	// Bean embeds the primary content record returned by article endpoints.
 	Bean
@@ -167,7 +146,7 @@ type BeanTrend struct {
 	Subscribers int64 `db:"subscribers" json:"subscribers,omitempty"`
 	// Shares is the aggregate number of reposts or share-like actions associated with this Bean.
 	Shares int64 `db:"shares" json:"shares,omitempty"`
-	// Related lists URLs of semantically or editorially related Beans.
+	// Related is the count of semantically or editorially related Beans.
 	Related int64 `db:"related" json:"related,omitempty"`
 	// Updated is when aggregate analytics were last refreshed and is omitted from JSON responses.
 	Updated time.Time `db:"updated" json:"-" swaggertype:"string" format:"date-time"`
@@ -176,11 +155,7 @@ type BeanTrend struct {
 }
 
 // BeanAggregate contains a `BeanTrend` plus publisher metadata.
-// @Description BeanAggregate composes a `BeanTrend` with the publisher's display fields
-// (BaseURL, SiteName, Description, Favicon).
-//
-// Notes:
-// - Publisher `Source` remains on the embedded `Bean` and is the canonical source id.
+// @Description Search result object that combines article content, social/trend metrics, and publisher display fields. Returned by searchArticles so agents can cite the article and identify the source without making a separate publisher lookup.
 type BeanAggregate struct {
 	// Bean embeds the primary content record returned by article endpoints.
 	BeanTrend
@@ -196,6 +171,7 @@ type BeanAggregate struct {
 }
 
 // PropagationCoverage is the same story published by another outlet.
+// @Description One cross-publisher coverage hit for a seed article URL. Use it to see whether a story was republished or covered by another source.
 type PropagationCoverage struct {
 	URL      string    `json:"url"`
 	Created  time.Time `json:"created" swaggertype:"string" format:"date-time"`
@@ -204,6 +180,7 @@ type PropagationCoverage struct {
 }
 
 // PropagationMention is a social/forum mention of an article from chatters.
+// @Description One social or forum mention for a seed article URL, including where it appeared and any available engagement counts.
 type PropagationMention struct {
 	ShareURL string    `json:"share_url"`
 	Source   string    `json:"source"`
@@ -214,6 +191,7 @@ type PropagationMention struct {
 }
 
 // PropagationResult groups publisher coverage and social mentions for one seed URL.
+// @Description Propagation result for one input article URL. `coverage` shows related publisher articles; `mentions` shows social/forum discussion. Empty arrays mean no propagation was found for that URL.
 type PropagationResult struct {
 	URL      string                `json:"url"`
 	Coverage []PropagationCoverage `json:"coverage"`
