@@ -9,3 +9,4 @@
 .tools
 nlp/.proto
 beansapi
+.models/
