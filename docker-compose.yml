@@ -1,7 +1,7 @@
 services:
   tei:
     build:
-      context: ./services
+      context: ./apis
       dockerfile: TEI-Dockerfile
     image: tei:local
     ports:
@@ -11,18 +11,18 @@ services:
 
   beansapi:
     build:
-      context: ./services/beans
-      dockerfile: Dockerfile
+      context: ./apis
+      dockerfile: beans/Dockerfile
     image: beans-api:local
     ports:
       - "8080:8080"
     volumes:
-      - ./services/beans/.beansack:/app/data
+      - ./apis/beans/.beansack:/app/data
     environment:
       PORT: "8080"
       EMBEDDER_BASE_URL: tei:10000
     env_file:
-      - ./services/beans/.env
+      - ./apis/beans/.env
     depends_on:
       - tei
     networks:
@@ -30,8 +30,8 @@ services:
 
   espressoapi:
     build:
-      context: ./services/espresso
-      dockerfile: Dockerfile
+      context: ./apis
+      dockerfile: espresso/Dockerfile
     image: espresso-api:local
     ports:
       - "8081:8080"
@@ -39,7 +39,7 @@ services:
       PORT: "8080"
       EMBEDDER_BASE_URL: tei:10000
     env_file:
-      - ./services/espresso/.env
+      - ./apis/espresso/.env
     depends_on:
       - tei
     networks:

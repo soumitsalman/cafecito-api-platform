@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "services/espresso/**"
+      - "apis/espresso/**"
+      - "apis/internal/embedding/**"
+      - "apis/go.mod"
+      - "apis/go.sum"
       - ".github/workflows/deploy-espresso.yml"
   workflow_dispatch:
 
@@ -57,9 +60,8 @@ jobs:
       - name: Build and push container image to registry
         uses: azure/container-apps-deploy-action@v2
         with:
-          appSourcePath: ${{ github.workspace }}/services/espresso
-          _dockerfilePathKey_: _dockerfilePath_
-          _targetLabelKey_: _targetLabel_
+          appSourcePath: ${{ github.workspace }}/apis
+          dockerfilePath: espresso/Dockerfile
           registryUrl: docker.io
           registryUsername: ${{ secrets.CAFECITOESPRESSOAPI_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.CAFECITOESPRESSOAPI_REGISTRY_PASSWORD }}

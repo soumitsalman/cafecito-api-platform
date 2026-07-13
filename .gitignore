@@ -6,12 +6,11 @@ node_modules/
 .env.zuplo
 
 # Go services
-services/beans/.beansack
-services/beans/.tools
-services/espresso/.espresso
-services/espresso/.tools
-services/beans/.env
-services/espresso/.env
+apis/beans/.beansack
+apis/.tools
+apis/espresso/.espresso
+apis/beans/.env
+apis/espresso/.env
 *.out
 *.log
 .logs
