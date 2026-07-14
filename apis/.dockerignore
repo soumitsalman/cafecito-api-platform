@@ -1,0 +1,19 @@
+# Secrets and service configuration
+**/.env
+**/.env.*
+**/*.env
+
+# Local state and caches
+**/.cache
+**/.logs
+**/.db
+**/.ducklake
+**/.beansack
+**/*.log
+**/*.out
+**/bin
+.tools
+internal/embedding/.proto
+
+# Version-control metadata
+.git

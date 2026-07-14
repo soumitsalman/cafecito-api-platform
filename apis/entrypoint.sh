@@ -7,7 +7,7 @@ text-embeddings-router \
   --port 10000 &
 tei_pid=$!
 
-/app/beansapi &
+/app/api &
 api_pid=$!
 
 terminate() {
