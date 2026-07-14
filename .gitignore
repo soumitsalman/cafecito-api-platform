@@ -22,3 +22,4 @@ apis/espresso/.env
 # OS Stuff
 
 .DS_Store
+.llama-cpp

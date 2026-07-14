@@ -416,9 +416,9 @@ func setupTestDB() *cupboard.Cupboard {
 	return cupboard.NewCupboard(context.Background(), connStr)
 }
 
-func setupTestEmbedder() *embedding.RemoteEmbedder {
+func setupTestEmbedder() *embedding.GRPCEmbedder {
 	cupboard.NoError(godotenv.Load("../.env"))
-	return embedding.NewRemoteEmbedder(
+	return embedding.NewGRPCEmbedder(
 		os.Getenv("EMBEDDER_BASE_URL"),
 		os.Getenv("EMBEDDER_API_KEY"),
 		os.Getenv("EMBEDDER_MODEL"),

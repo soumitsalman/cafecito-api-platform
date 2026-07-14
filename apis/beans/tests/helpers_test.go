@@ -13,11 +13,11 @@ import (
 const testVectorQuery = "market trend changes due to public policy changes"
 
 var (
-	testCategories = []string{"public_policy_and_administration", "art_and_design", "cybersecurity"}
-	testRegions    = []string{"north_america", "europe", "united_states"}
-	testEntities   = []string{"openai", "microsoft", "google"}
-	testTags       = []string{"artificial_intelligence", "cybersecurity"}
-	testSources    = []string{"techcrunch", "slashgear"}
+	testCategories      = []string{"public_policy_and_administration", "art_and_design", "cybersecurity"}
+	testRegions         = []string{"north_america", "europe", "united_states"}
+	testEntities        = []string{"openai", "microsoft", "google"}
+	testTags            = []string{"artificial_intelligence", "cybersecurity"}
+	testSources         = []string{"techcrunch", "slashgear"}
 	testPropagationURLs = []string{
 		"https://www.foxla.com/news/more-us-airlines-raise-baggage-fees-see-list",
 		"https://www.slashgear.com/2143752/us-airlines-increased-fees-fuel-prices/",
@@ -33,9 +33,9 @@ func setupTestDB() bs.Beansack {
 	return bs.NewPGSack(context.Background(), connStr)
 }
 
-func setupTestEmbedder() *embedding.RemoteEmbedder {
+func setupTestEmbedder() *embedding.GRPCEmbedder {
 	bs.NoError(godotenv.Load("../.env"))
-	return embedding.NewRemoteEmbedder(
+	return embedding.NewGRPCEmbedder(
 		os.Getenv("EMBEDDER_BASE_URL"),
 		os.Getenv("EMBEDDER_API_KEY"),
 		os.Getenv("EMBEDDER_MODEL"),

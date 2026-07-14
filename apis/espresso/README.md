@@ -28,7 +28,7 @@ The API expects a PostgreSQL database initialized by the Espresso ingestion pipe
 
 | Extension | Purpose |
 |-----------|---------|
-| `vector` | pgvector for sip embeddings (`vector(384)`) |
+| `vector` | pgvector for F2LLM embeddings (`vector(320)`) |
 | `pg_trgm` | Trigram support (used by the pipeline) |
 
 **Helper function**
@@ -54,7 +54,7 @@ Primary store for all sip kinds. Rows are immutable after insert (`ON CONFLICT D
 | `kind` | `TEXT` | `action`, `event`, or `signal` |
 | `created` | `TIMESTAMPTZ` | Creation time; drives default list ordering |
 | `source` | `UUID` | Optional FK to `sources.id` (not enforced) |
-| `embedding` | `vector(384)` | Dense vector for semantic search (`q` / `acc` on list routes) |
+| `embedding` | `vector(320)` | Dense vector for semantic search (`q` / `acc` on list routes) |
 | `tags` | `TEXT[]` | Facet tags; AND-filtered on `/events` and `/signals` |
 | `tags_fts` | `tsvector` | Generated stored column: `to_tsvector('simple', immutable_tags_to_text(tags))` |
 | `digest` | `JSONB` | Kind-specific payload; flattened in API responses |

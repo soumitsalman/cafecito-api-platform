@@ -28,7 +28,7 @@ The API expects a PostgreSQL database initialized by the Beans ingestion pipelin
 
 | Extension | Purpose |
 |-----------|---------|
-| `vector` | pgvector for bean embeddings (`vector(384)`) |
+| `vector` | pgvector for F2LLM embeddings (`vector(320)`) |
 | `pg_trgm` | Trigram support (used by the pipeline) |
 
 #### Table: `beans`
@@ -43,7 +43,7 @@ Primary store for all indexed articles and posts.
 | `created` | `TIMESTAMP` | Original publish time |
 | `collected` | `TIMESTAMP` | Ingest timestamp |
 | `summary`, `content` | `TEXT` | Body fields; `content` optional via `full_content` |
-| `embedding` | `vector(384)` | Semantic search (`q` + `acc`) |
+| `embedding` | `vector(320)` | Semantic search (`q` + `acc`) |
 | `categories`, `sentiments`, `regions`, `entities` | `VARCHAR[]` | NLP classification |
 | `tags` | `tsvector` | Generated from regions + entities + categories |
 

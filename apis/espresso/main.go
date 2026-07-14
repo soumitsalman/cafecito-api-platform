@@ -16,7 +16,7 @@ import (
 
 const (
 	DEFAULT_PORT              = "8080"
-	DEFAULT_EMBEDDER_BASE_URL = "localhost:10000"
+	DEFAULT_EMBEDDER_BASE_URL = "http://localhost:10000"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 
 	api := r.NewRouter(
 		db,
-		embedding.NewRemoteEmbedder(
+		embedding.NewHTTPEmbedder(
 			config.GetEnv("EMBEDDER_BASE_URL", DEFAULT_EMBEDDER_BASE_URL, true),
 			config.GetEnv("EMBEDDER_API_KEY", "", false),
 			config.GetEnv("EMBEDDER_MODEL", "", false),

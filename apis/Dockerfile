@@ -1,5 +1,5 @@
-# Build a selected Cafecito API and run it with a co-located TEI embedder.
-# Build with: docker build --build-arg SERVICE=beans -f Dockerfile.tei .
+# Build a selected Cafecito API and run it with a co-located llama.cpp embedder.
+# Build from apis/: docker build --build-arg SERVICE=beans -t cafecito-beans .
 ARG SERVICE
 
 FROM golang:1.26-alpine AS api-builder
@@ -17,42 +17,39 @@ RUN case "${SERVICE}" in \
     esac && \
     CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/api "./${SERVICE}"
 
+# Run llama-server and the selected API in one Linux container.
+FROM ubuntu:24.04
 
-# Bake the embedding model into the image so the runtime does not need Hub access.
-FROM python:3.11-slim AS model-downloader
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
 
-ARG MODEL_ID=avsolatorio/GIST-small-Embedding-v0
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
-
-RUN pip install --no-cache-dir "huggingface_hub[hf_transfer]"
-COPY . /build-context/
-
-# A local cache may contain the model directly or under .models/<model-name>.
-RUN set -eu; \
-    model_cache=/build-context/.models; \
-    model_name="$(basename "$MODEL_ID")"; \
-    if [ -f "${model_cache}/config.json" ]; then \
-        mv "${model_cache}" /model; \
-    elif [ -f "${model_cache}/${model_name}/config.json" ]; then \
-        mv "${model_cache}/${model_name}" /model; \
-    else \
-        hf download "$MODEL_ID" --local-dir /model; \
-    fi
-
-
-# Run TEI and the selected API in one container. Only the API port is published.
-FROM ghcr.io/huggingface/text-embeddings-inference:cpu-latest-grpc
-
-COPY --from=model-downloader /model /data
 COPY --from=api-builder /out/api /app/api
+COPY llama-cpp/ubuntu-x64/ /app/llama-cpp/
+COPY models/F2LLM-v2-80M.Q8_0.gguf /app/models/F2LLM-v2-80M.Q8_0.gguf
 COPY entrypoint.sh /app/entrypoint.sh
 
-ENV MODEL_ID=/data
-ENV PORT=8080
-ENV EMBEDDER_BASE_URL=localhost:10000
-ENV GIN_MODE=release
+RUN chmod +x /app/api /app/entrypoint.sh /app/llama-cpp/llama-server && \
+    cd /app/llama-cpp && \
+    ln -sf libggml.so.0.16.0 libggml.so.0 && \
+    ln -sf libggml-base.so.0.16.0 libggml-base.so.0 && \
+    ln -sf libllama.so.0.0.9999 libllama.so.0 && \
+    ln -sf libllama-common.so.0.0.9999 libllama-common.so.0 && \
+    ln -sf libmtmd.so.0.0.9999 libmtmd.so.0
 
-RUN chmod +x /app/entrypoint.sh
+ENV LLAMA_SERVER=/app/llama-cpp/llama-server
+ENV LLAMA_MODEL=/app/models/F2LLM-v2-80M.Q8_0.gguf
+ENV LLAMA_HOST=127.0.0.1
+ENV LLAMA_PORT=10000
+ENV LLAMA_CTX_SIZE=16384
+ENV LLAMA_PARALLEL=32
+ENV LLAMA_BATCH_SIZE=2048
+ENV LLAMA_UBATCH_SIZE=512
+ENV LD_LIBRARY_PATH=/app/llama-cpp
+ENV PORT=8080
+ENV EMBEDDER_BASE_URL=http://127.0.0.1:10000
+ENV EMBEDDER_MODEL=F2LLM-v2-80M
+ENV GIN_MODE=release
 
 EXPOSE 8080
 
