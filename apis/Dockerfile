@@ -1,6 +1,8 @@
 # Build a selected Cafecito API and run it with a co-located llama.cpp embedder.
 # Build from apis/: docker build --build-arg SERVICE=beans -t cafecito-beans .
 ARG SERVICE
+ARG MODEL_URL=https://huggingface.co/mradermacher/F2LLM-v2-80M-GGUF/resolve/main/F2LLM-v2-80M.Q8_0.gguf
+# ARG MODEL_SHA256=FB2A92E51DBA7120D5369704502520814775B27C116D27ED039690106BF224EE
 
 FROM golang:1.26-alpine AS api-builder
 ARG SERVICE
@@ -20,16 +22,23 @@ RUN case "${SERVICE}" in \
 # Run llama-server and the selected API in one Linux container.
 FROM ubuntu:24.04
 
+ARG MODEL_URL
+# ARG MODEL_SHA256
+
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl libgomp1 && \
+    apt-get install -y --no-install-recommends ca-certificates curl wget libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=api-builder /out/api /app/api
 COPY llama-cpp/ubuntu-x64/ /app/llama-cpp/
-COPY models/F2LLM-v2-80M.Q8_0.gguf /app/models/F2LLM-v2-80M.Q8_0.gguf
 COPY entrypoint.sh /app/entrypoint.sh
 
-RUN chmod +x /app/api /app/entrypoint.sh /app/llama-cpp/llama-server && \
+# Optional checksum validation:
+# echo "${MODEL_SHA256}  /app/.models/F2LLM-v2-80M.Q8_0.gguf" | sha256sum --check --status
+RUN mkdir -p /app/.models && \
+    wget --no-verbose --output-document=/app/.models/F2LLM-v2-80M.Q8_0.gguf \
+      "${MODEL_URL}" && \
+    chmod +x /app/api /app/entrypoint.sh /app/llama-cpp/llama-server && \
     cd /app/llama-cpp && \
     ln -sf libggml.so.0.16.0 libggml.so.0 && \
     ln -sf libggml-base.so.0.16.0 libggml-base.so.0 && \
@@ -38,7 +47,7 @@ RUN chmod +x /app/api /app/entrypoint.sh /app/llama-cpp/llama-server && \
     ln -sf libmtmd.so.0.0.9999 libmtmd.so.0
 
 ENV LLAMA_SERVER=/app/llama-cpp/llama-server
-ENV LLAMA_MODEL=/app/models/F2LLM-v2-80M.Q8_0.gguf
+ENV LLAMA_MODEL=/app/.models/F2LLM-v2-80M.Q8_0.gguf
 ENV LLAMA_HOST=127.0.0.1
 ENV LLAMA_PORT=10000
 ENV LLAMA_CTX_SIZE=16384

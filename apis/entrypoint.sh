@@ -2,7 +2,7 @@
 set -eu
 
 llama_server="${LLAMA_SERVER:-/app/llama-cpp/llama-server}"
-llama_model="${LLAMA_MODEL:-/app/models/F2LLM-v2-80M.Q8_0.gguf}"
+llama_model="${LLAMA_MODEL:-/app/.models/F2LLM-v2-80M.Q8_0.gguf}"
 
 if [ ! -x "${llama_server}" ]; then
   echo "llama-server is not executable: ${llama_server}" >&2

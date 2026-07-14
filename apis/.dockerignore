@@ -12,6 +12,8 @@
 **/*.log
 **/*.out
 **/bin
+# Models are downloaded during the image build from the upstream model repo.
+.models
 .tools
 internal/embedding/.proto
 
