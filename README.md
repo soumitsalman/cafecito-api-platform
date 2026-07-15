@@ -1,23 +1,22 @@
 ## Cafecito API Manager
 
 [Cafecito's](https://cafecito.tech) [API](https://api.cafecito.tech) & MCP gateways and [developer portal](https://developer.cafecito.tech) is hosted on [Zuplo](https://zuplo.com/).
-This monorepo contains the Zuplo gateway, Zudoku developer portal, and backend Go services for **Project Cafecito** products:
+This monorepo contains the Zuplo gateway, Zudoku developer portal, and backend Go apis for **Project Cafecito** products:
 
-- Beans API & MCP (`services/beans/`)
-- Espresso API & MCP (`services/espresso/`)
+- Beans API & MCP (`apis/beans/`)
+- Espresso API & MCP (`apis/espresso/`)
 - Cortado API & MCP (future, gateway routes only)
 - Latte API & MCP (future, gateway routes only)
 
 ## Repository layout
 
-| Path | Purpose |
-|------|---------|
-| `config/`, `modules/` | Zuplo API gateway (TypeScript) |
-| `docs/` | Zudoku developer portal |
-| `services/beans/` | Beans Go API |
-| `services/espresso/` | Espresso Go API |
-| `services/TEI-Dockerfile` | Shared local embedder image |
-| `docker-compose.yml` | Local stack: TEI + both APIs |
+- `config/`, `modules/` — Zuplo gateway routes, policies, and handlers.
+- `docs/` — Zudoku developer portal and product documentation.
+- `apis/beans/` — Beans Go API.
+- `apis/espresso/` — Espresso Go API.
+- `apis/internal/` — shared Go embedding client and utilities.
+- `apis/Dockerfile` and `apis/entrypoint.sh` — production container that runs one API with a co-located `llama-server`.
+- `docker-compose.yml` — local Compose file for both API containers.
 
 ## Gateway (Zuplo)
 
@@ -45,102 +44,39 @@ npm run dev
 
 Production build: `cd docs && npm run build`
 
-## Backend services (Go)
+## Backend apis (Go)
 
-Native run (requires `.env` with `PG_CONNECTION_STRING`, `EMBEDDER_BASE_URL`):
-
-```bash
-cd services/beans && make run    # :8080
-cd services/espresso && make run # :8080 (run one at a time natively)
-```
-
-Docker (from repo root; shared TEI on `:10000`):
+Native run requires PostgreSQL plus an embedding endpoint. Start a local `llama-server` with embedding enabled, or point `EMBEDDER_BASE_URL` at any OpenAI-compatible embedding URL supported by the API. Then set `PG_CONNECTION_STRING` and `EMBEDDER_BASE_URL` in the service `.env` file and run:
 
 ```bash
-docker compose up --build                  # beans :8080, espresso :8081
-docker compose up --build tei beansapi     # beans only
-docker compose up --build tei espressoapi  # espresso only
+cd apis/beans && go run .    # :8080
+cd apis/espresso && go run . # :8080 (run one at a time natively)
 ```
 
-Or use Makefile shortcuts: `make docker-up`, `make docker-beans`, `make docker-espresso`.
+The API expects the embedding endpoint to provide embeddings; a chat/completions-only URL is not sufficient.
 
-Each service needs a `services/<name>/.env` file for Docker Compose (`env_file`).
+### Docker Compose
 
-## Monorepo migration (deploy & ops)
-
-_Last updated: 2026-07-01_
-
-After merging backend deploy workflows into this repo, copy repository secrets from the old standalone repos into **cafecito-api-manager** (Settings → Secrets and variables → Actions).
-
-### Beans (`deploy-beans.yml`)
-
-| Secret | Source repo |
-|--------|-------------|
-| `CAFECITOBEANSAPI_AZURE_CLIENT_ID` | go-beans-api |
-| `CAFECITOBEANSAPI_AZURE_TENANT_ID` | go-beans-api |
-| `CAFECITOBEANSAPI_AZURE_SUBSCRIPTION_ID` | go-beans-api |
-| `CAFECITOBEANSAPI_REGISTRY_USERNAME` | go-beans-api |
-| `CAFECITOBEANSAPI_REGISTRY_PASSWORD` | go-beans-api |
-
-### Espresso (`deploy-espresso.yml`)
-
-| Secret | Source repo |
-|--------|-------------|
-| `CAFECITOESPRESSOAPI_AZURE_CLIENT_ID` | go-espresso-api |
-| `CAFECITOESPRESSOAPI_AZURE_TENANT_ID` | go-espresso-api |
-| `CAFECITOESPRESSOAPI_AZURE_SUBSCRIPTION_ID` | go-espresso-api |
-| `CAFECITOESPRESSOAPI_REGISTRY_USERNAME` | go-espresso-api |
-| `CAFECITOESPRESSOAPI_REGISTRY_PASSWORD` | go-espresso-api |
-
-### Azure Deployment Center
-
-For each Container App in Azure Portal:
-
-1. **cafecito-beans-api** — set GitHub repo to `soumitsalman/cafecito-api-manager`, branch `main`, app path `services/beans` (if the portal exposes a path setting).
-2. **cafecito-espresso-api** — same repo, app path `services/espresso`.
-
-Workflow `appSourcePath` is the authoritative Docker build context; keep Azure Deployment Center aligned to avoid regenerated workflow drift.
-
-### Zuplo path filters
-
-In Zuplo project → Source Control, exclude `services/**` from deploy triggers so backend-only pushes do not redeploy the gateway.
-
-### First deploy after merge
-
-Backend workflows will not auto-run until `services/beans/**` or `services/espresso/**` changes. Use **workflow_dispatch** on `deploy-beans.yml` and `deploy-espresso.yml` for an initial smoke deploy after secrets are copied.
-
-Merge `dev` → `main` (workflows trigger on `main` only).
-
-### Archive old repositories
-
-After monorepo deploys succeed, update each old repo README and archive on GitHub:
-
-**go-beans-api README:**
-
-```markdown
-# go-beans-api (archived)
-
-This repository has been merged into **[cafecito-api-manager](https://github.com/soumitsalman/cafecito-api-manager)**.
-
-Beans API source: [`services/beans/`](https://github.com/soumitsalman/cafecito-api-manager/tree/main/services/beans)
-```
-
-**go-espresso-api README:**
-
-```markdown
-# go-espresso-api (archived)
-
-This repository has been merged into **[cafecito-api-manager](https://github.com/soumitsalman/cafecito-api-manager)**.
-
-Espresso API source: [`services/espresso/`](https://github.com/soumitsalman/cafecito-api-manager/tree/main/services/espresso)
-```
-
-**Archive commands:**
+Compose builds the shared `apis/Dockerfile` twice, once for each API. Each container also starts its own `llama-server`, so no separate embedder or `tei` service is needed:
 
 ```bash
-gh repo archive soumitsalman/go-beans-api --yes
-gh repo archive soumitsalman/go-espresso-api --yes
+docker compose up --build beansapi       # Beans on :8080
+docker compose up --build espressoapi    # Espresso on :8081
+docker compose up --build                # Both APIs
 ```
+
+### Build and deploy the API image
+
+Build from the `apis/` directory, selecting the API with `SERVICE`:
+
+```bash
+docker build --build-arg SERVICE=beans -t cafecito-beans:latest ./apis
+docker build --build-arg SERVICE=espresso -t cafecito-espresso:latest ./apis
+```
+
+The Dockerfile downloads and hard-codes the `F2LLM-v2-80M.Q8_0.gguf` model, exposes the API on port `8080`, and starts the model server on the container loopback interface. Changing `MODEL_URL` at build time is supported, but runtime environment variables do not switch the baked-in model. Push the resulting image to your registry and deploy it with the platform’s container service configuration.
+
+Each service needs an `apis/<name>/.env` file for Compose (`env_file`), including its database connection and backend API key settings.
 
 ## Learn more
 

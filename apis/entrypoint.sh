@@ -3,6 +3,11 @@ set -eu
 
 llama_server="${LLAMA_SERVER:-/app/llama-cpp/llama-server}"
 llama_model="${LLAMA_MODEL:-/app/.models/F2LLM-v2-80M.Q8_0.gguf}"
+startup_timeout="${STARTUP_TIMEOUT:-30}"
+llama_host="${LLAMA_HOST:-127.0.0.1}"
+llama_port="${LLAMA_PORT:-10000}"
+api_pid=""
+llama_pid=""
 
 if [ ! -x "${llama_server}" ]; then
   echo "llama-server is not executable: ${llama_server}" >&2
@@ -13,6 +18,15 @@ if [ ! -f "${llama_model}" ]; then
   echo "GGUF model was not found: ${llama_model}" >&2
   exit 1
 fi
+
+terminate() {
+  if [ -n "${api_pid}" ]; then
+    kill -TERM "${api_pid}" 2>/dev/null || true
+  fi
+  if [ -n "${llama_pid}" ]; then
+    kill -TERM "${llama_pid}" 2>/dev/null || true
+  fi
+}
 
 "${llama_server}" \
   --model "${llama_model}" \
@@ -28,9 +42,12 @@ fi
   --port "${LLAMA_PORT:-10000}" &
 llama_pid=$!
 
+trap terminate INT TERM
+
+sleep 1
 attempt=0
 until curl --fail --silent --show-error \
-  "http://${LLAMA_HOST:-127.0.0.1}:${LLAMA_PORT:-10000}/health" >/dev/null; do
+  "http://${llama_host}:${llama_port}/health" >/dev/null; do
   if ! kill -0 "${llama_pid}" 2>/dev/null; then
     echo "llama-server exited before becoming ready" >&2
     wait "${llama_pid}" 2>/dev/null || true
@@ -38,8 +55,8 @@ until curl --fail --silent --show-error \
   fi
 
   attempt=$((attempt + 1))
-  if [ "${attempt}" -ge "${LLAMA_STARTUP_TIMEOUT:-120}" ]; then
-    echo "llama-server did not become ready within ${attempt} seconds" >&2
+  if [ "${attempt}" -ge "${startup_timeout}" ]; then
+    echo "llama-server did not become ready within ${startup_timeout} seconds" >&2
     kill -TERM "${llama_pid}" 2>/dev/null || true
     wait "${llama_pid}" 2>/dev/null || true
     exit 1
@@ -50,17 +67,12 @@ done
 /app/api &
 api_pid=$!
 
-terminate() {
-  kill -TERM "${api_pid}" "${llama_pid}" 2>/dev/null || true
-}
+api_status=0
+wait "${api_pid}" || api_status=$?
 
-trap terminate INT TERM
-
-# Exit when either process exits, forwarding termination to the other process.
-while kill -0 "${api_pid}" 2>/dev/null && kill -0 "${llama_pid}" 2>/dev/null; do
-  sleep 1
-done
-
-terminate
+# The API is the authoritative process. Its exit always shuts down llama-server.
+kill -TERM "${llama_pid}" 2>/dev/null || true
 wait "${api_pid}" 2>/dev/null || true
 wait "${llama_pid}" 2>/dev/null || true
+
+exit "${api_status}"

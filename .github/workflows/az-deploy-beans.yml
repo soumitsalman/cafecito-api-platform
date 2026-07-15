@@ -1,14 +1,20 @@
-name: Trigger auto deployment for cafecito-espresso-api
+name: Trigger auto deployment for cafecito-beans-api
 
 on:
   push:
-    branches: [main]
+    # Intentionally disabled: change this back to main to re-enable auto-deploys.
+    branches: [__disabled__]
     paths:
-      - "apis/espresso/**"
-      - "apis/internal/embedding/**"
+      - "apis/beans/**"
+      - "apis/internal/**"
       - "apis/go.mod"
       - "apis/go.sum"
-      - ".github/workflows/deploy-espresso.yml"
+      - "apis/Dockerfile"
+      - "apis/.dockerignore"
+      - "apis/entrypoint.sh"
+      - "apis/llama-cpp/**"
+      - "apis/fly.beans.toml"
+      - ".github/workflows/az-deploy-beans.yml"
   workflow_dispatch:
 
 jobs:
@@ -25,19 +31,19 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.CAFECITOESPRESSOAPI_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.CAFECITOESPRESSOAPI_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.CAFECITOESPRESSOAPI_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.CAFECITOBEANSAPI_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.CAFECITOBEANSAPI_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.CAFECITOBEANSAPI_AZURE_SUBSCRIPTION_ID }}
 
       - name: Render containerapp YAML
         run: |
           mkdir -p .github/containerapp
-          cat > .github/containerapp/espresso.rendered.yaml <<EOF
+          cat > .github/containerapp/beans.rendered.yaml <<EOF
           properties:
             template:
               containers:
                 - name: main
-                  image: docker.io/soumitsr/espresso-api:${GITHUB_SHA}
+                  image: docker.io/soumitsr/beans-api:${GITHUB_SHA}
                   resources:
                     cpu: 0.5
                     memory: 1Gi
@@ -61,13 +67,13 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           appSourcePath: ${{ github.workspace }}/apis
-          dockerfilePath: espresso/Dockerfile
+          dockerfilePath: beans/Dockerfile
           registryUrl: docker.io
-          registryUsername: ${{ secrets.CAFECITOESPRESSOAPI_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.CAFECITOESPRESSOAPI_REGISTRY_PASSWORD }}
-          containerAppName: cafecito-espresso-api
+          registryUsername: ${{ secrets.CAFECITOBEANSAPI_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.CAFECITOBEANSAPI_REGISTRY_PASSWORD }}
+          containerAppName: cafecito-beans-api
           resourceGroup: frontends-rg
-          imageToBuild: soumitsr/espresso-api:${{ github.sha }}
-          yamlConfigPath: .github/containerapp/espresso.rendered.yaml
+          imageToBuild: soumitsr/beans-api:${{ github.sha }}
+          yamlConfigPath: .github/containerapp/beans.rendered.yaml
           _buildArgumentsKey_: |
             _buildArgumentsValues_

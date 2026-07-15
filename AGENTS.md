@@ -4,14 +4,14 @@ Last refreshed: 2026-07-01
 
 ## System map
 
-Project Cafecito is a monorepo: Zuplo gateway, Zudoku developer portal, and backend Go services live in `cafecito-api-manager`.
+Project Cafecito is a monorepo: Zuplo gateway, Zudoku developer portal, and backend Go apis live in `cafecito-api-manager`.
 
 - **Root** (`config/`, `modules/`, `docs/`): Zuplo gateway and Zudoku developer portal. Owns public API paths, API-key creation, Clerk integration, rate limits, quotas, OpenAPI specs, and docs.
-- **`services/beans/`**: Beans service — read-only news/blog aggregation API with article search, trends, source metadata, and propagation tracking.
-- **`services/espresso/`**: Espresso service — read-only business intelligence API over "sips" with events, signals, tags, related records, and token-efficient text responses for MCP/agent workflows.
-- **`services/TEI-Dockerfile`** + root **`docker-compose.yml`**: shared local embedder and combined Docker stack.
+- **`apis/beans/`**: Beans service — read-only news/blog aggregation API with article search, trends, source metadata, and propagation tracking.
+- **`apis/espresso/`**: Espresso service — read-only business intelligence API over "sips" with events, signals, tags, related records, and token-efficient text responses for MCP/agent workflows.
+- **`apis/Dockerfile`** + **`apis/entrypoint.sh`**: API image with a co-located `llama-server`; root **`docker-compose.yml`** builds one image per API.
 
-Gateway paths use product prefixes such as `/beans/...` and `/espresso/...`. Backend Go services expose their routes without those prefixes locally, typically on `:8080`.
+Gateway paths use product prefixes such as `/beans/...` and `/espresso/...`. Backend Go apis expose their routes without those prefixes locally, typically on `:8080`.
 
 ## Gateway (root)
 
@@ -51,10 +51,10 @@ Docs/products:
 
 CI/deploy:
 
-- `.github/workflows/deploy-gateway.yml`: lint/test; `paths-ignore: services/**`
-- Zuplo deploys via GitHub integration — configure path filters to exclude `services/**`
+- `.github/workflows/deploy-gateway.yml`: lint/test; `paths-ignore: apis/**`
+- Zuplo deploys via GitHub integration — configure path filters to exclude `apis/**`
 
-## services/beans
+## apis/beans
 
 Stack:
 
@@ -108,15 +108,15 @@ Runtime config:
 
 Commands:
 
-- Build: `cd services/beans && go build -o beansapi .`
-- Run: `cd services/beans && make run` or `./beansapi`
-- Docker (from repo root): `docker compose up --build tei beansapi` (beans on `:8080`)
+- Build: `cd apis/beans && go build -o beansapi .`
+- Run: `cd apis/beans && go run .` or `./beansapi`
+- Docker (from repo root): `docker compose up --build beansapi` (beans on `:8080`; the image starts its own `llama-server`)
 - Regenerate docs: `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go -o docs`
 - Tests: `go test ./tests/...` with a reachable database and `.env`.
 
-Deploy: `.github/workflows/deploy-beans.yml` → Azure Container App `cafecito-beans-api` (paths: `services/beans/**`).
+Deploy: `.github/workflows/deploy-beans.yml` → Azure Container App `cafecito-beans-api` (paths: `apis/beans/**`).
 
-## services/espresso
+## apis/espresso
 
 Stack:
 
@@ -168,38 +168,32 @@ Runtime config:
 
 Commands:
 
-- Build: `cd services/espresso && go build -o espressoapi .`
-- Run: `cd services/espresso && make run` or `./espressoapi`
-- Docker (from repo root): `docker compose up --build tei espressoapi` (espresso on `:8081`)
+- Build: `cd apis/espresso && go build -o espressoapi .`
+- Run: `cd apis/espresso && go run .` or `./espressoapi`
+- Docker (from repo root): `docker compose up --build espressoapi` (espresso on `:8081`; the image starts its own `llama-server`)
 - Regenerate docs: `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`
 - Tests: `go test ./tests/...` with a reachable database and `.env`.
 
-Deploy: `.github/workflows/deploy-espresso.yml` → Azure Container App `cafecito-espresso-api` (paths: `services/espresso/**`).
+Deploy: `.github/workflows/deploy-espresso.yml` → Azure Container App `cafecito-espresso-api` (paths: `apis/espresso/**`).
 
 ## Local Docker stack
 
-Root `docker-compose.yml` runs:
-
-- `tei` — shared embedder from `services/TEI-Dockerfile`, port `10000`
-- `beansapi` — port `8080`, env from `services/beans/.env`
-- `espressoapi` — port `8081` (container `8080`), env from `services/espresso/.env`
-
-Production Azure deploys use pre-built `docker.io/soumitsr/tei-static:latest` sidecar, not the local TEI Dockerfile.
+Root `docker-compose.yml` builds `apis/Dockerfile` separately for `beansapi` and `espressoapi`. Each container runs its API and a co-located `llama-server`; there is no separate embedder service.
 
 ## Cross-component implementation notes
 
-- Public OpenAPI specs in `config/` should stay aligned with generated Swagger specs in `services/*/docs/`.
+- Public OpenAPI specs in `config/` should stay aligned with generated Swagger specs in `apis/*/docs/`.
 - Gateway paths add `/beans` or `/espresso`; backend service route files do not.
-- The gateway authenticates public traffic and forwards a backend API key header. The Go services can also enforce `API_KEYS` directly.
-- Both Go services use the same basic runtime pattern: env loading, DB pool, remote embedder, Gin router, CORS, optional API key middleware, and in-memory concurrency queue.
-- Both Go services rely on external ingestion pipelines for database schema and data population; schema changes may require coordinating with `pycoffeemaker`.
+- The gateway authenticates public traffic and forwards a backend API key header. The Go apis can also enforce `API_KEYS` directly.
+- Both Go apis use the same basic runtime pattern: env loading, DB pool, remote embedder, Gin router, CORS, optional API key middleware, and in-memory concurrency queue.
+- Both Go apis rely on external ingestion pipelines for database schema and data population; schema changes may require coordinating with `pycoffeemaker`.
 - For MCP/agent ergonomics, Espresso explicitly supports `response_type=text`; Beans exposes MCP docs and JSON APIs but does not currently mirror Espresso's text response format in the backend routes.
 
 ## First files to open by task
 
 - Gateway route/auth/rate-limit issue: `config/policies.json`, then `modules/gate-auth.ts`, `modules/tiered-rate-limit.ts`, and the relevant `config/*.oas.json`.
 - Developer portal/API-key issue: `docs/zudoku.config.tsx`, `modules/create-api-keys.ts`, `modules/clerk-webhook.ts`, `modules/consumer-ops.ts`.
-- Beans endpoint behavior: `services/beans/router/routes.go`, then `services/beans/beansack/pgsack.go` and `services/beans/beansack/types.go`.
-- Beans API spec/docs drift: `services/beans/docs/swagger.yaml`, `config/beans.oas.json`, and `docs/pages/howtos/beans-howto.mdx`.
-- Espresso endpoint behavior: `services/espresso/router/routes.go`, `services/espresso/router/types.go`, then `services/espresso/cupboard/database.go`.
-- Espresso API spec/docs drift: `services/espresso/docs/swagger.yaml`, `config/espresso.oas.json`, and `docs/pages/howtos/espresso-howto.mdx`.
+- Beans endpoint behavior: `apis/beans/router/routes.go`, then `apis/beans/beansack/pgsack.go` and `apis/beans/beansack/types.go`.
+- Beans API spec/docs drift: `apis/beans/docs/swagger.yaml`, `config/beans.oas.json`, and `docs/pages/howtos/beans-howto.mdx`.
+- Espresso endpoint behavior: `apis/espresso/router/routes.go`, `apis/espresso/router/types.go`, then `apis/espresso/cupboard/database.go`.
+- Espresso API spec/docs drift: `apis/espresso/docs/swagger.yaml`, `config/espresso.oas.json`, and `docs/pages/howtos/espresso-howto.mdx`.

@@ -430,7 +430,7 @@ go mod download
 go build -o beansapi .
 
 # or
-make run
+go run .
 ```
 
 ```bash

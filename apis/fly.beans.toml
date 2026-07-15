@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for cafecito-beans-api on 2026-07-15T08:59:39-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'cafecito-beans-api'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+  ignorefile = ".dockerignore"
+
+  [build.args]
+    SERVICE = 'beans'
+
+[env]
+  MAX_CONCURRENT_REQUESTS = '512'
+  STARTUP_TIMEOUT = '30'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '2gb'

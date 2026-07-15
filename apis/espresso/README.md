@@ -423,7 +423,7 @@ go mod download
 go build -o espressoapi .
 
 # or
-make run
+go run .
 ```
 
 ```bash

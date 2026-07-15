@@ -5,7 +5,7 @@ node_modules/
 .env
 .env.zuplo
 
-# Go services
+# Go apis
 .beansack
 .cupboard
 .tools
@@ -19,6 +19,9 @@ node_modules/
 
 # Azure deploy render output
 .github/containerapp/*.rendered.yaml
+
+# Fly.io stuff
+.fly
 
 # OS Stuff
 

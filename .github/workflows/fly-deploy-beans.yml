@@ -1,0 +1,33 @@
+# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+
+name: Fly Deploy
+on:
+  push:
+    branches:
+      - restructure
+    # Deploy only when the Beans image or this workflow/configuration changes.
+    # The image is built from apis/ and the shared Dockerfile/assets, while
+    # Espresso-only source changes do not affect the Beans deployment.
+    paths:
+      - "apis/beans/**"
+      - "apis/internal/**"
+      - "apis/go.mod"
+      - "apis/go.sum"
+      - "apis/Dockerfile"
+      - "apis/.dockerignore"
+      - "apis/entrypoint.sh"
+      - "apis/llama-cpp/**"
+      - "apis/fly.beans.toml"
+      - ".github/workflows/fly-beans-deploy.yml"
+  workflow_dispatch:
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    concurrency: deploy-beans
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy ./apis --config ./fly.beans.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
