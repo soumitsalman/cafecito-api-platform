@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-llama_server="${LLAMA_SERVER:-/app/llama-cpp/llama-server}"
+llama_server="${LLAMA_SERVER:-/app/.tools/llama-cpp/llama-server}"
 llama_model="${LLAMA_MODEL:-/app/.models/F2LLM-v2-80M.Q8_0.gguf}"
 startup_timeout="${STARTUP_TIMEOUT:-30}"
 llama_host="${LLAMA_HOST:-127.0.0.1}"

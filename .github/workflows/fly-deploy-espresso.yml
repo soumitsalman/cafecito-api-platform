@@ -15,7 +15,6 @@ on:
       - "apis/Dockerfile"
       - "apis/.dockerignore"
       - "apis/entrypoint.sh"
-      - "apis/llama-cpp/**"
       - "apis/fly.espresso.toml"
       - ".github/workflows/fly-deploy-espresso.yml"
   workflow_dispatch:

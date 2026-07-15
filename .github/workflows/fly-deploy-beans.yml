@@ -15,7 +15,6 @@ on:
       - "apis/Dockerfile"
       - "apis/.dockerignore"
       - "apis/entrypoint.sh"
-      - "apis/llama-cpp/**"
       - "apis/fly.beans.toml"
       - ".github/workflows/fly-deploy-beans.yml"
   workflow_dispatch:
