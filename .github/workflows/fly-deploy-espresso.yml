@@ -1,6 +1,6 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 
-name: Fly Deploy Espresso
+name: Fly Deploy Espresso API
 on:
   push:
     branches:
@@ -18,12 +18,12 @@ on:
       - "apis/entrypoint.sh"
       - "apis/llama-cpp/**"
       - "apis/fly.espresso.toml"
-      - ".github/workflows/fly-espresso-deploy.yml"
+      - ".github/workflows/fly-deploy-espresso.yml"
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy Espresso app
+    name: Deploy Espresso api
     runs-on: ubuntu-latest
     concurrency: deploy-espresso
     steps:

@@ -1,6 +1,6 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 
-name: Fly Deploy Beans
+name: Fly Deploy Beans API
 on:
   push:
     branches:
@@ -18,11 +18,11 @@ on:
       - "apis/entrypoint.sh"
       - "apis/llama-cpp/**"
       - "apis/fly.beans.toml"
-      - ".github/workflows/fly-beans-deploy.yml"
+      - ".github/workflows/fly-deploy-beans.yml"
   workflow_dispatch:
 jobs:
   deploy:
-    name: Deploy app
+    name: Deploy Beans api
     runs-on: ubuntu-latest
     concurrency: deploy-beans
     steps:
