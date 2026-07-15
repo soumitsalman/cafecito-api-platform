@@ -3,8 +3,7 @@
 name: Fly Deploy Espresso API
 on:
   push:
-    branches:
-      - restructure
+    branches: [dev]
     # Deploy only when the Espresso image or this workflow/configuration changes.
     # The image is built from apis/ and the shared Dockerfile/assets, while
     # Beans-only source changes do not affect the Espresso deployment.
