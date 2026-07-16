@@ -16,7 +16,7 @@
     "react": "^19",
     "react-dom": "^19",
     "slugify": "^1.6.6",
-    "zudoku": "^0.79.1"
+    "zudoku": "^0.82.3"
   },
   "devDependencies": {
     "@types/node": "^22",

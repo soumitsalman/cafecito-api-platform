@@ -1,0 +1,72 @@
+diff --git a/node_modules/zudoku/src/lib/authentication/providers/clerk.tsx b/node_modules/zudoku/src/lib/authentication/providers/clerk.tsx
+index 3e4e0ba..b449aaf 100644
+--- a/node_modules/zudoku/src/lib/authentication/providers/clerk.tsx
++++ b/node_modules/zudoku/src/lib/authentication/providers/clerk.tsx
+@@ -36,9 +36,13 @@ type ClerkRedirectOptions = {
+   signUpForceRedirectUrl?: string;
+ };
+ 
++type ClerkUIConstructor = unknown;
++
+ type Clerk = {
+   session: ClerkSession | null | undefined;
+-  load: () => Promise<void>;
++  load: (options?: {
++    ui?: { ClerkUI: ClerkUIConstructor };
++  }) => Promise<void>;
+   signOut: (opts: { redirectUrl: string }) => Promise<void>;
+   redirectToSignIn: (opts: ClerkRedirectOptions) => Promise<void>;
+   redirectToSignUp: (opts: ClerkRedirectOptions) => Promise<void>;
+@@ -63,24 +67,41 @@ const loadClerk = (publishableKey: string): Promise<Clerk> => {
+ 
+   clerkPromise = new Promise<void>((resolve, reject) => {
+     const frontendApiUrl = getClerkFrontendApi(publishableKey);
+-
+-    const script = document.createElement("script");
+-    script.src = `https://${frontendApiUrl}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
+-    script.async = true;
+-    script.crossOrigin = "anonymous";
+-    script.dataset.clerkPublishableKey = publishableKey;
+-    script.onload = () => resolve();
+-    script.onerror = () => {
++    const uiScript = document.createElement("script");
++    uiScript.src = `https://${frontendApiUrl}/npm/@clerk/ui@1/dist/ui.browser.js`;
++    uiScript.async = true;
++    uiScript.crossOrigin = "anonymous";
++    uiScript.onload = () => {
++      const script = document.createElement("script");
++      script.src = `https://${frontendApiUrl}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
++      script.async = true;
++      script.crossOrigin = "anonymous";
++      script.dataset.clerkPublishableKey = publishableKey;
++      script.onload = () => resolve();
++      script.onerror = () => {
++        clerkPromise = undefined;
++        reject(new Error("Failed to load Clerk from CDN"));
++      };
++      document.head.appendChild(script);
++    };
++    uiScript.onerror = () => {
+       clerkPromise = undefined;
+-      reject(new Error("Failed to load Clerk from CDN"));
++      reject(new Error("Failed to load Clerk UI from CDN"));
+     };
+-    document.head.appendChild(script);
++
++    document.head.appendChild(uiScript);
+   }).then(async () => {
+     const clerk = (window as { Clerk?: Clerk }).Clerk;
+     if (!clerk) {
+       throw new Error("Clerk script loaded but window.Clerk is not available");
+     }
+-    await clerk.load();
++    const clerkUI = (
++      window as { __internal_ClerkUICtor?: ClerkUIConstructor }
++    ).__internal_ClerkUICtor;
++    if (!clerkUI) {
++      throw new Error("Clerk UI script loaded but ClerkUI is not available");
++    }
++    await clerk.load({ ui: { ClerkUI: clerkUI } });
+     return clerk;
+   });
+ 
