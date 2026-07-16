@@ -1,11 +1,10 @@
 import {
   ClerkProvider,
-  SignedIn,
-  SignedOut,
+  Show,
   SignIn,
   UserProfile,
-} from "@clerk/clerk-react";
-import { dark } from '@clerk/ui/themes'
+} from "@clerk/react";
+import { dark } from "@clerk/ui/themes";
 
 const viteEnv = (import.meta as ImportMeta & {
   env?: Record<string, string | undefined>;
@@ -29,14 +28,14 @@ export default function AccountPage() {
 
   return (
     <div className="my-4">
-      <ClerkProvider publishableKey={clerkPubKey} appearance={{theme: dark}}>
-          <SignedIn>
-            <UserProfile path="/account" routing="path" />
-          </SignedIn>
+      <ClerkProvider publishableKey={clerkPubKey} appearance={{ theme: dark }}>
+        <Show when="signed-in">
+          <UserProfile path="/account" routing="path" />
+        </Show>
 
-          <SignedOut>
-            <SignIn routing="virtual" signUpUrl="/account?mode=sign-up" />
-          </SignedOut>
+        <Show when="signed-out">
+          <SignIn routing="hash" signUpUrl="/account?mode=sign-up" />
+        </Show>
       </ClerkProvider>
     </div>
   );
