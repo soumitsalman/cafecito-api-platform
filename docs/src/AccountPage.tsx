@@ -4,6 +4,7 @@ import {
   SignIn,
   UserProfile,
 } from "@clerk/react";
+import { ui } from "@clerk/ui";
 import { dark } from "@clerk/ui/themes";
 
 const viteEnv = (import.meta as ImportMeta & {
@@ -28,7 +29,11 @@ export default function AccountPage() {
 
   return (
     <div className="my-4">
-      <ClerkProvider publishableKey={clerkPubKey} appearance={{ theme: dark }}>
+      <ClerkProvider
+        publishableKey={clerkPubKey}
+        ui={ui}
+        appearance={{ theme: dark }}
+      >
         <Show when="signed-in">
           <UserProfile path="/account" routing="path" />
         </Show>

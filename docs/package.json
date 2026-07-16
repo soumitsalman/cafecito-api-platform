@@ -11,7 +11,7 @@
   "dependencies": {
     "@clerk/clerk-js": "^5.125.1",
     "@clerk/react": "^6.12.4",
-    "@clerk/ui": "^1.1.0",
+    "@clerk/ui": "^1.25.4",
     "@mdx-js/react": "3.0.1",
     "react": "^19",
     "react-dom": "^19",
