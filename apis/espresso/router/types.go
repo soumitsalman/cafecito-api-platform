@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
 	datautils "github.com/soumitsalman/data-utils"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
 )
 
 // ErrorResponse is the standard JSON error envelope for 4xx and 5xx responses.

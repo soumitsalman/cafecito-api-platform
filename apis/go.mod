@@ -1,4 +1,4 @@
-module github.com/soumitsalman/cafecito-platform/apis
+module github.com/soumitsalman/cafecito-api-platform/apis
 
 go 1.25.0
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	bs "github.com/soumitsalman/cafecito-platform/apis/beans/beansack"
+	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/k0kubun/pp"

@@ -14,7 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/k0kubun/pp"
-	"github.com/soumitsalman/cafecito-platform/apis/beans/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	bs "github.com/soumitsalman/cafecito-platform/apis/beans/beansack"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
 const testVectorQuery = "market trend changes due to public policy changes"

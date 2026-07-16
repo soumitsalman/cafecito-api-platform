@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
 const testVectorQuery = "market trend changes due to public policy changes"

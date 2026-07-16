@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
 	"github.com/stretchr/testify/assert"
 )
 

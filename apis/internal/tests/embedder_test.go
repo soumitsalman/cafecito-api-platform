@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
 const retrievalQueryPrefix = "Instruct: Given a question, retrieve passages that can help answer the question.\nQuery: "

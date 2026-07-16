@@ -18,7 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/k0kubun/pp"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

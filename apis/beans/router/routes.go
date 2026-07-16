@@ -12,8 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	bs "github.com/soumitsalman/cafecito-platform/apis/beans/beansack"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )

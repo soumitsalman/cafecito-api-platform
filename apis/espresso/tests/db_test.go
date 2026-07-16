@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/k0kubun/pp"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
 	"github.com/stretchr/testify/assert"
 )
 

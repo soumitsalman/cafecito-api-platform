@@ -18,11 +18,11 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	bs "github.com/soumitsalman/cafecito-platform/apis/beans/beansack"
-	_ "github.com/soumitsalman/cafecito-platform/apis/beans/docs"
-	r "github.com/soumitsalman/cafecito-platform/apis/beans/router"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/config"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
+	_ "github.com/soumitsalman/cafecito-api-platform/apis/beans/docs"
+	r "github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
 const (

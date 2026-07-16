@@ -25,8 +25,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )

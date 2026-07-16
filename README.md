@@ -77,8 +77,3 @@ docker build --build-arg SERVICE=espresso -t cafecito-espresso:latest ./apis
 The Dockerfile downloads and hard-codes the `F2LLM-v2-80M.Q8_0.gguf` model, exposes the API on port `8080`, and starts the model server on the container loopback interface. Changing `MODEL_URL` at build time is supported, but runtime environment variables do not switch the baked-in model. Push the resulting image to your registry and deploy it with the platform’s container service configuration.
 
 Each service needs an `apis/<name>/.env` file for Compose (`env_file`), including its database connection and backend API key settings.
-
-## Learn more
-
-- [Zuplo documentation](https://zuplo.com/docs)
-- [Zuplo Discord](https://discord.zuplo.com)

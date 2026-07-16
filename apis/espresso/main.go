@@ -7,11 +7,11 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	"github.com/soumitsalman/cafecito-platform/apis/espresso/cupboard"
-	_ "github.com/soumitsalman/cafecito-platform/apis/espresso/docs"
-	r "github.com/soumitsalman/cafecito-platform/apis/espresso/router"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/config"
-	"github.com/soumitsalman/cafecito-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	_ "github.com/soumitsalman/cafecito-api-platform/apis/espresso/docs"
+	r "github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
 const (
