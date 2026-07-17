@@ -103,7 +103,7 @@ All metadata endpoints support `offset` (default 0) and `limit` (default 16, max
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
 | `q` | string (3–512) | Optional semantic search query (natural language, triggers vector embedding) |
-| `acc` | number (0–1) | Embedding similarity threshold — `0.0` = broad, `1.0` = strict (default `0.75`) |
+| `acc` | number (0–1) | Embedding similarity threshold — `0.0` = broad, `1.0` = strict (default `0.5`) |
 | `content_type` | string | Content type filter: `news` or `blog` |
 | `tags` | string[] | Case/whitespace-insensitive filter across categories, regions, entities combined (**recommended**). E.g., `AI`, `ai`, `#ai` are equivalent. AND combination. |
 | `categories` | string[] | Precise category topic filters — inclusive OR, case/whitespace-sensitive (discover values via `listCategories`) |
@@ -592,7 +592,7 @@ curl -s "${BASE_URL}/beans/articles/propagation?urls=https://example.com/story-a
 
 - **Discover filters first** — call `listCategories`, `listEntities`, or `listRegions` before exact `categories` / `regions` / `entities` filters.
 - **Prefer feeds over search** when a time-ordered window is enough — `getLatestArticles`, `getTrendingArticles`, and `getTopHeadlines` are lighter than full-corpus `searchArticles`.
-- **Start with `acc=0.75`**, then tweak up for precision or down for recall.
+- **Start with `acc=0.5`**, then tweak up for precision or down for recall.
 - **Use `from` parameter** on latest/trending to keep feeds fresh — specify YYYY-MM-DD dates (e.g., `from=2026-03-10`). Do not use `from` on top-headlines (fixed 24h window).
 - **Use `full_content=true`** sparingly — requests will be slower and payload larger; great for RAG/summarization pipelines.
 - **Paginate with `offset` + `limit`** for stable ingestion pipelines and monitoring.

@@ -1,4 +1,4 @@
-package cupboard
+package db
 
 import (
 	"fmt"

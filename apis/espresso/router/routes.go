@@ -25,7 +25,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -34,7 +34,7 @@ import (
 const (
 	MIN_WINDOW          = 1
 	DEFAULT_WINDOW      = 7 // DAYS
-	DEFAULT_ACCURACY    = 0.75
+	DEFAULT_ACCURACY    = 0.5
 	DEFAULT_LIMIT       = 16
 	MAX_LIMIT           = 128
 	FAVICON_PATH        = "images/espresso-insta-dark.png"
@@ -63,7 +63,7 @@ type sipsQueryParams struct {
 	IDs  []string  `form:"ids" collection_format:"csv"`
 	From time.Time `form:"from" time_format:"2006-01-02" swaggertype:"string" format:"date"`
 	Q    string    `form:"q" binding:"max=1024"`
-	Acc  float64   `form:"acc,default=0.75" binding:"min=0,max=1"`
+	Acc  float64   `form:"acc,default=0.5" binding:"min=0,max=1"`
 	Tags []string  `form:"tags" collection_format:"csv"`
 	baseQueryParams
 }
@@ -80,7 +80,7 @@ type relatedQueryParams struct {
 
 // Configuration wires database, embedding, auth, and caching dependencies into HTTP handlers.
 type Configuration struct {
-	DB       *cupboard.Cupboard
+	DB       *db.Cupboard
 	Embedder embedding.Embedder
 	APIKeys  map[string]string
 	queue    chan int
@@ -126,7 +126,7 @@ func (r *Configuration) getTags(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	data, err := r.DB.GetTags(c.Request.Context(), cupboard.Pagination{Limit: params.Limit, Offset: params.Offset})
+	data, err := r.DB.GetTags(c.Request.Context(), db.Pagination{Limit: params.Limit, Offset: params.Offset})
 	returnResponse(c, data, err, params.ResponseType)
 }
 
@@ -146,13 +146,13 @@ func convertStringsToUUIDs(strings []string) ([]uuid.UUID, error) {
 	return uuids, nil
 }
 
-func (config *Configuration) extractSipsParams(c *gin.Context) (*cupboard.Condition, *cupboard.Pagination, string) {
+func (config *Configuration) extractSipsParams(c *gin.Context) (*db.Condition, *db.Pagination, string) {
 	var input sipsQueryParams
 	if err := c.ShouldBindQuery(&input); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil, nil, ""
 	}
-	conditions := cupboard.Condition{
+	conditions := db.Condition{
 		Created: input.From,
 		Tags:    input.Tags,
 	}
@@ -171,14 +171,15 @@ func (config *Configuration) extractSipsParams(c *gin.Context) (*cupboard.Condit
 			return nil, nil, ""
 		}
 		config.cache.Set(input.Q, conditions.Embedding)
-		conditions.Distance = 1 - input.Acc
+		distance := 1 - input.Acc
+		conditions.Distance = &distance
 	}
-	return &conditions, &cupboard.Pagination{Limit: input.Limit, Offset: input.Offset}, input.ResponseType
+	return &conditions, &db.Pagination{Limit: input.Limit, Offset: input.Offset}, input.ResponseType
 }
 
 // getEvents godoc
 // @Summary Search event intelligence
-// @Description Returns event-kind sips sorted by `created` descending, newest first.
+// @Description Returns event-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
 // @Description **When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.
 // @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
 // @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
@@ -190,7 +191,7 @@ func (config *Configuration) extractSipsParams(c *gin.Context) (*cupboard.Condit
 // @Param ids query []string false "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
 // @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
 // @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param from query string false "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
 // @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
@@ -208,14 +209,14 @@ func (r *Configuration) getEvents(c *gin.Context) {
 	if conditions == nil || page == nil {
 		return
 	}
-	conditions.Kinds = cupboard.EVENTS
+	conditions.Kinds = db.EVENTS
 	items, err := r.DB.QuerySips(c.Request.Context(), *conditions, *page)
 	returnResponse(c, items, err, response_type)
 }
 
 // getSignals godoc
 // @Summary Search synthesized signals
-// @Description Returns signal-kind sips sorted by `created` descending, newest first.
+// @Description Returns signal-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
 // @Description **When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.
 // @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
 // @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
@@ -227,7 +228,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 // @Param ids query []string false "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
 // @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
 // @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param from query string false "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
 // @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
@@ -245,7 +246,7 @@ func (r *Configuration) getSignals(c *gin.Context) {
 	if conditions == nil || page == nil {
 		return
 	}
-	conditions.Kinds = cupboard.SIGNALS
+	conditions.Kinds = db.SIGNALS
 	items, err := r.DB.QuerySips(c.Request.Context(), *conditions, *page)
 	returnResponse(c, items, err, response_type)
 }
@@ -296,11 +297,11 @@ func (r *Configuration) getRelated(c *gin.Context) {
 	}
 	items, err := r.DB.QueryRelatedSips(
 		c.Request.Context(),
-		cupboard.Condition{
+		db.Condition{
 			IDs:          ids,
 			Relationship: strings.ToUpper(uri.Relationship),
 		},
-		cupboard.Pagination{Limit: query.Limit, Offset: query.Offset},
+		db.Pagination{Limit: query.Limit, Offset: query.Offset},
 	)
 	returnResponse(c, items, err, query.ResponseType)
 }
@@ -314,7 +315,7 @@ func returnResponse[T any](c *gin.Context, items []T, err error, response_type s
 		c.Status(http.StatusNoContent)
 		return
 	}
-	if sips, ok := any(items).([]cupboard.Sip); ok {
+	if sips, ok := any(items).([]db.Sip); ok {
 		if response_type == "text" {
 			c.String(http.StatusOK, SipsToText(sips))
 			return
@@ -330,7 +331,7 @@ func returnResponse[T any](c *gin.Context, items []T, err error, response_type s
 	c.JSON(http.StatusOK, items)
 }
 
-func NewRouter(db *cupboard.Cupboard, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
+func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
 	if max_concurrent_requests <= 0 {
 		max_concurrent_requests = DEFAULT_CONCURRENCY // default to 100 if not set or invalid
 	}

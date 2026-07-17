@@ -1,7 +1,8 @@
-package cupboard
+package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 	pgxvec "github.com/pgvector/pgvector-go/pgx"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
 )
 
 // pg connection configuration
@@ -35,9 +37,10 @@ const (
 )
 
 var (
-	EVENTS        = []string{"event:blog", "event:news", "event:post", "event:site", "event:social"}
-	SIGNALS       = []string{"signal"}
-	RELATIONSHIPS = []string{"SAME_AS", "DERIVED_FROM"}
+	EVENTS                    = []string{"event:blog", "event:news", "event:post", "event:site", "event:social"}
+	SIGNALS                   = []string{"signal"}
+	RELATIONSHIPS             = []string{"SAME_AS", "DERIVED_FROM"}
+	ErrVectorDistanceRequired = errors.New("vector counts require a distance threshold")
 )
 
 type Condition struct {
@@ -48,7 +51,7 @@ type Condition struct {
 	Tags         []string
 	FTS          bool
 	Embedding    []float32
-	Distance     float64
+	Distance     *float64
 	Extra        []string // CAUTION: This is a catch-all for any additional conditions. Use with care to avoid SQL injection.
 }
 
@@ -75,6 +78,9 @@ func NewCupboard(ctx context.Context, connString string) *Cupboard {
 		config.ConnConfig.RuntimeParams = map[string]string{}
 	}
 	config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%dmin", _TIMEOUT)
+	// Uncomment with pgvector 0.8.0+ to improve recall for filtered HNSW searches.
+	// config.ConnConfig.RuntimeParams["hnsw.iterative_scan"] = "strict_order"
+	// config.ConnConfig.RuntimeParams["hnsw.ef_search"] = "100"
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		return pgxvec.RegisterTypes(ctx, conn)
 	}
@@ -87,7 +93,11 @@ func NewCupboard(ctx context.Context, connString string) *Cupboard {
 }
 
 func (p *Cupboard) QuerySips(ctx context.Context, conditions Condition, page Pagination) ([]Sip, error) {
-	query, args := p.buildSQL(SIPS, conditions, page, _SIP_FIELDS)
+	if len(conditions.Embedding) > 0 {
+		query, args := BuildVectorSQL(conditions, page)
+		return fetchAll[Sip](ctx, p.db, query, args)
+	}
+	query, args := BuildScalarSQL(SIPS, conditions, page, _SIP_FIELDS)
 	return fetchAll[Sip](ctx, p.db, query, args)
 }
 
@@ -122,7 +132,14 @@ func (p *Cupboard) GetTags(ctx context.Context, page Pagination) ([]string, erro
 }
 
 func (p *Cupboard) CountSips(ctx context.Context, conditions Condition) (int64, error) {
-	query, args := p.buildSQL(SIPS, conditions, Pagination{}, "COUNT(*)")
+	if len(conditions.Embedding) > 0 {
+		if conditions.Distance == nil {
+			return 0, ErrVectorDistanceRequired
+		}
+		query, args := BuildVectorCountSQL(conditions)
+		return fetchOneScalar[int64](ctx, p.db, query, args)
+	}
+	query, args := BuildScalarSQL(SIPS, conditions, Pagination{}, "COUNT(*)")
 	return fetchOneScalar[int64](ctx, p.db, query, args)
 }
 
@@ -133,14 +150,12 @@ func (p *Cupboard) Close() {
 }
 
 // SQL query string builder utilities
-func (p *Cupboard) buildSQL(table string, conditions Condition, page Pagination, fields_expr string) (string, pgx.NamedArgs) {
-	// select fields
-	where_parts := make([]string, 0, 10)
-	params := pgx.NamedArgs{}
+func BuildScalarSQL(table string, conditions Condition, page Pagination, fields_expr string) (string, pgx.NamedArgs) {
+	where_parts, params := buildWhereParts(table, conditions)
 	order_parts := []string{}
 
 	// set fields and order parts based on table
-	if table == SIPS {
+	if table == SIPS && fields_expr != "COUNT(*)" {
 		order_parts = []string{_LATEST_SIPS, _TRENDING_SIPS}
 	}
 
@@ -148,6 +163,25 @@ func (p *Cupboard) buildSQL(table string, conditions Condition, page Pagination,
 	if table == SIPS {
 		from_expr = _SIP_FROM
 	}
+
+	expr_builder := strings.Builder{}
+	expr_builder.WriteString(fmt.Sprintf("SELECT %s FROM %s", fields_expr, from_expr))
+	if len(where_parts) > 0 {
+		expr_builder.WriteString("\nWHERE ")
+		expr_builder.WriteString(strings.Join(where_parts, " AND "))
+	}
+	if len(order_parts) > 0 {
+		expr_builder.WriteString("\nORDER BY ")
+		expr_builder.WriteString(strings.Join(order_parts, ", "))
+	}
+	buildPaginationExpr(page, &expr_builder, params)
+
+	return expr_builder.String(), params
+}
+
+func buildWhereParts(table string, conditions Condition) ([]string, pgx.NamedArgs) {
+	where_parts := make([]string, 0, 8)
+	params := pgx.NamedArgs{}
 
 	// when a set of IDs are given check if a relationship is set --> query the items that are related to the given IDs
 	// otherwise query the items by the given IDs
@@ -172,31 +206,69 @@ func (p *Cupboard) buildSQL(table string, conditions Condition, page Pagination,
 			params["tags"] = conditions.Tags
 		}
 	}
-	if len(conditions.Embedding) > 0 {
-		embedding_col := sipColumn(table, "embedding")
-		if conditions.Distance > 0 {
-			where_parts = append(where_parts, embedding_col+" <=> @embedding <= @distance")
-			params["distance"] = conditions.Distance
-		} else {
-			order_parts = []string{"(" + embedding_col + " <=> @embedding) ASC", _LATEST_SIPS}
-		}
-		params["embedding"] = pgvector.NewVector(conditions.Embedding)
-	}
 	if len(conditions.Extra) > 0 {
 		where_parts = append(where_parts, conditions.Extra...)
 	}
 
+	return where_parts, params
+}
+
+func BuildVectorSQL(conditions Condition, page Pagination) (string, pgx.NamedArgs) {
+	where_parts, params := buildWhereParts(SIPS, conditions)
+	embedding_col := sipColumn(SIPS, "embedding")
+	distance_expr := embedding_col + " <=> @embedding"
+	params["embedding"] = pgvector.NewVector(conditions.Embedding)
+
+	candidate_limit := (page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER
+	if candidate_limit <= 0 {
+		candidate_limit = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT
+	}
+	params["candidate_limit"] = candidate_limit
+
 	expr_builder := strings.Builder{}
-	expr_builder.WriteString(fmt.Sprintf("SELECT %s FROM %s", fields_expr, from_expr))
+	expr_builder.WriteString("WITH nearest_results AS MATERIALIZED (\n")
+	expr_builder.WriteString("SELECT ")
+	expr_builder.WriteString(_SIP_FIELDS)
+	expr_builder.WriteString(", ")
+	expr_builder.WriteString(distance_expr)
+	expr_builder.WriteString(" AS distance\nFROM ")
+	expr_builder.WriteString(_SIP_FROM)
 	if len(where_parts) > 0 {
 		expr_builder.WriteString("\nWHERE ")
 		expr_builder.WriteString(strings.Join(where_parts, " AND "))
 	}
-	if len(order_parts) > 0 {
-		expr_builder.WriteString("\nORDER BY ")
-		expr_builder.WriteString(strings.Join(order_parts, ", "))
+	expr_builder.WriteString("\nORDER BY ")
+	expr_builder.WriteString(distance_expr)
+	expr_builder.WriteString(" ASC\nLIMIT @candidate_limit\n)")
+	expr_builder.WriteString("\nSELECT ")
+	expr_builder.WriteString(_SIP_FIELDS)
+	expr_builder.WriteString("\nFROM nearest_results")
+	if conditions.Distance != nil {
+		expr_builder.WriteString("\nWHERE distance <= @distance")
+		params["distance"] = *conditions.Distance
 	}
+	expr_builder.WriteString("\nORDER BY distance ASC")
 	buildPaginationExpr(page, &expr_builder, params)
+
+	return expr_builder.String(), params
+}
+
+func BuildVectorCountSQL(conditions Condition) (string, pgx.NamedArgs) {
+	where_parts, params := buildWhereParts(SIPS, conditions)
+
+	if conditions.Distance != nil {
+		where_parts = append(where_parts, "(sips.embedding <=> @embedding) <= @distance")
+		params["embedding"] = pgvector.NewVector(conditions.Embedding)
+		params["distance"] = *conditions.Distance
+	}
+
+	expr_builder := strings.Builder{}
+	expr_builder.WriteString("SELECT COUNT(*) FROM ")
+	expr_builder.WriteString(_SIP_FROM)
+	if len(where_parts) > 0 {
+		expr_builder.WriteString("\nWHERE ")
+		expr_builder.WriteString(strings.Join(where_parts, " AND "))
+	}
 
 	return expr_builder.String(), params
 }

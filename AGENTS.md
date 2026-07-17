@@ -1,6 +1,6 @@
 # Cafecito API Manager Repository Knowledge Base
 
-Last refreshed: 2026-07-01
+Last refreshed: 2026-07-17
 
 ## System map
 
@@ -182,12 +182,25 @@ Root `docker-compose.yml` builds `apis/Dockerfile` separately for `beansapi` and
 
 ## Cross-component implementation notes
 
+- **When routes or swaggo docstrings in `apis/` change**, do both in the same change (in parallel where possible):
+  1. Regenerate Swagger with swaggo (beans: `cd apis/beans && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go -o docs`; espresso: `cd apis/espresso && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`).
+  2. Update the matching gateway OpenAPI file in `config/` (`config/beans.oas.json` for beans, `config/espresso.oas.json` for espresso) so public paths, parameters, and schemas stay aligned — gateway paths keep the `/beans` or `/espresso` prefix.
 - Public OpenAPI specs in `config/` should stay aligned with generated Swagger specs in `apis/*/docs/`.
 - Gateway paths add `/beans` or `/espresso`; backend service route files do not.
 - The gateway authenticates public traffic and forwards a backend API key header. The Go apis can also enforce `API_KEYS` directly.
 - Both Go apis use the same basic runtime pattern: env loading, DB pool, remote embedder, Gin router, CORS, optional API key middleware, and in-memory concurrency queue.
 - Both Go apis rely on external ingestion pipelines for database schema and data population; schema changes may require coordinating with `pycoffeemaker`.
 - For MCP/agent ergonomics, Espresso explicitly supports `response_type=text`; Beans exposes MCP docs and JSON APIs but does not currently mirror Espresso's text response format in the backend routes.
+
+## Go naming conventions (`apis/`)
+
+When writing or editing Go code under `apis/`, follow:
+
+- Local variables: `lower_snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+- Private functions: `camelCase`
+- Public functions: `PascalCase`
+- **Tests**: all Go tests belong in the service's `tests/` directory (e.g. `apis/beans/tests/`, `apis/espresso/tests/`). **Never** place `*_test.go` files next to production code under packages like `router/`, `cupboard/`, `beansack/`, `nlp/`, etc.
 
 ## First files to open by task
 

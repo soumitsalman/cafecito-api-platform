@@ -19,7 +19,7 @@
     "paths": {
         "/events": {
             "get": {
-                "description": "Returns event-kind sips sorted by `created` descending, newest first.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+                "description": "Returns event-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -61,8 +61,8 @@
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },
@@ -270,7 +270,7 @@
         },
         "/signals": {
             "get": {
-                "description": "Returns signal-kind sips sorted by `created` descending, newest first.\n**When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+                "description": "Returns signal-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.\n**When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -312,8 +312,8 @@
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },

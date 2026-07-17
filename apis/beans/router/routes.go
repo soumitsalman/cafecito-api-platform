@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
+	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -21,7 +21,7 @@ import (
 const (
 	MIN_WINDOW          = 1
 	DEFAULT_WINDOW      = 7 // DAYS
-	DEFAULT_ACCURACY    = 0.75
+	DEFAULT_ACCURACY    = 0.5
 	DEFAULT_LIMIT       = 16
 	MAX_LIMIT           = 128
 	FAVICON_PATH        = "./images/beans.png"
@@ -50,8 +50,8 @@ type PaginationInput struct {
 	Offset int `form:"offset" binding:"min=0"`
 }
 
-func (p PaginationInput) ToDB() bs.Pagination {
-	return bs.Pagination{Limit: p.Limit, Offset: p.Offset}
+func (p PaginationInput) ToDB() db.Pagination {
+	return db.Pagination{Limit: p.Limit, Offset: p.Offset}
 }
 
 func normalizePagination(p *PaginationInput) error {
@@ -87,7 +87,7 @@ type ArticlesInput struct {
 	Q string `form:"q" binding:"max=512"`
 	// Acc: Similarity accuracy threshold (0.0-1.0). Higher => stricter match.
 	// Used to compute vector distance (distance = 1 - Acc).
-	Acc float64 `form:"acc,default=0.75" binding:"min=0,max=1"`
+	Acc float64 `form:"acc,default=0.5" binding:"min=0,max=1"`
 	// ContentType: Optional content type filter (e.g., "news" or "blog").
 	ContentType string `form:"content_type" binding:"omitempty,oneof=news blog"`
 	// Categories: Filter results to one or more categories/topics (CSV).
@@ -134,7 +134,7 @@ func bindPropagationInput(c *gin.Context) (PropagationInput, error) {
 }
 
 type Configuration struct {
-	DB       bs.Beansack
+	DB       db.Beansack
 	Embedder embedding.Embedder
 	APIKeys  map[string]string
 	queue    chan int
@@ -188,7 +188,7 @@ func validateTagsParams(c *gin.Context) {
 // @ID listCategories
 // @Router /tags/categories [get]
 func (r *Configuration) getCategories(c *gin.Context) {
-	page := c.MustGet("req_page").(bs.Pagination)
+	page := c.MustGet("req_page").(db.Pagination)
 	data, err := r.DB.DistinctCategories(c.Request.Context(), page)
 	returnResponse(c, data, err)
 }
@@ -212,7 +212,7 @@ func (r *Configuration) getCategories(c *gin.Context) {
 // @ID listEntities
 // @Router /tags/entities [get]
 func (r *Configuration) getEntities(c *gin.Context) {
-	page := c.MustGet("req_page").(bs.Pagination)
+	page := c.MustGet("req_page").(db.Pagination)
 	data, err := r.DB.DistinctEntities(c.Request.Context(), page)
 	returnResponse(c, data, err)
 }
@@ -236,7 +236,7 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @ID listRegions
 // @Router /tags/regions [get]
 func (r *Configuration) getRegions(c *gin.Context) {
-	page := c.MustGet("req_page").(bs.Pagination)
+	page := c.MustGet("req_page").(db.Pagination)
 	data, err := r.DB.DistinctRegions(c.Request.Context(), page)
 	returnResponse(c, data, err)
 }
@@ -252,7 +252,7 @@ func validatePublishersParams(c *gin.Context) {
 		return
 	}
 	c.Set("req_params", input)
-	c.Set("req_conditions", bs.Condition{Sources: input.Sources})
+	c.Set("req_conditions", db.Condition{Sources: input.Sources})
 	c.Set("req_page", input.PaginationInput.ToDB())
 	c.Next()
 }
@@ -278,9 +278,9 @@ func validatePublishersParams(c *gin.Context) {
 // @ID getPublishers
 // @Router /sources [get]
 func (r *Configuration) getPublishers(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(bs.Condition)
-	page := c.MustGet("req_page").(bs.Pagination)
-	items, err := r.DB.QueryPublishers(c.Request.Context(), conditions, page, []string{bs.CORE_PUBLISHER_FIELDS})
+	conditions := c.MustGet("req_conditions").(db.Condition)
+	page := c.MustGet("req_page").(db.Pagination)
+	items, err := r.DB.QueryPublishers(c.Request.Context(), conditions, page, []string{db.CORE_PUBLISHER_FIELDS})
 	returnResponse(c, items, err)
 }
 
@@ -294,7 +294,7 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	conditions := bs.Condition{
+	conditions := db.Condition{
 		URLs:       input.URLs,
 		Kind:       input.ContentType,
 		Created:    input.From,
@@ -307,10 +307,11 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 		Extra:      []string{},
 	}
 	if input.FullContent {
-		conditions.Extra = append(conditions.Extra, bs.UNRESTRICTED_CONTENT_CONDITIONS)
+		conditions.Extra = append(conditions.Extra, db.UNRESTRICTED_CONTENT_CONDITIONS)
 	}
 	if input.Q != "" {
-		conditions.Distance = 1 - input.Acc
+		distance := 1 - input.Acc
+		conditions.Distance = &distance
 		if embedding, found := config.cache.GetIfPresent(input.Q); found {
 			conditions.Embedding = embedding
 		} else {
@@ -322,9 +323,9 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 			config.cache.Set(input.Q, conditions.Embedding)
 		}
 	}
-	columns := []string{bs.CORE_BEAN_FIELDS}
+	columns := []string{db.CORE_BEAN_FIELDS}
 	if input.FullContent {
-		columns = append(columns, bs.K_CONTENT)
+		columns = append(columns, db.K_CONTENT)
 	}
 	c.Set("req_params", input)
 	c.Set("req_conditions", conditions)
@@ -342,13 +343,13 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 // @Description - `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).
 // @Description - `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).
 // @Description - `urls`: fetch specific articles by canonical URL (CSV).
-// @Description **Performance**: scans the full index; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.
+// @Description **Performance**: semantic search uses indexed nearest-neighbor candidates; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.
 // @Description **Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.
 // @Tags Articles
 // @Accept json
 // @Produce json
 // @Param q query string false "Semantic search query in natural language (3–512 chars). Ranks by embedding similarity."
-// @Param acc query number false "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
 // @Param urls query []string false "Fetch articles by exact URL (CSV). Satisfies the required-search-param rule on its own." collectionFormat(csv)
 // @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values). Good when exact tag spelling is unknown." collectionFormat(csv)
@@ -370,12 +371,12 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 // @Router /articles/search [get]
 func (r *Configuration) searchArticles(c *gin.Context) {
 	input := c.MustGet("req_params").(ArticlesInput)
-	conditions := c.MustGet("req_conditions").(bs.Condition)
-	page := c.MustGet("req_page").(bs.Pagination)
+	conditions := c.MustGet("req_conditions").(db.Condition)
+	page := c.MustGet("req_page").(db.Pagination)
 	// the precanned columns do not apply here
-	columns := []string{bs.EXTENDED_BEAN_FIELDS}
+	columns := []string{db.EXTENDED_BEAN_FIELDS}
 	if input.FullContent {
-		columns = append(columns, bs.K_CONTENT)
+		columns = append(columns, db.K_CONTENT)
 	}
 	// NOTE: if no time window is given, thats fine
 	// but it should at least provide some search param
@@ -404,7 +405,7 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param q query string false "Optional semantic search query (3–512 chars). Narrows results by embedding similarity."
-// @Param acc query number false "Match strictness when q is set. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
 // @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
 // @Param categories query []string false "Exact topic filter (OR). Use listCategories for valid values." collectionFormat(csv)
@@ -424,8 +425,8 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @ID getLatestArticles
 // @Router /articles/latest [get]
 func (r *Configuration) getLatestArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(bs.Condition)
-	page := c.MustGet("req_page").(bs.Pagination)
+	conditions := c.MustGet("req_conditions").(db.Condition)
+	page := c.MustGet("req_page").(db.Pagination)
 	columns := c.MustGet("req_columns").([]string)
 	// default to last 7 days if no date filter is there
 	// and disable trending filter
@@ -448,7 +449,7 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param q query string false "Optional semantic search query (3–512 chars)."
-// @Param acc query number false "Match strictness when q is set. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
 // @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
 // @Param categories query []string false "Exact topic filter (OR)." collectionFormat(csv)
@@ -468,8 +469,8 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @ID getTrendingArticles
 // @Router /articles/trending [get]
 func (r *Configuration) getTrendingArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(bs.Condition)
-	page := c.MustGet("req_page").(bs.Pagination)
+	conditions := c.MustGet("req_conditions").(db.Condition)
+	page := c.MustGet("req_page").(db.Pagination)
 	columns := c.MustGet("req_columns").([]string)
 	// default to last 7 days if trending window provided
 	if conditions.Updated.IsZero() {
@@ -491,7 +492,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param q query string false "Optional semantic search query (3–512 chars)."
-// @Param acc query number false "Match strictness when q is set. Default 0.75." default(0.75) minimum(0) maximum(1)
+// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
 // @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
 // @Param categories query []string false "Exact topic filter (OR)." collectionFormat(csv)
@@ -510,8 +511,8 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @ID getTopHeadlines
 // @Router /articles/top-headlines [get]
 func (r *Configuration) getTopHeadlinesArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(bs.Condition)
-	page := c.MustGet("req_page").(bs.Pagination)
+	conditions := c.MustGet("req_conditions").(db.Condition)
+	page := c.MustGet("req_page").(db.Pagination)
 	columns := c.MustGet("req_columns").([]string)
 	conditions.Created = time.Now().AddDate(0, 0, -MIN_WINDOW) // last 24 hours
 	conditions.Updated = time.Now().AddDate(0, 0, -MIN_WINDOW)
@@ -574,7 +575,7 @@ func (r *Configuration) handleArticlePropagation(c *gin.Context) {
 	c.JSON(http.StatusOK, items)
 }
 
-func NewRouter(db bs.Beansack, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
+func NewRouter(db db.Beansack, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
 	if max_concurrent_requests <= 0 {
 		max_concurrent_requests = DEFAULT_CONCURRENCY // default to 100 if not set or invalid
 	}

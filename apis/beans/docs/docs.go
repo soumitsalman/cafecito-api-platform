@@ -47,8 +47,8 @@ const docTemplate = `{
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness when q is set. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness when q is set. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },
@@ -342,7 +342,7 @@ const docTemplate = `{
         },
         "/articles/search": {
             "get": {
-                "description": "**Primary MCP tool** — full-corpus search sorted by relevance.\n**Requires at least one of**: ` + "`" + `q` + "`" + `, ` + "`" + `tags` + "`" + `, ` + "`" + `categories` + "`" + `, ` + "`" + `regions` + "`" + `, ` + "`" + `entities` + "`" + `, or ` + "`" + `urls` + "`" + `.\n**Search modes** (combinable with filters):\n- ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + `: semantic vector search over article embeddings (natural language, 3–512 chars).\n- ` + "`" + `tags` + "`" + `: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- ` + "`" + `categories` + "`" + ` / ` + "`" + `regions` + "`" + ` / ` + "`" + `entities` + "`" + `: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).\n- ` + "`" + `urls` + "`" + `: fetch specific articles by canonical URL (CSV).\n**Performance**: scans the full index; prefer ` + "`" + `full_content=false` + "`" + ` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
+                "description": "**Primary MCP tool** — full-corpus search sorted by relevance.\n**Requires at least one of**: ` + "`" + `q` + "`" + `, ` + "`" + `tags` + "`" + `, ` + "`" + `categories` + "`" + `, ` + "`" + `regions` + "`" + `, ` + "`" + `entities` + "`" + `, or ` + "`" + `urls` + "`" + `.\n**Search modes** (combinable with filters):\n- ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + `: semantic vector search over article embeddings (natural language, 3–512 chars).\n- ` + "`" + `tags` + "`" + `: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- ` + "`" + `categories` + "`" + ` / ` + "`" + `regions` + "`" + ` / ` + "`" + `entities` + "`" + `: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).\n- ` + "`" + `urls` + "`" + `: fetch specific articles by canonical URL (CSV).\n**Performance**: semantic search uses indexed nearest-neighbor candidates; prefer ` + "`" + `full_content=false` + "`" + ` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
                 "consumes": [
                     "application/json"
                 ],
@@ -365,8 +365,8 @@ const docTemplate = `{
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },
@@ -548,8 +548,8 @@ const docTemplate = `{
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness when q is set. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness when q is set. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },
@@ -714,8 +714,8 @@ const docTemplate = `{
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.75,
-                        "description": "Match strictness when q is set. Default 0.75.",
+                        "default": 0.5,
+                        "description": "Match strictness when q is set. Default 0.5.",
                         "name": "acc",
                         "in": "query"
                     },

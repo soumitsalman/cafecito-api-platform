@@ -374,8 +374,8 @@ paths:
         in: query
         name: q
         type: string
-      - default: 0.75
-        description: Match strictness when q is set. Default 0.75.
+      - default: 0.5
+        description: Match strictness when q is set. Default 0.5.
         in: query
         maximum: 1
         minimum: 0
@@ -604,7 +604,7 @@ paths:
         - `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).
         - `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).
         - `urls`: fetch specific articles by canonical URL (CSV).
-        **Performance**: scans the full index; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.
+        **Performance**: semantic search uses indexed nearest-neighbor candidates; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.
         **Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.
       operationId: searchArticles
       parameters:
@@ -613,9 +613,9 @@ paths:
         in: query
         name: q
         type: string
-      - default: 0.75
+      - default: 0.5
         description: Match strictness when q is set. 0.0=broad, 1.0=strict. Default
-          0.75.
+          0.5.
         in: query
         maximum: 1
         minimum: 0
@@ -749,8 +749,8 @@ paths:
         in: query
         name: q
         type: string
-      - default: 0.75
-        description: Match strictness when q is set. Default 0.75.
+      - default: 0.5
+        description: Match strictness when q is set. Default 0.5.
         in: query
         maximum: 1
         minimum: 0
@@ -870,8 +870,8 @@ paths:
         in: query
         name: q
         type: string
-      - default: 0.75
-        description: Match strictness when q is set. Default 0.75.
+      - default: 0.5
+        description: Match strictness when q is set. Default 0.5.
         in: query
         maximum: 1
         minimum: 0

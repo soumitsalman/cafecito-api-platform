@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	datautils "github.com/soumitsalman/data-utils"
 )
 
@@ -54,16 +54,16 @@ type Signal struct {
 	Tags            []string `json:"tags" example:"ai_sovereign_wealth_fund,ai_taxation,compute_tax,inflation,market_volatility"`
 }
 
-func enrichSipDigest(sip *cupboard.Sip) {
+func enrichSipDigest(sip *db.Sip) {
 	sip.Digest["id"] = sip.ID
 	sip.Digest["reported"] = sip.Created
 }
 
-func sipsToDigest(sips []cupboard.Sip) []map[string]any {
+func sipsToDigest(sips []db.Sip) []map[string]any {
 	for i := range sips {
 		enrichSipDigest(&sips[i])
 	}
-	return datautils.Transform(sips, func(sip *cupboard.Sip) map[string]any {
+	return datautils.Transform(sips, func(sip *db.Sip) map[string]any {
 		return sip.Digest
 	})
 }
@@ -193,7 +193,7 @@ func isExcludedMiddleKey(key string) bool {
 	return false
 }
 
-func SipToText(sip *cupboard.Sip) string {
+func SipToText(sip *db.Sip) string {
 	var lines []string
 
 	if !sip.Created.IsZero() {
@@ -226,7 +226,7 @@ func SipToText(sip *cupboard.Sip) string {
 	return strings.Join(lines, "\n")
 }
 
-func SipsToText(sips []cupboard.Sip) string {
+func SipsToText(sips []db.Sip) string {
 	blocks := make([]string, len(sips))
 	for i := range sips {
 		blocks[i] = SipToText(&sips[i])

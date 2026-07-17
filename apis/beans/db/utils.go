@@ -1,4 +1,4 @@
-package beansack
+package db
 
 import (
 	"database/sql/driver"

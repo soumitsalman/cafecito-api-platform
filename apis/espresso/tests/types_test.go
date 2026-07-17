@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/cupboard"
+	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSipToText(t *testing.T) {
-	sip := cupboard.Sip{
+	sip := db.Sip{
 		Created: time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC),
 		Digest: map[string]any{
 			"id":             uuid.New(),
@@ -44,7 +44,7 @@ func TestSipToText(t *testing.T) {
 }
 
 func TestSipsToText(t *testing.T) {
-	sips := []cupboard.Sip{
+	sips := []db.Sip{
 		{
 			Created: time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC),
 			Digest:  map[string]any{"briefing": "first"},

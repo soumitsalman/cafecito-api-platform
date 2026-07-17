@@ -80,7 +80,7 @@ List endpoints flatten each sip's digest and merge **`id`**, **`reported`**, and
 | `ids` | CSV UUIDs | Fetch specific sips by UUID (RFC 4122) |
 | `tags` | CSV strings | Tag filters, ANDed across supplied tags |
 | `q` | string | Semantic search query, max 1024 characters (requires embedder) |
-| `acc` | number (0–1) | Minimum similarity for `q` — `0.0` = broad, `1.0` = strict (default `0.75`) |
+| `acc` | number (0–1) | Minimum similarity for `q` — `0.0` = broad, `1.0` = strict (default `0.5`) |
 | `from` | date | Include sips created on or after `YYYY-MM-DD` (JSON field is `reported`) |
 | `response_type` | string | `json` or `text`, default `json` |
 | `limit` | integer (1–128) | Page size, default `16` |

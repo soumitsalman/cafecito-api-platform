@@ -180,7 +180,7 @@ paths:
   /events:
     get:
       description: |-
-        Returns event-kind sips sorted by `created` descending, newest first.
+        Returns event-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
         **When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.
         **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
         **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
@@ -210,8 +210,8 @@ paths:
         maxLength: 1024
         name: q
         type: string
-      - default: 0.75
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.
+      - default: 0.5
+        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
         in: query
         maximum: 1
         minimum: 0
@@ -379,7 +379,7 @@ paths:
   /signals:
     get:
       description: |-
-        Returns signal-kind sips sorted by `created` descending, newest first.
+        Returns signal-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
         **When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.
         **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
         **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
@@ -409,8 +409,8 @@ paths:
         maxLength: 1024
         name: q
         type: string
-      - default: 0.75
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.75.
+      - default: 0.5
+        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
         in: query
         maximum: 1
         minimum: 0

@@ -18,7 +18,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	bs "github.com/soumitsalman/cafecito-api-platform/apis/beans/beansack"
+	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
 	_ "github.com/soumitsalman/cafecito-api-platform/apis/beans/docs"
 	r "github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
@@ -37,8 +37,8 @@ func main() {
 	defer cancel()
 
 	connStr := config.GetEnv("PG_CONNECTION_STRING", "", true)
-	db := bs.NewPGSack(ctx, connStr)
-	defer db.Close()
+	beansack := db.NewPGSack(ctx, connStr)
+	defer beansack.Close()
 
 	// determine concurrency limit from environment
 	maxStr := config.GetEnv("MAX_CONCURRENT_REQUESTS", "", false)
@@ -48,7 +48,7 @@ func main() {
 	}
 
 	api := r.NewRouter(
-		db,
+		beansack,
 		embedding.NewHTTPEmbedder(
 			config.GetEnv("EMBEDDER_BASE_URL", DEFAULT_EMBEDDER_BASE_URL, true),
 			config.GetEnv("EMBEDDER_API_KEY", "", false),

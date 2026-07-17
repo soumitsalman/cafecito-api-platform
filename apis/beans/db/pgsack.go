@@ -1,8 +1,9 @@
-package beansack
+package db
 
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 	pgxvec "github.com/pgvector/pgvector-go/pgx"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
 	datautils "github.com/soumitsalman/data-utils"
 )
 
@@ -25,6 +27,71 @@ const (
 	_TRENDING_BEANS_VIEW   = "trending_beans_view"
 	_AGGREGATED_BEANS_VIEW = "aggregated_beans_view"
 )
+
+// Name of mandatory tables.
+const (
+	BEANS            = "beans"
+	PUBLISHERS       = "publishers"
+	CHATTERS         = "chatters"
+	RELATED_BEANS    = "related_beans"
+	BEAN_RELATIONS   = "bean_relations"
+	FIXED_CATEGORIES = "fixed_categories"
+	FIXED_SENTIMENTS = "fixed_sentiments"
+)
+
+const (
+	CORE_BEAN_FIELDS                = "url, kind, title, summary, author, source, image_url, created, categories, sentiments, regions, entities"
+	CORE_PUBLISHER_FIELDS           = "source, base_url, site_name, description, favicon"
+	EXTENDED_BEAN_FIELDS            = "url, kind, title, summary, author, source, image_url, created, categories, sentiments, regions, entities, base_url, site_name, description, favicon, likes, comments, shares, related"
+	UNRESTRICTED_CONTENT_CONDITIONS = "restricted_content IS NULL AND content IS NOT NULL"
+	ORDER_BY_LATEST                 = "created DESC"
+	ORDER_BY_TRENDING               = "trend_score DESC"
+	ORDER_BY_DISTANCE               = "distance ASC"
+)
+
+var (
+	ErrNotImplemented         = errors.New("method not implemented")
+	ErrVectorDistanceRequired = errors.New("vector counts require a distance threshold")
+)
+
+type Condition struct {
+	URLs       []string
+	Kind       string
+	Created    time.Time
+	Updated    time.Time
+	Collected  time.Time
+	Categories []string
+	Regions    []string
+	Entities   []string
+	Tags       []string
+	Sources    []string
+	Embedding  []float32
+	Distance   *float64
+	Extra      []string // CAUTION: This is a catch-all for any additional conditions. Use with care to avoid SQL injection.
+}
+
+type Pagination struct {
+	Limit  int
+	Offset int
+}
+
+type Beansack interface {
+	QueryBeans(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]BeanAggregate, error)
+	QueryLatestBeans(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]Bean, error)
+	QueryTrendingBeans(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]BeanTrend, error)
+	QueryPublishers(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]Publisher, error)
+	QueryChatters(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]Chatter, error)
+	QueryPropagation(ctx context.Context, urls []string) ([]PropagationResult, error)
+
+	DistinctCategories(ctx context.Context, page Pagination) ([]string, error)
+	DistinctSentiments(ctx context.Context, page Pagination) ([]string, error)
+	DistinctEntities(ctx context.Context, page Pagination) ([]string, error)
+	DistinctRegions(ctx context.Context, page Pagination) ([]string, error)
+	DistinctSources(ctx context.Context, page Pagination) ([]string, error)
+
+	CountRows(ctx context.Context, table string, conditions Condition) (int64, error)
+	Close()
+}
 
 type PGSack struct {
 	db *pgxpool.Pool
@@ -44,6 +111,9 @@ func NewPGSack(ctx context.Context, connString string) *PGSack {
 		config.ConnConfig.RuntimeParams = map[string]string{}
 	}
 	config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%dmin", _TIMEOUT)
+	// Uncomment with pgvector 0.8.0+ to improve recall for filtered HNSW searches.
+	// config.ConnConfig.RuntimeParams["hnsw.iterative_scan"] = "strict_order"
+	// config.ConnConfig.RuntimeParams["hnsw.ef_search"] = "100"
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		return pgxvec.RegisterTypes(ctx, conn)
 	}
@@ -81,7 +151,7 @@ func (p *PGSack) QueryTrendingBeans(ctx context.Context, conditions Condition, p
 
 // TODO: how to pass in text/tag/keyword based search
 func (p *PGSack) QueryPublishers(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]Publisher, error) {
-	query, args := p.buildSQL(PUBLISHERS, conditions, nil, page, columns)
+	query, args := p.BuildScalarSQL(PUBLISHERS, conditions, nil, page, columns)
 	items, err := fetchAll[dataRow](ctx, p.db, query, args)
 	if err != nil {
 		return nil, err
@@ -90,7 +160,7 @@ func (p *PGSack) QueryPublishers(ctx context.Context, conditions Condition, page
 }
 
 func (p *PGSack) QueryChatters(ctx context.Context, conditions Condition, page Pagination, columns []string) ([]Chatter, error) {
-	query, args := p.buildSQL(CHATTERS, conditions, nil, page, columns)
+	query, args := p.BuildScalarSQL(CHATTERS, conditions, nil, page, columns)
 	items, err := fetchAll[dataRow](ctx, p.db, query, args)
 	if err != nil {
 		return nil, err
@@ -194,32 +264,39 @@ func (p *PGSack) QueryPropagation(ctx context.Context, urls []string) ([]Propaga
 
 func (p *PGSack) DistinctCategories(ctx context.Context, page Pagination) ([]string, error) {
 	// SELECT DISTINCT unnest(categories) AS category FROM beans WHERE categories IS NOT NULL ORDER BY category
-	query, args := p.buildSQL(BEANS, Condition{Extra: []string{"categories IS NOT NULL"}}, []string{"category"}, page, []string{"DISTINCT unnest(categories) AS category"})
+	query, args := p.BuildScalarSQL(BEANS, Condition{Extra: []string{"categories IS NOT NULL"}}, []string{"category"}, page, []string{"DISTINCT unnest(categories) AS category"})
 	return fetchAllScalar[string](ctx, p.db, query, args)
 }
 
 func (p *PGSack) DistinctSentiments(ctx context.Context, page Pagination) ([]string, error) {
-	query, args := p.buildSQL(BEANS, Condition{Extra: []string{"sentiments IS NOT NULL"}}, []string{"sentiment"}, page, []string{"DISTINCT unnest(sentiments) AS sentiment"})
+	query, args := p.BuildScalarSQL(BEANS, Condition{Extra: []string{"sentiments IS NOT NULL"}}, []string{"sentiment"}, page, []string{"DISTINCT unnest(sentiments) AS sentiment"})
 	return fetchAllScalar[string](ctx, p.db, query, args)
 }
 
 func (p *PGSack) DistinctEntities(ctx context.Context, page Pagination) ([]string, error) {
-	query, args := p.buildSQL(BEANS, Condition{Extra: []string{"entities IS NOT NULL"}}, []string{"entity"}, page, []string{"DISTINCT unnest(entities) AS entity"})
+	query, args := p.BuildScalarSQL(BEANS, Condition{Extra: []string{"entities IS NOT NULL"}}, []string{"entity"}, page, []string{"DISTINCT unnest(entities) AS entity"})
 	return fetchAllScalar[string](ctx, p.db, query, args)
 }
 
 func (p *PGSack) DistinctRegions(ctx context.Context, page Pagination) ([]string, error) {
-	query, args := p.buildSQL(BEANS, Condition{Extra: []string{"regions IS NOT NULL"}}, []string{"region"}, page, []string{"DISTINCT unnest(regions) AS region"})
+	query, args := p.BuildScalarSQL(BEANS, Condition{Extra: []string{"regions IS NOT NULL"}}, []string{"region"}, page, []string{"DISTINCT unnest(regions) AS region"})
 	return fetchAllScalar[string](ctx, p.db, query, args)
 }
 
 func (p *PGSack) DistinctSources(ctx context.Context, page Pagination) ([]string, error) {
-	query, args := p.buildSQL(PUBLISHERS, Condition{}, []string{"source"}, page, []string{"source"})
+	query, args := p.BuildScalarSQL(PUBLISHERS, Condition{}, []string{"source"}, page, []string{"source"})
 	return fetchAllScalar[string](ctx, p.db, query, args)
 }
 
 func (p *PGSack) CountRows(ctx context.Context, table string, conditions Condition) (int64, error) {
-	query, args := p.buildSQL(table, conditions, nil, Pagination{}, []string{"count(*)"})
+	if len(conditions.Embedding) > 0 {
+		if conditions.Distance == nil {
+			return 0, ErrVectorDistanceRequired
+		}
+		query, args := p.BuildVectorCountSQL(table, conditions)
+		return fetchOneScalar[int64](ctx, p.db, query, args)
+	}
+	query, args := p.BuildScalarSQL(table, conditions, nil, Pagination{}, []string{"count(*)"})
 	return fetchOneScalar[int64](ctx, p.db, query, args)
 }
 
@@ -230,79 +307,134 @@ func (p *PGSack) Close() {
 }
 
 func fetchBeans(ctx context.Context, p *PGSack, table string, conditions Condition, orders []string, page Pagination, columns []string) ([]dataRow, error) {
-	query, args := p.buildSQL(table, conditions, orders, page, columns)
+	var query string
+	var args pgx.NamedArgs
+	if len(conditions.Embedding) > 0 {
+		where_expr, where_params := p.buildWhereExpr(conditions)
+		query, args = p.BuildVectorSQL(table, conditions, where_expr, where_params, orders, page, buildSQLFields(columns))
+	} else {
+		query, args = p.BuildScalarSQL(table, conditions, orders, page, columns)
+	}
 	beans, err := fetchAll[dataRow](ctx, p.db, query, args)
 	// logQueryResult(beans, err)
 	return beans, err
 }
 
 // SQL query string builder utilities
-// TODO: add function for building query
-func (p *PGSack) buildSQL(table string, conditions Condition, orders []string, page Pagination, columns []string) (string, pgx.NamedArgs) {
+// BuildScalarSQL creates a non-vector query from scalar filters, ordering, and pagination.
+func (p *PGSack) BuildScalarSQL(table string, conditions Condition, orders []string, page Pagination, columns []string) (string, pgx.NamedArgs) {
 	// where clause first - because we may need it before select
-	where_expr, where_params := p.buildSQLWhere(conditions)
+	where_expr, where_params := p.buildWhereExpr(conditions)
 
 	// select fields
-	fields := "*"
-	if len(columns) > 0 {
-		fields = strings.Join(columns, ", ")
-	}
+	fields := buildSQLFields(columns)
 
-	// either simple select or vector search with distance calculation
 	base_expr := fmt.Sprintf("SELECT %s FROM %s %s", fields, table, where_expr)
-	base_params := pgx.NamedArgs{}
-	if conditions.Embedding != nil {
-		base_expr = fmt.Sprintf(`
-			WITH vector_distances AS (
-                SELECT *, (embedding <=> @embedding::vector) AS distance
-                FROM %s
-				%s
-            )
-            SELECT %s
-            FROM vector_distances
-            WHERE distance <= @distance`,
-			table, where_expr, fields,
-		)
-		base_params["embedding"] = pgvector.NewVector(conditions.Embedding)
-		base_params["distance"] = conditions.Distance
-		if orders == nil {
-			orders = []string{ORDER_BY_DISTANCE}
-		} else {
-			orders = append(orders, ORDER_BY_DISTANCE)
-		}
-	}
 	builder := strings.Builder{}
 	builder.WriteString(base_expr)
 
 	// orders
 	if len(orders) > 0 {
 		builder.WriteString(" ")
-		builder.WriteString(p.buildPGOrderBy(orders...))
+		builder.WriteString(buildOrderBy(orders...))
 	}
 	// pagination
-	page_expr, page_params := p.buildPGLimitOffset(page)
+	page_expr, page_params := buildPaginationExpr(page)
 	if page_expr != "" {
 		builder.WriteString(" ")
 		builder.WriteString(page_expr)
 	}
-	query, args := builder.String(), mergeParams(base_params, where_params, page_params)
+	query, args := builder.String(), mergeParams(where_params, page_params)
 	// LogQuery(query, args)
 	return query, args
+}
+
+func buildSQLFields(columns []string) string {
+	if len(columns) == 0 {
+		return "*"
+	}
+	return strings.Join(columns, ", ")
+}
+
+// BuildVectorSQL creates an HNSW-compatible nearest-neighbor query with an optional distance cutoff.
+func (p *PGSack) BuildVectorSQL(table string, conditions Condition, where_expr string, where_params pgx.NamedArgs, orders []string, page Pagination, fields string) (string, pgx.NamedArgs) {
+	candidate_limit := (page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER
+	if candidate_limit <= 0 {
+		candidate_limit = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT
+	}
+
+	distance_expr := "embedding <=> @embedding::vector"
+	candidate_params := pgx.NamedArgs{
+		"embedding":       pgvector.NewVector(conditions.Embedding),
+		"candidate_limit": candidate_limit,
+	}
+
+	if orders == nil {
+		orders = []string{ORDER_BY_DISTANCE}
+	} else {
+		orders = append(orders, ORDER_BY_DISTANCE)
+	}
+
+	builder := strings.Builder{}
+	builder.WriteString("WITH nearest_results AS MATERIALIZED (\n")
+	builder.WriteString("SELECT *, (")
+	builder.WriteString(distance_expr)
+	builder.WriteString(") AS distance\nFROM ")
+	builder.WriteString(table)
+	if where_expr != "" {
+		builder.WriteString("\n")
+		builder.WriteString(where_expr)
+	}
+	builder.WriteString("\nORDER BY ")
+	builder.WriteString(distance_expr)
+	builder.WriteString(" ASC\nLIMIT @candidate_limit\n)\nSELECT ")
+	builder.WriteString(fields)
+	builder.WriteString("\nFROM nearest_results")
+	if conditions.Distance != nil {
+		builder.WriteString("\nWHERE distance <= @distance")
+		candidate_params["distance"] = *conditions.Distance
+	}
+	builder.WriteString("\n")
+	builder.WriteString(buildOrderBy(orders...))
+
+	page_expr, page_params := buildPaginationExpr(page)
+	if page_expr != "" {
+		builder.WriteString(" ")
+		builder.WriteString(page_expr)
+	}
+
+	return builder.String(), mergeParams(candidate_params, where_params, page_params)
+}
+
+// BuildVectorCountSQL creates an exact vector-distance count query without ANN ordering.
+func (p *PGSack) BuildVectorCountSQL(table string, conditions Condition) (string, pgx.NamedArgs) {
+	where_expr, where_params := p.buildWhereExpr(conditions)
+	if conditions.Distance != nil {
+		if where_expr == "" {
+			where_expr = "WHERE (embedding <=> @embedding::vector) <= @distance"
+		} else {
+			where_expr += " AND (embedding <=> @embedding::vector) <= @distance"
+		}
+		where_params = mergeParams(where_params, pgx.NamedArgs{
+			"embedding": pgvector.NewVector(conditions.Embedding),
+			"distance":  *conditions.Distance,
+		})
+	}
+
+	return fmt.Sprintf("SELECT count(*) FROM %s %s", table, where_expr), where_params
 }
 
 func mergeParams(maps ...pgx.NamedArgs) pgx.NamedArgs {
 	merged := pgx.NamedArgs{}
 	for _, m := range maps {
-		if m != nil {
-			for k, v := range m {
-				merged[k] = v
-			}
+		for k, v := range m {
+			merged[k] = v
 		}
 	}
 	return merged
 }
 
-func (p *PGSack) buildSQLWhere(conditions Condition) (string, pgx.NamedArgs) {
+func (p *PGSack) buildWhereExpr(conditions Condition) (string, pgx.NamedArgs) {
 	parts := make([]string, 0, 10) // preallocate for expected conditions
 	args := pgx.NamedArgs{}
 
@@ -366,14 +498,14 @@ func (p *PGSack) buildSQLWhere(conditions Condition) (string, pgx.NamedArgs) {
 	return fmt.Sprintf("WHERE %s", strings.Join(parts, " AND ")), args
 }
 
-func (p *PGSack) buildPGOrderBy(order ...string) string {
+func buildOrderBy(order ...string) string {
 	if len(order) == 0 {
 		return ""
 	}
 	return "ORDER BY " + strings.Join(order, ", ")
 }
 
-func (p *PGSack) buildPGLimitOffset(page Pagination) (string, pgx.NamedArgs) {
+func buildPaginationExpr(page Pagination) (string, pgx.NamedArgs) {
 	parts := make([]string, 0, 2)
 	args := pgx.NamedArgs{}
 
