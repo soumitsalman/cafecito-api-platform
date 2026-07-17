@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/avast/retry-go/v5"
 	"github.com/rs/zerolog/log"
+	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
 )
 
 type HTTPEmbedder struct {
@@ -17,6 +19,7 @@ type HTTPEmbedder struct {
 	apiKey   string
 	model    string
 	client   *http.Client
+	retrier  *retry.Retrier
 }
 
 type httpEmbeddingRequest struct {
@@ -55,6 +58,10 @@ func NewHTTPEmbedder(baseURL, apiKey, model string) *HTTPEmbedder {
 			Timeout:   _TIMEOUT,
 			Transport: transport,
 		},
+		retrier: retry.New(
+			retry.Attempts(config.RETRY_ATTEMPTS),
+			retry.Delay(config.RETRY_DELAY),
+		),
 	}
 }
 
@@ -87,33 +94,46 @@ func (e *HTTPEmbedder) embed(ctx context.Context, inputs []string) [][]float32 {
 		}
 	}
 
-	resp, err := e.client.Do(req)
+	var decoded httpEmbeddingResponse
+	// this is the retry part: waiting for the API to be available
+	err = e.retrier.Do(
+		func() error {
+			resp, err := e.client.Do(req)
+			if err != nil {
+				log.Error().Str("module", "EMBEDDER").Err(err).Msg("llama embedding request failed")
+				return err
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+				log.Error().
+					Str("module", "EMBEDDER").
+					Int("status", resp.StatusCode).
+					Str("response", strings.TrimSpace(string(body))).
+					Msg("llama embedding request returned an error")
+				return fmt.Errorf("llama embedding request returned an error: %d", resp.StatusCode)
+			}
+
+			if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+				log.Error().Str("module", "EMBEDDER").Err(err).Msg("failed to decode llama embedding response")
+				return fmt.Errorf("failed to decode llama embedding response: %w", err)
+			}
+
+			if len(decoded.Data) != len(inputs) {
+				log.Error().
+					Str("module", "EMBEDDER").
+					Err(fmt.Errorf("received %d embeddings for %d inputs", len(decoded.Data), len(inputs))).
+					Msg("invalid llama embedding response")
+				return fmt.Errorf("received %d embeddings for %d inputs", len(decoded.Data), len(inputs))
+			}
+
+			return nil
+		},
+	)
+
 	if err != nil {
 		log.Error().Str("module", "EMBEDDER").Err(err).Msg("llama embedding request failed")
-		return nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		log.Error().
-			Str("module", "EMBEDDER").
-			Int("status", resp.StatusCode).
-			Str("response", strings.TrimSpace(string(body))).
-			Msg("llama embedding request returned an error")
-		return nil
-	}
-
-	var decoded httpEmbeddingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		log.Error().Str("module", "EMBEDDER").Err(err).Msg("failed to decode llama embedding response")
-		return nil
-	}
-	if len(decoded.Data) != len(inputs) {
-		log.Error().
-			Str("module", "EMBEDDER").
-			Err(fmt.Errorf("received %d embeddings for %d inputs", len(decoded.Data), len(inputs))).
-			Msg("invalid llama embedding response")
 		return nil
 	}
 

@@ -3,9 +3,6 @@ set -eu
 
 llama_server="${LLAMA_SERVER:-/app/.tools/llama-cpp/llama-server}"
 llama_model="${LLAMA_MODEL:-/app/.models/F2LLM-v2-80M.Q8_0.gguf}"
-startup_timeout="${STARTUP_TIMEOUT:-30}"
-llama_host="${LLAMA_HOST:-127.0.0.1}"
-llama_port="${LLAMA_PORT:-10000}"
 api_pid=""
 llama_pid=""
 
@@ -43,26 +40,6 @@ terminate() {
 llama_pid=$!
 
 trap terminate INT TERM
-
-sleep 1
-attempt=0
-until curl --fail --silent --show-error \
-  "http://${llama_host}:${llama_port}/health" >/dev/null; do
-  if ! kill -0 "${llama_pid}" 2>/dev/null; then
-    echo "llama-server exited before becoming ready" >&2
-    wait "${llama_pid}" 2>/dev/null || true
-    exit 1
-  fi
-
-  attempt=$((attempt + 1))
-  if [ "${attempt}" -ge "${startup_timeout}" ]; then
-    echo "llama-server did not become ready within ${startup_timeout} seconds" >&2
-    kill -TERM "${llama_pid}" 2>/dev/null || true
-    wait "${llama_pid}" 2>/dev/null || true
-    exit 1
-  fi
-  sleep 1
-done
 
 /app/api &
 api_pid=$!
