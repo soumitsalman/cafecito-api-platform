@@ -310,7 +310,7 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 		conditions.Extra = append(conditions.Extra, db.UNRESTRICTED_CONTENT_CONDITIONS)
 	}
 	if input.Q != "" {
-		distance := 1 - input.Acc
+		distance := (1 - input.Acc) * 2
 		conditions.Distance = &distance
 		if embedding, found := config.cache.GetIfPresent(input.Q); found {
 			conditions.Embedding = embedding

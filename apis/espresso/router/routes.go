@@ -171,7 +171,7 @@ func (config *Configuration) extractSipsParams(c *gin.Context) (*db.Condition, *
 			return nil, nil, ""
 		}
 		config.cache.Set(input.Q, conditions.Embedding)
-		distance := 1 - input.Acc
+		distance := (1 - input.Acc) * 2
 		conditions.Distance = &distance
 	}
 	return &conditions, &db.Pagination{Limit: input.Limit, Offset: input.Offset}, input.ResponseType
