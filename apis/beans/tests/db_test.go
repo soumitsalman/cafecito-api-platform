@@ -27,8 +27,6 @@ func TestBuildVectorSQLUsesHNSWCandidateQuery(t *testing.T) {
 	query, params := (&db.PGSack{}).BuildVectorSQL(
 		db.BEANS,
 		conditions,
-		"WHERE categories && @categories AND created >= @created_from",
-		nil,
 		[]string{db.ORDER_BY_LATEST},
 		db.Pagination{Limit: 16, Offset: 4},
 		"*",

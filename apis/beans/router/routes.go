@@ -296,7 +296,7 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 	}
 	conditions := db.Condition{
 		URLs:       input.URLs,
-		Kind:       input.ContentType,
+		Kind:       []string{db.NEWS, db.BLOG}, // default
 		Created:    input.From,
 		Updated:    input.From,
 		Tags:       input.Tags,
@@ -305,6 +305,9 @@ func (config *Configuration) validateArticlesParams(c *gin.Context) {
 		Entities:   input.Entities,
 		Sources:    input.Sources,
 		Extra:      []string{},
+	}
+	if len(input.ContentType) > 0 {
+		conditions.Kind = []string{input.ContentType}
 	}
 	if input.FullContent {
 		conditions.Extra = append(conditions.Extra, db.UNRESTRICTED_CONTENT_CONDITIONS)

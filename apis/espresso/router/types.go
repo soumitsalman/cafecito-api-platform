@@ -201,7 +201,7 @@ func SipToText(sip *db.Sip) string {
 	}
 
 	if tags := entityTags(sip.Digest); len(tags) > 0 {
-		lines = append(lines, "related:"+strings.Join(tags, "|"))
+		lines = append(lines, "tags:"+strings.Join(tags, "|"))
 	}
 
 	for _, key := range _priorityDigestKeys {

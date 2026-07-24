@@ -156,6 +156,9 @@ func (config *Configuration) extractSipsParams(c *gin.Context) (*db.Condition, *
 		Created: input.From,
 		Tags:    input.Tags,
 	}
+	if input.From.IsZero() {
+		conditions.Created = time.Now().AddDate(0, 0, -DEFAULT_WINDOW) // default to last 7 days if no published/trending filter provided
+	}
 	if len(input.IDs) > 0 {
 		ids, err := convertStringsToUUIDs(input.IDs)
 		if err != nil {

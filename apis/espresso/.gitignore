@@ -7,5 +7,6 @@
 .espresso
 .tools
 nlp/.proto
+graphify-out
 
 .models/

@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	EVENTS                    = []string{"event:blog", "event:news", "event:post", "event:site", "event:social"}
+	EVENTS                    = []string{"event:blog", "event:news", "event:post", "event:site", "event:social", "event"}
 	SIGNALS                   = []string{"signal"}
 	RELATIONSHIPS             = []string{"SAME_AS", "DERIVED_FROM"}
 	ErrVectorDistanceRequired = errors.New("vector counts require a distance threshold")
@@ -64,6 +64,11 @@ type Cupboard struct {
 	db *pgxpool.Pool
 }
 
+const _SQL_HNSW_SETTINGS = `
+SET hnsw.iterative_scan = strict_order;
+SET hnsw.ef_search = 100;
+`
+
 func NewCupboard(ctx context.Context, connString string) *Cupboard {
 	config, err := pgxpool.ParseConfig(connString)
 	NoError(err)
@@ -78,11 +83,12 @@ func NewCupboard(ctx context.Context, connString string) *Cupboard {
 		config.ConnConfig.RuntimeParams = map[string]string{}
 	}
 	config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%dmin", _TIMEOUT)
-	// Uncomment with pgvector 0.8.0+ to improve recall for filtered HNSW searches.
-	// config.ConnConfig.RuntimeParams["hnsw.iterative_scan"] = "strict_order"
-	// config.ConnConfig.RuntimeParams["hnsw.ef_search"] = "100"
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		return pgxvec.RegisterTypes(ctx, conn)
+		if err := pgxvec.RegisterTypes(ctx, conn); err != nil {
+			return err
+		}
+		_, err := conn.Exec(ctx, _SQL_HNSW_SETTINGS)
+		return err
 	}
 
 	db, err := pgxpool.NewWithConfig(ctx, config)
@@ -215,15 +221,11 @@ func buildWhereParts(table string, conditions Condition) ([]string, pgx.NamedArg
 
 func BuildVectorSQL(conditions Condition, page Pagination) (string, pgx.NamedArgs) {
 	where_parts, params := buildWhereParts(SIPS, conditions)
+
 	embedding_col := sipColumn(SIPS, "embedding")
 	distance_expr := embedding_col + " <=> @embedding"
 	params["embedding"] = pgvector.NewVector(conditions.Embedding)
-
-	candidate_limit := (page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER
-	if candidate_limit <= 0 {
-		candidate_limit = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT
-	}
-	params["candidate_limit"] = candidate_limit
+	params["candidate_limit"] = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT + ((page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER)
 
 	expr_builder := strings.Builder{}
 	expr_builder.WriteString("WITH nearest_results AS MATERIALIZED (\n")

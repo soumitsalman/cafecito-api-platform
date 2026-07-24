@@ -56,7 +56,7 @@ var (
 
 type Condition struct {
 	URLs       []string
-	Kind       string
+	Kind       []string
 	Created    time.Time
 	Updated    time.Time
 	Collected  time.Time
@@ -97,6 +97,11 @@ type PGSack struct {
 	db *pgxpool.Pool
 }
 
+const _SQL_HNSW_SETTINGS = `
+SET hnsw.iterative_scan = strict_order;
+SET hnsw.ef_search = 100;
+`
+
 func NewPGSack(ctx context.Context, connString string) *PGSack {
 	config, err := pgxpool.ParseConfig(connString)
 	NoError(err)
@@ -111,11 +116,12 @@ func NewPGSack(ctx context.Context, connString string) *PGSack {
 		config.ConnConfig.RuntimeParams = map[string]string{}
 	}
 	config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%dmin", _TIMEOUT)
-	// Uncomment with pgvector 0.8.0+ to improve recall for filtered HNSW searches.
-	// config.ConnConfig.RuntimeParams["hnsw.iterative_scan"] = "strict_order"
-	// config.ConnConfig.RuntimeParams["hnsw.ef_search"] = "100"
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		return pgxvec.RegisterTypes(ctx, conn)
+		if err := pgxvec.RegisterTypes(ctx, conn); err != nil {
+			return err
+		}
+		_, err := conn.Exec(ctx, _SQL_HNSW_SETTINGS)
+		return err
 	}
 
 	db, err := pgxpool.NewWithConfig(ctx, config)
@@ -306,20 +312,6 @@ func (p *PGSack) Close() {
 	}
 }
 
-func fetchBeans(ctx context.Context, p *PGSack, table string, conditions Condition, orders []string, page Pagination, columns []string) ([]dataRow, error) {
-	var query string
-	var args pgx.NamedArgs
-	if len(conditions.Embedding) > 0 {
-		where_expr, where_params := p.buildWhereExpr(conditions)
-		query, args = p.BuildVectorSQL(table, conditions, where_expr, where_params, orders, page, buildSQLFields(columns))
-	} else {
-		query, args = p.BuildScalarSQL(table, conditions, orders, page, columns)
-	}
-	beans, err := fetchAll[dataRow](ctx, p.db, query, args)
-	// logQueryResult(beans, err)
-	return beans, err
-}
-
 // SQL query string builder utilities
 // BuildScalarSQL creates a non-vector query from scalar filters, ordering, and pagination.
 func (p *PGSack) BuildScalarSQL(table string, conditions Condition, orders []string, page Pagination, columns []string) (string, pgx.NamedArgs) {
@@ -344,9 +336,8 @@ func (p *PGSack) BuildScalarSQL(table string, conditions Condition, orders []str
 		builder.WriteString(" ")
 		builder.WriteString(page_expr)
 	}
-	query, args := builder.String(), mergeParams(where_params, page_params)
-	// LogQuery(query, args)
-	return query, args
+	// LogQuery(builder.String(), mergeParams(where_params, page_params))
+	return builder.String(), mergeParams(where_params, page_params)
 }
 
 func buildSQLFields(columns []string) string {
@@ -357,17 +348,12 @@ func buildSQLFields(columns []string) string {
 }
 
 // BuildVectorSQL creates an HNSW-compatible nearest-neighbor query with an optional distance cutoff.
-func (p *PGSack) BuildVectorSQL(table string, conditions Condition, where_expr string, where_params pgx.NamedArgs, orders []string, page Pagination, fields string) (string, pgx.NamedArgs) {
-	candidate_limit := (page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER
-	if candidate_limit <= 0 {
-		candidate_limit = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT
-	}
+func (p *PGSack) BuildVectorSQL(table string, conditions Condition, orders []string, page Pagination, fields string) (string, pgx.NamedArgs) {
+	where_expr, where_params := p.buildWhereExpr(conditions)
 
 	distance_expr := "embedding <=> @embedding::vector"
-	candidate_params := pgx.NamedArgs{
-		"embedding":       pgvector.NewVector(conditions.Embedding),
-		"candidate_limit": candidate_limit,
-	}
+	where_params["embedding"] = pgvector.NewVector(conditions.Embedding)
+	where_params["candidate_limit"] = config.VECTOR_QUERY_DEFAULT_CANDIDATE_LIMIT + ((page.Offset + page.Limit) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER)
 
 	if orders == nil {
 		orders = []string{ORDER_BY_DISTANCE}
@@ -392,7 +378,7 @@ func (p *PGSack) BuildVectorSQL(table string, conditions Condition, where_expr s
 	builder.WriteString("\nFROM nearest_results")
 	if conditions.Distance != nil {
 		builder.WriteString("\nWHERE distance <= @distance")
-		candidate_params["distance"] = *conditions.Distance
+		where_params["distance"] = *conditions.Distance
 	}
 	builder.WriteString("\n")
 	builder.WriteString(buildOrderBy(orders...))
@@ -402,8 +388,8 @@ func (p *PGSack) BuildVectorSQL(table string, conditions Condition, where_expr s
 		builder.WriteString(" ")
 		builder.WriteString(page_expr)
 	}
-
-	return builder.String(), mergeParams(candidate_params, where_params, page_params)
+	// LogQuery(builder.String(), mergeParams(candidate_params, where_params, page_params))
+	return builder.String(), mergeParams(where_params, page_params)
 }
 
 // BuildVectorCountSQL creates an exact vector-distance count query without ANN ordering.
@@ -420,7 +406,6 @@ func (p *PGSack) BuildVectorCountSQL(table string, conditions Condition) (string
 			"distance":  *conditions.Distance,
 		})
 	}
-
 	return fmt.Sprintf("SELECT count(*) FROM %s %s", table, where_expr), where_params
 }
 
@@ -443,8 +428,8 @@ func (p *PGSack) buildWhereExpr(conditions Condition) (string, pgx.NamedArgs) {
 		args["urls"] = conditions.URLs // pgx handles []string as array automatically
 	}
 
-	if conditions.Kind != "" {
-		parts = append(parts, "kind = @kind")
+	if len(conditions.Kind) > 0 {
+		parts = append(parts, "kind = ANY(@kind)")
 		args["kind"] = conditions.Kind
 	}
 
@@ -561,6 +546,18 @@ func fetchAllScalar[T any](ctx context.Context, db *pgxpool.Pool, query string, 
 	}
 	defer rows.Close()
 	return pgx.CollectRows(rows, pgx.RowTo[T])
+}
+
+func fetchBeans(ctx context.Context, p *PGSack, table string, conditions Condition, orders []string, page Pagination, columns []string) ([]dataRow, error) {
+	var query string
+	var args pgx.NamedArgs
+	if len(conditions.Embedding) > 0 {
+
+		query, args = p.BuildVectorSQL(table, conditions, orders, page, buildSQLFields(columns))
+	} else {
+		query, args = p.BuildScalarSQL(table, conditions, orders, page, columns)
+	}
+	return fetchAll[dataRow](ctx, p.db, query, args)
 }
 
 // PGX marshalling and unmarshalling for custom types
