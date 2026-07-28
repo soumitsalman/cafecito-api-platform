@@ -80,24 +80,23 @@ func (e *HTTPEmbedder) embed(ctx context.Context, inputs []string) [][]float32 {
 		return nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.endpoint, bytes.NewReader(payload))
-	if err != nil {
-		log.Error().Str("module", "EMBEDDER").Err(err).Msg("failed to create llama embedding request")
-		return nil
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if e.apiKey != "" {
-		if strings.HasPrefix(strings.ToLower(e.apiKey), "bearer ") {
-			req.Header.Set("Authorization", e.apiKey)
-		} else {
-			req.Header.Set("Authorization", "Bearer "+e.apiKey)
-		}
-	}
-
 	var decoded httpEmbeddingResponse
-	// this is the retry part: waiting for the API to be available
 	err = e.retrier.Do(
 		func() error {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.endpoint, bytes.NewReader(payload))
+			if err != nil {
+				log.Error().Str("module", "EMBEDDER").Err(err).Msg("failed to create llama embedding request")
+				return err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			if e.apiKey != "" {
+				if strings.HasPrefix(strings.ToLower(e.apiKey), "bearer ") {
+					req.Header.Set("Authorization", e.apiKey)
+				} else {
+					req.Header.Set("Authorization", "Bearer "+e.apiKey)
+				}
+			}
+
 			resp, err := e.client.Do(req)
 			if err != nil {
 				log.Error().Str("module", "EMBEDDER").Err(err).Msg("llama embedding request failed")
