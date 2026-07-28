@@ -9,8 +9,16 @@ app = "cafecito-embedder-api"
   force_https = false
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0  
+  min_machines_running = 0
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  grace_period = "5s"
+  interval = "5s"
+  timeout = "2s"
 
 [[vm]]
-  size = 'shared-cpu-4x'
+  size = 'shared-cpu-2x'
   memory = '2gb'
