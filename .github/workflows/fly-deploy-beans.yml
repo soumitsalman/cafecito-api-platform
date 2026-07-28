@@ -14,7 +14,6 @@ on:
       - "apis/go.sum"
       - "apis/Dockerfile"
       - "apis/.dockerignore"
-      - "apis/entrypoint.sh"
       - "apis/fly.beans.toml"
       - ".github/workflows/fly-deploy-beans.yml"
   workflow_dispatch:

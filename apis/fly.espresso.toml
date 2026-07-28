@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for cafecito-espresso-api on 2026-07-15T11:13:10-04:00
+# fly.toml app configuration file generated for cafecito-espresso-api on 2026-07-28T12:30:25-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -14,6 +14,8 @@ primary_region = 'iad'
     SERVICE = 'espresso'
 
 [env]
+  EMBEDDER_BASE_URL = 'http://cafecito-embedder-api.flycast'
+  EMBEDDER_MODEL = 'F2LLM-v2-80M'
   MAX_CONCURRENT_REQUESTS = '512'
 
 [http_service]
@@ -26,4 +28,4 @@ primary_region = 'iad'
 
 [[vm]]
   size = 'shared-cpu-2x'
-  memory = '2gb'
+  memory = '1gb'

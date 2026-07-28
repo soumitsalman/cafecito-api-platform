@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.7
+
+ARG MODEL_URL=https://huggingface.co/mradermacher/F2LLM-v2-80M-GGUF/resolve/main/F2LLM-v2-80M.Q8_0.gguf
+
+FROM ubuntu:24.04 AS model-assets
+ARG MODEL_URL
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates wget && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /models && \
+    wget --no-verbose \
+      --output-document=/models/F2LLM-v2-80M.Q8_0.gguf \
+      "${MODEL_URL}"
+
+FROM ghcr.io/ggml-org/llama.cpp:server
+
+COPY --from=model-assets /models/F2LLM-v2-80M.Q8_0.gguf /models/F2LLM-v2-80M.Q8_0.gguf
+
+EXPOSE 8080
+
+CMD ["--model", "/models/F2LLM-v2-80M.Q8_0.gguf", "--embedding", "--pooling", "last", "--embd-normalize", "2", "--ctx-size", "16384", "--parallel", "32", "--batch-size", "512", "--ubatch-size", "512", "--host", "0.0.0.0", "--port", "8080"]

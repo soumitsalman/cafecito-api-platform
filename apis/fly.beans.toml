@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for cafecito-beans-api on 2026-07-15T08:59:39-04:00
+# fly.toml app configuration file generated for cafecito-beans-api on 2026-07-28T12:19:15-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -8,12 +8,14 @@ primary_region = 'iad'
 
 [build]
   dockerfile = 'Dockerfile'
-  ignorefile = ".dockerignore"
+  ignorefile = '.dockerignore'
 
   [build.args]
     SERVICE = 'beans'
 
 [env]
+  EMBEDDER_BASE_URL = 'http://cafecito-embedder-api.flycast'
+  EMBEDDER_MODEL = 'F2LLM-v2-80M'
   MAX_CONCURRENT_REQUESTS = '512'
 
 [http_service]
@@ -26,4 +28,4 @@ primary_region = 'iad'
 
 [[vm]]
   size = 'shared-cpu-2x'
-  memory = '2gb'
+  memory = '1gb'
