@@ -1,7 +1,7 @@
 # Espresso API Target Contract
 
 Status: target design and implementation instruction  
-Updated: 2026-08-04  
+Updated: 2026-08-10  
 Scope: Espresso API only  
 Predecessor: [API_CAPABILITY_GAP_ANALYSIS.md](API_CAPABILITY_GAP_ANALYSIS.md)
 
@@ -54,9 +54,9 @@ not a public response field and the API does not derive a public
 
 - `/events` searches all Event-family records.
 - `/events/{event_id}` retrieves any Event-family record by UUID.
-- `/events/{event_id}/evidence` returns a bare list containing the requested
-  Event and every direct `SAME_AS` Event. Each list item contains only
-  `event_id`, `created`, `source_id`, `url`, and `base_url`.
+- `/events/{event_id}/evidence` returns a paginated collection containing the
+  requested Event and every direct `SAME_AS` Event. Each item contains only
+  `event_id`, `created_at`, `source_id`, `url`, and `base_url`.
 - `/signals/{signal_id}/events` returns Event-family records targeted by the
   Signal's `DERIVED_FROM` relations.
 
@@ -86,13 +86,13 @@ The target contract adapts general patterns from current structured-event
 services without copying their domain-specific fields:
 
 - [GDELT Cloud API v2](https://docs.gdeltcloud.com/api-reference/v2): collection
-  and detail routes, cursor pagination, evidence previews, explicit ranking,
+  and detail routes, cursor pagination, evidence previews,
   entity references, and Event summaries.
 - [Event Registry](https://newsapi.ai/documentation): Event-to-source drilldown,
   source metadata, filter-value resolution, selectable response information,
   and incremental feeds.
 - [PredictHQ Events API](https://docs.predicthq.com/api/events/search-events):
-  explicit temporal filters, deterministic sorting, typed entities, update
+  explicit temporal filters, deterministic ordering, typed entities, update
   filtering, and documented impact ranking.
 - [Trading Economics calendar schema](https://docs.tradingeconomics.com/economic_calendar/schema/):
   atomic observations with actual, previous, forecast, revised, unit, reference
@@ -145,6 +145,15 @@ Gateway routes include the `/espresso` prefix. Backend Go routes omit it.
 | `/events/{id}/evidence` vs retired `/events/{id}/equivalents` | `evidence` answers a customer question and hides `SAME_AS`. `equivalents` exposes an internal graph concept and is not part of the primary target surface. |
 | Espresso `/signals` vs Perigon Signals | Espresso Signals are generated conclusions. Perigon Signals are saved monitoring definitions. A future saved-monitoring feature must use `/monitors` or `/saved-queries`, not overload `/signals`. |
 
+### 4.2.1 Response payload separation
+
+| Route shape | Routes | `data` payload | Route-added fields |
+|---|---|---|---|
+| Event or Signal collection | R01, R04, R05, R07 | Each item is a flattened `Sip.Digest` object. | None. |
+| Event or Signal detail | R02, R06 | One flattened `Sip.Digest` object. | `links` and `counts`, parallel to digest fields. |
+| Event evidence collection | R03 | Each item is the compact provenance projection `event_id`, `created_at`, `source_id`, `url`, and `base_url`. | None. |
+| Source resource | R08, R09 | Separate normalized collection and detail documents. | Only the documented Source fields. |
+
 ### 4.3 Common collection parameters
 
 Unless a route overrides a parameter, collections use:
@@ -152,8 +161,8 @@ Unless a route overrides a parameter, collections use:
 | Parameter | Type | Default | Contract |
 |---|---|---:|---|
 | `limit` | integer, 1–128 | 20 | Maximum returned records. The query fetches `limit+1` to determine whether a next cursor exists. |
-| `cursor` | opaque string | absent | Encodes the last sort key and UUID. Clients must not construct or inspect it. |
-| `response_type` | `json` or `text` | `json` | Text is for MCP/LLM context. It contains the same flattened digest records with deterministic ordering and a record delimiter. |
+| `cursor` | opaque string | absent | Encodes the last ordering key and UUID. Clients must not construct or inspect it. |
+| `response_type` | `json` or `text` | `json` | Text is for MCP/LLM context. It contains the route collection items in deterministic order with a record delimiter. |
 
 Collection success:
 
@@ -162,6 +171,7 @@ Collection success:
   "data": [],
   "pagination": {
     "limit": 20,
+    "returned_count": 0,
     "next_cursor": null
   },
   "meta": {
@@ -178,9 +188,19 @@ Detail success:
 }
 ```
 
+`returned_count` is the number of items in this `data` page. It is not a total
+match count. `meta` belongs to collection envelopes only; detail responses do
+not contain a `meta` field.
+
 Empty collections return `200` with `data: []`. Missing detail resources return
 `404`. Validation failures return `400`. Internal failures return `500` with a
 stable error code and no database error text.
+
+No route accepts a `sort` parameter. Event and Signal collections use semantic
+distance ordering when `q` is present; otherwise they use stored creation time,
+then UUID, descending. R03 uses stored creation time, then Event UUID,
+descending. Source and tag collections use the fixed route-specific ordering in
+their query contracts.
 
 ### 4.3.1 Event and Signal response materialization
 
@@ -190,7 +210,7 @@ row's `Sip.Digest` object directly at the item root. The example name
 `any_signal_field` means the actual member name from the digest; it is never a
 literal wrapper field.
 
-- `id`, `created`, `briefing`, and every other output member are read from
+- `id`, `created_at`, `briefing`, and every other output member are read from
   `Sip.Digest`. The API must not substitute storage-column values for them or
   append storage-column values to the item.
 - Flatten every actual digest member at the response-item root. Do not use
@@ -201,23 +221,25 @@ literal wrapper field.
 - Do not add public `kind`, `representation`, or `object` fields. A member
   appears only when it is in the digest, except for the explicit route metadata
   defined for R02 and R06 below.
-- R03 is an explicit typed-list exception: each item has only `event_id`,
-  `created`, `source_id`, `url`, and `base_url`, and the list contains the requested Event
+- R03 is an explicit typed-item exception: each item has only `event_id`,
+  `created_at`, `source_id`, `url`, and `base_url`, and the collection contains the requested Event
   plus every Event connected to it by `SAME_AS`.
-- R02 adds `links.evidence`, `links.signals`, `links.action`,
-  `coverage_count`, `signals_count`, and `actions_count`.
-- R06 adds `links.events` and `events_count`.
-- R01, R04, R05, and R07 use the normal collection/detail envelopes. R02 and
-  R06 use the normal detail envelope plus their explicit route metadata. R03
-  is the bare JSON list described above.
+- R02 adds `links` and `counts` objects alongside the flattened Event digest
+  members. `counts` contains `coverage`, `signals`, and `actions`.
+- R06 adds `links` and `counts` objects alongside the flattened Signal digest
+  members. `counts` contains `events`.
+- R02 and R06 write `links` and `counts` inside `data`, parallel to the
+  flattened digest members. They are not response-envelope `meta` fields.
+- R01, R03, R04, R05, and R07 use the normal collection envelope. R02 and R06
+  use the normal detail envelope plus their explicit route metadata.
 
-For example, a digest with `id`, `created`, `briefing`, `confidence`, and
+For example, a digest with `id`, `created_at`, `briefing`, `confidence`, and
 `market_context` produces this Event or Signal item:
 
 ```json
 {
   "id": "event-id",
-  "created": "2026-07-29T13:00:00Z",
+  "created_at": "2026-07-29T13:00:00Z",
   "briefing": "Example briefing",
   "confidence": 0.92,
   "market_context": { "inventory": "elevated" }
@@ -235,7 +257,7 @@ Parameters:
 
 | Parameter | Type | Meaning |
 |---|---|---|
-| `q` | string, max 1024 | Semantic query. When present, default sort is `relevance`. |
+| `q` | string, max 1024 | Semantic query. |
 | `from` / `to` | RFC 3339 timestamp | Inclusive bounds on the stored creation timestamp. These do not claim Event occurrence time. |
 | `ids` | CSV UUIDs, max 128 | Restrict to known Event-family IDs. Prefer the detail route for one ID. |
 | `event_types` | CSV strings | Allowlisted match against `digest.event_type`. |
@@ -243,8 +265,6 @@ Parameters:
 | `companies`, `people`, `products`, `regions` | CSV strings | Match existing digest arrays. Values are not canonical IDs yet. |
 | `source_ids` | CSV UUIDs | Match the persisted source UUID on Event-family records. For related Event-family coverage, follow `/events/{id}/evidence`. |
 | `tags` | CSV strings | Match persisted tags. |
-| `tag_mode` | `any` or `all` | `any` uses overlap; `all` requires every supplied tag. Default `any`. |
-| `sort` | `recent,relevance` | `relevance` requires `q`. |
 
 
 Response model: a collection of flattened Event digest documents.
@@ -252,7 +272,7 @@ Response model: a collection of flattened Event digest documents.
 Example:
 
 ```http
-GET /espresso/events?q=semiconductor+demand&impact_levels=high&tags=guidance&tag_mode=all&sort=relevance&limit=2
+GET /espresso/events?q=semiconductor+demand&impact_levels=high&tags=guidance&limit=2
 ```
 
 ```json
@@ -260,22 +280,22 @@ GET /espresso/events?q=semiconductor+demand&impact_levels=high&tags=guidance&tag
   "data": [
     {
       "id": "fe836bc8-d631-4efc-8050-b7b6cf823849",
-      "created": "2026-07-29T13:00:00Z",
+      "created_at": "2026-07-29T13:00:00Z",
       "briefing": "Example Semiconductor lowered guidance after demand weakened.",
       "event_type": "earnings_guidance",
       "impact_level": "high",
       "actions": ["Annual revenue guidance changed from $10B to $8B."],
-      "companies": ["Example Semiconductor"],
+      "companies": ["example_semiconductor"],
       "regions": ["asia", "united_states"],
       "market_context": { "inventory": "elevated" }
     }
   ],
-  "pagination": { "limit": 2, "next_cursor": null },
+  "pagination": { "limit": 2, "returned_count": 1, "next_cursor": null },
   "meta": { "as_of": "2026-08-03T16:00:00Z" }
 }
 ```
 
-`created` is returned only when it is a member of the Event digest. The API
+`created_at` is returned only when it is a member of the Event digest. The API
 does not rename or substitute a storage timestamp into the Event document.
 
 ### 4.5 R02 — Retrieve one Event-family record
@@ -299,26 +319,29 @@ fields to the returned digest document.
 
 #### 4.5.1 Event detail metadata
 
-In addition to the flattened digest members, R02 returns relationship links and
-relationship counts. `coverage_count` equals the length of the R03 list,
-including the requested Event. `signals_count` counts Signals derived from the
-Event's relation scope, and `actions_count` counts Actions related to the
-Event.
+In addition to the flattened digest members, R02 returns `links` and `counts`
+objects at the same level as those digest members. `counts.coverage` is the full
+direct `SAME_AS` evidence scope, including the requested Event; it is not the R03
+page `returned_count`. `counts.signals` counts
+Signals derived from the Event's relation scope, and `counts.actions` counts
+Actions related to the Event.
 
 ```json
 {
   "data": {
     "id": "event-id",
-    "created": "2026-07-29T13:00:00Z",
+    "created_at": "2026-07-29T13:00:00Z",
     "briefing": "Example briefing",
     "links": {
-      "evidence": "/events/{id}/evidence",
-      "signals": "/events/{id}/signals",
-      "action": "/events/{id}/actions"
+      "evidence": "/events/event-id/evidence",
+      "signals": "/events/event-id/signals",
+      "actions": "/events/event-id/actions"
     },
-    "coverage_count": 3,
-    "signals_count": 2,
-    "actions_count": 1
+    "counts": {
+      "coverage": 3,
+      "signals": 2,
+      "actions": 1
+    }
   }
 }
 ```
@@ -342,34 +365,49 @@ Parameters:
 
 | Parameter | Type | Meaning |
 |---|---|---|
-| `source_ids` | CSV UUIDs | Restrict evidence to selected sources. |
-| `from` / `to` | RFC 3339 timestamp | Inclusive evidence stored-creation bounds. |
-| `sort` | `recent` | Evidence is ordered by stored creation timestamp, then ID, descending. |
+| `source_ids` | CSV UUIDs | Restrict direct `SAME_AS` neighbours to selected sources. |
+| `from` / `to` | RFC 3339 timestamp | Restrict direct `SAME_AS` neighbours by inclusive stored-creation bounds. |
 
-Response model: a bare JSON list of `EventEvidenceItem` objects. Each item
-contains only `event_id`, `created`, `source_id`, `url`, and `base_url`. It does
-not use the normal collection envelope or pagination wrapper.
+R03 has no `sort` parameter. The server orders its evidence records by stored
+creation time and Event UUID, descending.
+
+Response model: a normal paginated collection of `EventEvidenceItem` objects.
+Each item contains only `id`, `created_at`, `source_id`, `url`, and
+`base_url`. This compact provenance projection is intentionally different from
+the flattened Event and Signal digest records returned by other collections.
+These fields come from the persisted Event record, not `Sip.Digest`.
+`source_id`, `url`, and `base_url` are `null` when their stored values are
+unavailable.
+
+The collection envelope is required because a direct `SAME_AS` relation set is
+not bounded. It provides the same pagination and freshness contract as the
+other Espresso collections without expanding the evidence item payload.
 
 ```json
-[
-  {
-    "event_id": "event-id-for-requested-event",
-    "created": "2026-07-29T13:00:00Z",
-    "source_id": "source-id-for-requested-event",
-    "url": "https://example.com/example-semiconductor-guidance",
-    "base_url": "https://example.com"
-  },
-  {
-    "event_id": "event-id-for-related-event",
-    "created": "2026-07-29T13:08:00Z",
-    "source_id": "source-id-for-related-event",
-    "url": "https://example.com/example-semiconductor-outlook",
-    "base_url": "https://example.com"
-  }
-]
+{
+  "data": [
+    {
+      "id": "event-id-for-requested-event",
+      "created_at": "2026-07-29T13:00:00Z",
+      "source_id": "source-id-for-requested-event",
+      "url": "https://example.com/example-semiconductor-guidance",
+      "base_url": "https://example.com"
+    },
+    {
+      "id": "event-id-for-related-event",
+      "created_at": "2026-07-29T13:08:00Z",
+      "source_id": "source-id-for-related-event",
+      "url": "https://example.com/example-semiconductor-outlook",
+      "base_url": "https://example.com"
+    }
+  ],
+  "pagination": { "limit": 20, "returned_count": 2, "next_cursor": null },
+  "meta": { "as_of": "2026-08-03T16:00:00Z" }
+}
 ```
 
-The list contains the requested Event even when it has no `SAME_AS` neighbours.
+The requested Event remains in the result set even when it has no `SAME_AS`
+neighbours or does not match the optional evidence filters.
 
 ### 4.7 R04 — Retrieve Signals derived from an Event
 
@@ -380,11 +418,28 @@ then finds Signals whose outgoing `DERIVED_FROM` edge targets any member of that
 set. The caller does not need to know which stored Event-family row was used as
 the relation target.
 
-Parameters: `impact_levels`, `impacted_domains`, `tags`, `tag_mode`,
-`from`, `to`, `sort=recent|relevance`, and common collection parameters.
-`relevance` requires `q`; `q` is also accepted.
+Parameters: `impact_levels`, `impacted_domains`, `tags`, `from`, `to`, `q`, and
+common collection parameters.
 
 Response model: a collection of flattened Signal digest documents.
+
+```json
+{
+  "data": [
+    {
+      "id": "signal-id",
+      "created_at": "2026-07-30T09:00:00Z",
+      "briefing": "Demand weakness is spreading across semiconductor suppliers.",
+      "impacted_domains": ["technology", "markets"],
+      "forecast": "Supplier earnings revisions are likely over the next quarter."
+    }
+  ],
+  "pagination": { "limit": 20, "returned_count": 1, "next_cursor": null },
+  "meta": { "as_of": "2026-08-03T16:00:00Z" }
+}
+```
+
+The item has no route-added `links` or `counts`; those belong only on R06.
 
 This route is not a generic graph traversal. It returns only `kind=signal`.
 The server first verifies that `event_id` identifies an Event-family record. A
@@ -404,8 +459,7 @@ Parameters:
 | `ids` | CSV UUIDs, max 128 | Restrict to known Signal IDs. |
 | `impact_levels` | CSV: `low,medium,high` | Match Signal impact level. |
 | `impacted_domains` | CSV strings | Match existing digest array. |
-| `tags` / `tag_mode` | CSV plus `any|all` | Persisted tag filtering. |
-| `sort` | `recent,relevance` | `relevance` requires `q`. |
+| `tags` | CSV | Persisted tag filtering. |
 | Common collection parameters | — | `limit`, `cursor`, `response_type`. |
 
 Response model: a collection of flattened Signal digest documents.
@@ -415,7 +469,7 @@ Response model: a collection of flattened Signal digest documents.
   "data": [
     {
       "id": "5d540490-5ef1-4d61-84fd-1234885b7d97",
-      "created": "2026-07-30T09:00:00Z",
+      "created_at": "2026-07-30T09:00:00Z",
       "briefing": "Demand weakness is spreading across semiconductor suppliers.",
       "impact_level": "high",
       "drivers": ["export controls", "inventory correction"],
@@ -424,7 +478,7 @@ Response model: a collection of flattened Signal digest documents.
       "forecast": "Supplier earnings revisions are likely over the next quarter."
     }
   ],
-  "pagination": { "limit": 20, "next_cursor": null },
+  "pagination": { "limit": 20, "returned_count": 1, "next_cursor": null },
   "meta": { "as_of": "2026-08-03T16:00:00Z" }
 }
 ```
@@ -448,20 +502,22 @@ supporting Events.
 
 #### 4.9.1 Signal detail metadata
 
-In addition to the flattened digest members, R06 returns the supporting-event
-link and the number of supporting Events. `events_count` is the number of
-Events returned by the Signal's supporting-event relation query.
+In addition to the flattened digest members, R06 returns `links` and `counts`
+objects at the same level as those digest members. `counts.events` is the
+number of Events returned by the Signal's supporting-event relation query.
 
 ```json
 {
   "data": {
     "id": "signal-id",
-    "created": "2026-07-30T09:00:00Z",
+    "created_at": "2026-07-30T09:00:00Z",
     "briefing": "Example briefing",
     "links": {
-      "events": "/signals/{id}/events"
+      "events": "/signals/signal-id/events"
     },
-    "events_count": 4
+    "counts": {
+      "events": 4
+    }
   }
 }
 ```
@@ -474,10 +530,28 @@ The route follows the Signal's outgoing `DERIVED_FROM` edges and returns target
 records whose kind is `event` or starts with `event:`. Use R03 when the caller
 specifically wants the `SAME_AS` evidence neighborhood of one Event record.
 
-Parameters: `event_types`, `impact_levels`, `tags`, `tag_mode`, `from`, `to`,
-`sort=recent|relevance`, `q`, and common collection parameters.
+Parameters: `event_types`, `impact_levels`, `tags`, `from`, `to`, `q`, and
+common collection parameters.
 
 Response model: a collection of flattened Event digest documents.
+
+```json
+{
+  "data": [
+    {
+      "id": "event-id",
+      "created_at": "2026-07-29T13:00:00Z",
+      "briefing": "Example Semiconductor lowered guidance after demand weakened.",
+      "event_type": "earnings_guidance",
+      "market_context": { "inventory": "elevated" }
+    }
+  ],
+  "pagination": { "limit": 20, "returned_count": 1, "next_cursor": null },
+  "meta": { "as_of": "2026-08-03T16:00:00Z" }
+}
+```
+
+The item has no route-added `links` or `counts`; those belong only on R02.
 
 This route returns direct Event-family targets. It does not rewrite source-oriented
 records into another document shape.
@@ -515,7 +589,7 @@ the normalized discovery fields `id`, `base_url`, `domain_name`, and
       "site_name": "Example Business"
     }
   ],
-  "pagination": { "limit": 20, "next_cursor": null },
+  "pagination": { "limit": 20, "returned_count": 1, "next_cursor": null },
   "meta": { "as_of": "2026-08-03T16:00:00Z" }
 }
 ```
@@ -575,8 +649,8 @@ contract exist. Do not rename this route to `/filter-values/tags`.
 These are required target routes but remain action-gated.
 
 Target collection parameters: `q`, `from`, `to`, `action_types`,
-`subject_types`, `subject_ids`, `tags`, `tag_mode`, `source_ids`,
-`sort=recent|relevance`, and common collection parameters.
+`subject_types`, `subject_ids`, `tags`, `source_ids`,
+and common collection parameters.
 
 Response models:
 
@@ -731,13 +805,6 @@ type EvidenceRow struct {
     BaseURL  *string    `db:"base_url"`
 }
 
-type SortMode string
-
-const (
-    SortRecent    SortMode = "recent"
-    SortRelevance SortMode = "relevance"
-)
-
 type TagMode string
 
 const (
@@ -752,7 +819,6 @@ type PageRequest struct {
 
 type Cursor struct {
     Version       int
-    Sort          SortMode
     ID            uuid.UUID
     Created       *time.Time
     Distance      *float64
@@ -778,7 +844,6 @@ type SipFilters struct {
     SubjectTypes    []string
     SubjectIDs      []string
     Embedding       []float32
-    Sort            SortMode
 }
 
 type Page[T any] struct {
@@ -832,8 +897,9 @@ import (
 )
 
 type Pagination struct {
-    Limit      int     `json:"limit"`
-    NextCursor *string `json:"next_cursor"`
+    Limit         int     `json:"limit"`
+    ReturnedCount int     `json:"returned_count"`
+    NextCursor    *string `json:"next_cursor"`
 }
 
 type ResponseMeta struct {
@@ -869,7 +935,7 @@ type SourceReference struct {
 
 type EventEvidenceItem struct {
     EventID  uuid.UUID  `json:"event_id"`
-    Created  time.Time  `json:"created"`
+    Created  time.Time  `json:"created_at"`
     SourceID *uuid.UUID `json:"source_id"`
     URL      *string    `json:"url"`
     BaseURL  *string    `json:"base_url"`
@@ -967,16 +1033,16 @@ Router mapping rules:
 2. Require the selected Event or Signal `Digest` to be a JSON object.
 3. Write every actual digest member directly into the response item. Do not
    decode to `Event`, `Signal`, `EventEvidence`, an allowlist, or `Extra`.
-4. Read `id`, `created`, and all other flattened Event/Signal members from
+4. Read `id`, `created_at`, and all other flattened Event/Signal members from
    the digest; R02/R06 relationship metadata is the explicit route exception.
 5. Omit a digest member if `len(field) == 0`; otherwise retain it unchanged.
-6. R03 evidence items use `EventEvidenceItem`: a bare list item with only
-   `event_id`, `created`, `source_id`, `url`, and `base_url`. It includes the
+6. R03 evidence items use `EventEvidenceItem`: a collection item with only
+   `event_id`, `created_at`, `source_id`, `url`, and `base_url`. It includes the
    requested Event and every direct `SAME_AS` Event.
-7. R02 adds the documented `links` and relationship-count fields to the
-   flattened Event digest item.
-8. R06 adds the documented `links` and event-count field to the flattened
-   Signal digest item.
+7. R02 adds the documented `links` and `counts` objects to the flattened Event
+   digest item, parallel to its digest members and not inside response `meta`.
+8. R06 adds the documented `links` and `counts` objects to the flattened Signal
+   digest item, parallel to its digest members and not inside response `meta`.
 9. Use `SourceCollectionResponse` for R08 and `SourceDetailResponse` for R09.
    Do not use one Source response type for both routes.
 10. Action decoding remains behind an adapter until the external Action contract
@@ -997,7 +1063,7 @@ semantics.
 
 1. Event queries include every kind satisfying `s.kind LIKE 'event%'`.
 2. Event-family evidence queries use the same prefix predicate and may use the
-   documented source, time, tag, sort, and cursor filters. They do not have a
+   documented source, time, tag, and cursor filters. They do not have a
    representation filter.
 3. Signal queries always include `s.kind = 'signal'`.
 4. Action queries always include `s.kind = 'action'` after the dependency gate.
@@ -1009,11 +1075,11 @@ semantics.
    client-supplied JSON key or SQL expression.
 9. Scalar pagination is keyset pagination. Offset is retained only on deprecated
    compatibility routes.
-10. Every sort has a deterministic UUID tie-breaker.
+10. Every collection ordering has a deterministic UUID tie-breaker.
 11. Fetch `limit+1` rows, return at most `limit`, and encode the last returned
-    sort key in an opaque versioned cursor.
-12. Semantic search cursor data includes distance and UUID. Recent cursor data
-    includes created timestamp and UUID.
+    ordering key in an opaque versioned cursor.
+12. Semantic-query cursor data includes distance and UUID. Default-order cursor
+    data includes created timestamp and UUID.
 13. Relationship queries omit orphaned targets from the public result and
     increment an internal integrity metric.
 14. `SAME_AS` is resolved in both orientations.
@@ -1028,7 +1094,7 @@ semantics.
 |---|---|---|
 | R01 `GET /events` | `QueryEvents(ctx, filters, page)` | `Page[Sip]` |
 | R02 `GET /events/{id}` | `GetEvent(ctx, id)` | `Sip` |
-| R03 `GET /events/{id}/evidence` | `QueryEventEvidence(ctx, id, filters)` | `[]EvidenceRow` |
+| R03 `GET /events/{id}/evidence` | `QueryEventEvidence(ctx, id, filters, page)` | `Page[EvidenceRow]` |
 | R04 `GET /events/{id}/signals` | `QueryEventSignals(ctx, id, filters, page)` | `Page[Sip]` |
 | R05 `GET /signals` | `QuerySignals(ctx, filters, page)` | `Page[Sip]` |
 | R06 `GET /signals/{id}` | `GetSignal(ctx, id)` | `Sip` |
@@ -1112,14 +1178,15 @@ LIMIT 1;
 ```
 
 No row maps to `404 event_not_found`. A database failure maps to `500` and must
-not be confused with not-found. The R02 query also obtains
-`coverage_count`, `signals_count`, and `actions_count` using the
-corresponding relationship sets.
+not be confused with not-found. The R02 query also obtains `counts.coverage`, `counts.signals`, and
+`counts.actions` using the corresponding relationship sets. `counts.coverage`
+counts the R03 `evidence_ids` set before evidence filters and pagination, so an
+Event with no `SAME_AS` neighbour reports `1`.
 
 ### 6.5 R03 query — Event evidence
 
 The result includes the requested record and every direct `SAME_AS` neighbour.
-R03 returns only `event_id`, `created`, `source_id`, `url`, and `base_url`.
+R03 returns only `event_id`, `created_at`, `source_id`, `url`, and `base_url`.
 
 For a one-hop star relation:
 
@@ -1144,10 +1211,17 @@ SELECT
 FROM evidence_ids AS e
 JOIN sips AS s ON s.id = e.id
 WHERE s.kind LIKE 'event%'
-  AND (@source_ids_empty OR s.source = ANY(@source_ids))
-  AND (@from IS NULL OR s.created >= @from)
-  AND (@to IS NULL OR s.created <= @to)
-ORDER BY s.created DESC, s.id DESC;
+  AND (
+      s.id = @event_id
+      OR (
+          (@source_ids_empty OR s.source = ANY(@source_ids))
+          AND (@from IS NULL OR s.created >= @from)
+          AND (@to IS NULL OR s.created <= @to)
+      )
+  )
+  AND (@cursor_created IS NULL OR (s.created, s.id) < (@cursor_created, @cursor_id))
+ORDER BY s.created DESC, s.id DESC
+LIMIT @limit_plus_one;
 ```
 
 The query is intentionally one-hop: it includes the requested Event and the
@@ -1197,7 +1271,7 @@ WHERE s.kind = 'signal'
   )
 ```
 
-All cursor, tag, date, ID, semantic, and deterministic sort rules remain
+All cursor, tag, date, ID, semantic, and deterministic ordering rules remain
 the same.
 
 ### 6.8 R06 query — one Signal
@@ -1210,8 +1284,8 @@ WHERE id = @signal_id
 LIMIT 1;
 ```
 
-The R06 query also obtains `events_count` from the Signal's
-`DERIVED_FROM` targets.
+The R06 query also obtains `counts.events` from the Signal's `DERIVED_FROM`
+targets.
 
 ### 6.9 R07 query — Event-family records supporting a Signal
 
@@ -1295,8 +1369,8 @@ SELECT id, kind, created, source, tags, digest, url, base_url
 FROM sips AS s
 WHERE s.kind = 'action'
   AND <allowlisted Action filters>
-  AND <cursor predicate for selected sort>
-ORDER BY <selected deterministic sort>, s.id
+  AND <cursor predicate for deterministic ordering>
+ORDER BY deterministic ordering, s.id
 LIMIT @limit_plus_one;
 ```
 
@@ -1410,8 +1484,8 @@ additive. State that behavior in the route documentation.
 
 - JSON is the canonical contract.
 - Text is a deterministic projection of the route's JSON response.
-- R03 text renders the same bare list of `event_id`, `created`, `source_id`,
-  `url`, and `base_url` items.
+- R03 text renders the same compact `event_id`, `created_at`, `source_id`,
+  `url`, and `base_url` collection items.
 - R02 and R06 text include their route metadata counts and links.
 - Event/Signal digest fields otherwise render without a fixed field list.
 - Arrays retain their order and use an escaped delimiter.
@@ -1430,8 +1504,10 @@ For every published route:
    `kind` or `representation` fields.
 4. State exactly which timestamp `from` and `to` filter.
 5. State `tags` any/all behavior.
-6. List allowed sort values and their prerequisites.
-7. Include executable request and response examples.
+6. State the fixed server ordering and that the route does not accept a `sort`
+   parameter.
+7. Include executable request and response examples, including the standard
+   collection envelope for every collection route.
 8. Document `200`, `400`, `404`, `429`, and `500`.
 9. Keep backend Swagger and gateway OpenAPI schemas aligned.
 10. Do not advertise action routes as available before the dependency gate
@@ -1478,7 +1554,7 @@ Do not expose `get_related_sips` in the primary MCP catalog.
 
 | Task | Change type | Priority | Acceptance |
 |---|---|---:|---|
-| Document current bare arrays, offset pagination, `created` semantics, empty `204` behavior, and tag matching before changing them. | Documentation/spec | P0 | Docs match deployed behavior. |
+| Document current bare arrays, offset pagination, `created_at` semantics, empty `204` behavior, and tag matching before changing them. | Documentation/spec | P0 | Docs match deployed behavior. |
 | Correct Event and Signal flattened-digest response schemas in backend Swagger and gateway OpenAPI. | Documentation/spec/generated | P0 | Generated and gateway specs agree. |
 | Make text rendering deterministic from the flattened digest document. | Code/test/docs | P0 | Golden tests are stable across runs. |
 | Add detail routes backed by existing UUID filtering. | Code/query/spec/test/docs | P0 | Correct `404` versus `500` behavior. |
@@ -1492,7 +1568,7 @@ Do not expose `get_related_sips` in the primary MCP catalog.
 | Implement bidirectional Event evidence query. | Query/code/test | P0 | Both stored `SAME_AS` orientations return the same evidence. |
 | Implement direct Signal→Event-family and equivalence-aware Event→Signal queries. | Query/code/test | P0 | Routes return only their declared resource's flattened digest documents. |
 | Add source list/detail and source filtering. | Query/code/test/docs | P0 | Source IDs copy directly into Event filters. |
-| Add `to`, typed digest filters, `tag_mode`, deterministic sort, and cursor pagination. | Query/code/spec/test/docs | P0 | Every collection has stable, non-duplicating page traversal. |
+| Add `to`, typed digest filters, deterministic ordering, and cursor pagination. | Query/code/spec/test/docs | P0 | Every collection has stable, non-duplicating page traversal. |
 | Define orphan relation behavior and internal integrity metrics. | Query/test/operations | P0 | Orphans do not corrupt responses and are measurable. |
 
 ### Stage 2 — Publish target routes

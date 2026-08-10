@@ -1,10 +1,10 @@
 // @title 			Espresso API & MCP
-// @version 		0.1
-// @description 	MCP-ready business intelligence over curated "sips" for agents, dashboards, and automated research workflows.
-// @description 	A **sip** is one unit of intelligence. `event` records describe observed business or market developments. `signal` records synthesize higher-level implications from related events and actions. `action` records are lower-level source facts used by the ingestion pipeline.
-// @description 	Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for time-ordered developments; (3) searchSignals for synthesized implications; (4) getRelatedSips to follow `same_as` duplicates or `derived_from` intelligence chains.
-// @description 	Conventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. All sip IDs are UUID strings such as `339366bc-464d-582f-8132-6875ccc814d2`.
-// @description 	Response formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same underlying records as compact field-per-line plain text with lower token overhead.
+// @version 		0.2
+// @description 	MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.
+// @description 	An **Event** is any record whose kind starts with `event` (canonical `event`, plus `event:news`, `event:blog`, `event:post`, `event:site`, `event:social`). A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
+// @description 	Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.
+// @description 	Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use cursor pagination: `limit` default 20 max 128, and an opaque `cursor` returned as `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
+// @description Response formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same non-empty digest members as compact field-per-line plain text with `---` record delimiters. Public Event and Signal payloads do not synthesize storage id, created, kind, representation, or object fields.
 // @schemes 		https
 // @license.name 	MIT
 // @contact.name 	Project Cafecito
@@ -13,78 +13,220 @@
 package router
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/alpkeskin/gotoon"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/maypok86/otter/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	datautils "github.com/soumitsalman/data-utils"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const (
-	MIN_WINDOW          = 1
-	DEFAULT_WINDOW      = 7 // DAYS
-	DEFAULT_ACCURACY    = 0.5
-	DEFAULT_LIMIT       = 16
-	MAX_LIMIT           = 128
-	FAVICON_PATH        = "images/espresso-insta-dark.png"
-	DEFAULT_CONCURRENCY = 512
+	MIN_WINDOW       = 1
+	DEFAULT_WINDOW   = 7 // DAYS
+	DEFAULT_ACCURACY = 0.5
+	DEFAULT_LIMIT    = 16
+	MAX_LIMIT        = 128
 )
 
 const (
-	_CACHE_SIZE = 1000
-	_CACHE_TTL  = 30 * time.Minute
+	API_ERROR_INVALID_REQUEST = "invalid_request"
+	API_ERROR_DB_ERROR        = "db_unavailable"
+	API_ERROR_EMBEDDING_ERROR = "embedder_unavailable"
+	API_ERROR_ENCODING_ERROR  = "encoding_error"
+	API_ERROR_INVALID_DATA    = "invalid_data"
+	API_ERROR_NOT_FOUND       = "not_found"
+	API_ERROR_UNAUTHORIZED    = "unauthorized"
 )
 
 const (
-	_EMBEDDER_ERROR = "Embedder just died. Retry in a bit."
-	_DB_ERROR       = "DB just died. Retry in a bit."
+	API_ERROR_MSG_OUR_BAD              = "It's not you, it's us. Retry in a bit."
+	API_ERROR_MSG_TRY_DIFFERENT_FORMAT = "Serialization issue. Fallback to `response_type=json`."
+	API_ERROR_MSG_EVENT_NOT_FOUND      = "EVENT with this ID not found"
+	API_ERROR_MSG_SIGNAL_NOT_FOUND     = "SIGNAL with this ID not found"
+	API_ERROR_MSG_ACTION_NOT_FOUND     = "ACTION with this ID not found"
+	API_ERROR_MSG_SOURCE_NOT_FOUND     = "SOURCE with this ID not found"
+	API_ERROR_MSG_MISSING_API_KEY      = "Missing API Key"
 )
-
-// baseQueryParams holds shared pagination query parameters for list endpoints.
-type baseQueryParams struct {
-	ResponseType string `form:"response_type,default=json" binding:"oneof=json text"`
-	Limit        int    `form:"limit,default=16" binding:"min=1,max=128"`
-	Offset       int    `form:"offset" binding:"min=0"`
-}
-
-// sipsQueryParams holds shared filter and search parameters for /events and /signals.
-type sipsQueryParams struct {
-	IDs  []string  `form:"ids" collection_format:"csv"`
-	From time.Time `form:"from" time_format:"2006-01-02" swaggertype:"string" format:"date"`
-	Q    string    `form:"q" binding:"max=1024"`
-	Acc  float64   `form:"acc,default=0.5" binding:"min=0,max=1"`
-	Tags []string  `form:"tags" collection_format:"csv"`
-	baseQueryParams
-}
-
-type relatedURIParams struct {
-	Relationship string `uri:"relationship" binding:"required,oneof=same_as derived_from"`
-}
-
-// relatedQueryParams holds query parameters for GET /related/{relationship}.
-type relatedQueryParams struct {
-	IDs []string `form:"ids" collection_format:"csv" binding:"required"`
-	baseQueryParams
-}
 
 // Configuration wires database, embedding, auth, and caching dependencies into HTTP handlers.
 type Configuration struct {
 	DB       *db.Cupboard
 	Embedder embedding.Embedder
 	APIKeys  map[string]string
-	queue    chan int
-	cache    *otter.Cache[string, []float32]
+}
+
+// createPageRequest creates a PageRequest for db from given pagination params and validates the cursor.
+func (p *paginationParams) createPageRequest(c *gin.Context, config *Configuration) (*db.PageRequest, error) {
+	if p.Limit == 0 {
+		p.Limit = DEFAULT_LIMIT
+	}
+	cursor, err := db.DecodeCursor(p.Cursor)
+	if err != nil {
+		return nil, APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+	}
+	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
+}
+
+// createEventFilters converts EventSearchParams into typed Filters.
+func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		IDs:          p.IDs,
+		SourceIDs:    p.SourceIDs,
+		EventTypes:   p.EventTypes,
+		ImpactLevels: p.ImpactLevels,
+		Companies:    p.Companies,
+		People:       p.People,
+		Products:     p.Products,
+		Regions:      p.Regions,
+		Tags:         p.Tags,
+		CreatedFrom:  p.From,
+		CreatedTo:    p.To,
+	}
+	if len(p.Q) > 0 {
+		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
+		if len(filters.Embedding) == 0 {
+			return nil, APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
+		}
+		distance := (1 - p.Acc) * 2
+		filters.Distance = &distance
+	}
+	return filters, nil
+}
+
+// buildSignalFilters converts signalSearchParams into typed SipFilters.
+func (p *SignalSearchParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		IDs:             p.IDs,
+		ImpactLevels:    p.ImpactLevels,
+		ImpactedDomains: p.ImpactedDomains,
+		Tags:            p.Tags,
+		CreatedFrom:     p.From,
+		CreatedTo:       p.To,
+	}
+	if len(p.Q) > 0 {
+		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
+		if len(filters.Embedding) == 0 {
+			return nil, APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
+		}
+		distance := (1 - p.Acc) * 2
+		filters.Distance = &distance
+	}
+	return filters, nil
+}
+
+func (params *EventEvidenceParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		SourceIDs:   params.SourceIDs,
+		CreatedFrom: params.From,
+		CreatedTo:   params.To,
+	}
+	return filters, nil
+}
+
+func (params *EventSignalsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		ImpactLevels:    params.ImpactLevels,
+		ImpactedDomains: params.ImpactedDomains,
+		Tags:            params.Tags,
+		CreatedFrom:     params.From,
+		CreatedTo:       params.To,
+	}
+	return filters, nil
+}
+
+func (params *SignalEventsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		ImpactLevels:    params.ImpactLevels,
+		ImpactedDomains: params.ImpactedDomains,
+		Tags:            params.Tags,
+		EventTypes:      params.EventTypes,
+		CreatedFrom:     params.From,
+		CreatedTo:       params.To,
+	}
+	return filters, nil
+}
+
+// createSipKinds maps the `resource` CSV to stored SipKinds. action is intentionally ignored (action-gated).
+func createSipKinds(resources []string) []string {
+	var kinds []string
+	for _, res := range resources {
+		switch strings.ToLower(strings.TrimSpace(res)) {
+		case "event", "evidence":
+			kinds = append(kinds, db.SIP_KIND_EVENT)
+		case "signal":
+			kinds = append(kinds, db.SIP_KIND_SIGNAL)
+		case "action":
+			kinds = append(kinds, db.SIP_KIND_ACTION)
+		}
+	}
+	return kinds
+}
+
+// writeCollection writes a typed collection envelope as JSON, or compact text when requested.
+func writePage[T any](c *gin.Context, items []T, limit int, next_cursor *string, response_type string) {
+	if items == nil {
+		items = []T{}
+	}
+	response := PageResponse[T]{
+		Data:       items,
+		Pagination: Pagination{Limit: limit, NextCursor: next_cursor},
+		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
+	}
+	switch response_type {
+	case "yaml":
+		c.YAML(http.StatusOK, response)
+	case "toon":
+		if encoded, err := gotoon.Encode(response); err != nil {
+			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
+		} else {
+			c.String(http.StatusOK, encoded)
+		}
+	default:
+		c.JSON(http.StatusOK, response)
+	}
+}
+
+// writeDetail writes a typed detail envelope as JSON, or compact text when requested.
+func writeItem[T any](c *gin.Context, item T, response_type string) {
+	response := ItemResponse[T]{Data: item}
+	switch response_type {
+	case "yaml":
+		c.YAML(http.StatusOK, response)
+	case "toon":
+		if encoded, err := gotoon.Encode(response); err != nil {
+			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
+		} else {
+			c.String(http.StatusOK, encoded)
+		}
+	default:
+		c.JSON(http.StatusOK, response)
+	}
+}
+
+// writeError writes an APIError to the response.
+// Uses InternalServerError for DB, Embedding, Encoding errors and default cases
+func writeError(c *gin.Context, err error) {
+	// NOTE:
+	status := http.StatusInternalServerError
+	if api_err, ok := err.(APIError); ok {
+		switch api_err.Code {
+		case API_ERROR_INVALID_REQUEST:
+			status = http.StatusBadRequest
+		case API_ERROR_NOT_FOUND:
+			status = http.StatusNotFound
+		}
+	}
+	c.AbortWithStatusJSON(status, err)
 }
 
 // health godoc
@@ -96,267 +238,504 @@ type Configuration struct {
 // @ID healthCheck
 // @Router /health [get]
 func (r *Configuration) health(c *gin.Context) {
+	// TODO: tie with embedder health and db health check
 	c.JSON(http.StatusOK, gin.H{"status": "alive"})
+}
+
+// getEvents godoc
+// @Summary Search Event-family records
+// @Description Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.
+// @Description **When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.
+// @Description **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
+// @Description **Time**: `from`/`to` are inclusive bounds on record `created_at` until an occurrence-time field exists. They do not claim Event occurrence time.
+// @Description **Tags**: match on persisted tags uses overlap (any supplied tag).
+// @Description **Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.
+// @Description **Agent format**: use `response_type=text` for compact field-per-line records with `---` delimiters when feeding an LLM or MCP client.
+// @Tags Events
+// @Produce json
+// @Produce plain
+// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder. When present, default sort is relevance." maxlength(1024)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
+// @Param from query string false "Only include records created on or after this date (RFC3339 timestamp)." format(date-time)
+// @Param to query string false "Only include records created on or before this date (RFC3339 timestamp)." format(date-time)
+// @Param ids query []string false "Restrict to known Event-family IDs (CSV). Prefer the detail route for one ID." collectionFormat(csv)
+// @Param event_types query []string false "Allowlisted match against digest.event_type (CSV)." collectionFormat(csv)
+// @Param impact_levels query []string false "Match digest.impact_level (CSV): low, medium, high." collectionFormat(csv)
+// @Param companies query []string false "Match digest.companies array (CSV)." collectionFormat(csv)
+// @Param people query []string false "Match digest.people array (CSV)." collectionFormat(csv)
+// @Param products query []string false "Match digest.products array (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Match digest.regions array (CSV)." collectionFormat(csv)
+// @Param source_ids query []string false "Match the persisted source UUID, including direct SAME_AS evidence coverage (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
+// @Success 200 {object} EventCollectionResponse "Event-family records when response_type=json; plain-text event blocks when response_type=text"
+// @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @ID searchEvents
+// @Router /events [get]
+func (r *Configuration) getEvents(c *gin.Context) {
+	var params EventSearchParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryEvents(c.Request.Context(), *filters, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getEvent godoc
+// @Summary Retrieve one Event-family record
+// @Description What Event-family record has this UUID? Retrieves any record whose kind starts with `event` by UUID and returns its raw non-empty flattened digest members plus detail metadata links and relation counts. Returns 404 when no such record exists.
+// @Tags Events
+// @Produce json
+// @Produce plain
+// @Param event_id path string true "Event-family record UUID (RFC 4122)." format(uuid)
+// @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
+// @Success 200 {object} EventDetailResponse "The Event-family record"
+// @Failure 400 {object} APIError "Malformed UUID"
+// @Failure 404 {object} APIError "No Event-family record with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID getEvent
+// @Router /events/{event_id} [get]
+func (r *Configuration) getEvent(c *gin.Context) {
+	var params itemParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	event, err := r.DB.GetEvent(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if event.IsZero() {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		return
+	}
+	counts, err := r.DB.CountRelations(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writeItem(c, NewDigestDocument(&event).addEventDetails(counts), params.ResponseType)
+}
+
+// getEventEvidence godoc
+// @Summary Retrieve Event evidence
+// @Description Which source-specific records support this Event? Returns a bare JSON list containing the requested Event and every direct SAME_AS Event-family neighbour in both relation orientations. Each item contains only event_id, created, source_id, url, and base_url. The default scope is direct_same_as: a bounded claim about current data, not a complete transitive equivalence closure.
+// @Tags Events
+// @Produce json
+// @Produce plain
+// @Param id path string true "Event-family record UUID (RFC 4122)." format(uuid)
+// @Param source_ids query []string false "Restrict evidence to selected sources (CSV)." collectionFormat(csv)
+// @Param from query string false "Inclusive evidence created_at lower bound (RFC3339 timestamp)." format(date-time)
+// @Param to query string false "Inclusive evidence created_at upper bound (RFC3339 timestamp)." format(date-time)
+// @Param response_type query string false "Output format. json returns the bare evidence list; text returns the same records as compact plain text." Enums(json, text) default(json)
+// @Success 200 {array} EventEvidenceItem "Bare Event evidence list"
+// @Failure 400 {object} APIError "Malformed UUID or invalid parameters"
+// @Failure 404 {object} APIError "No Event-family record with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID getEventEvidence
+// @Router /events/{id}/evidence [get]
+func (r *Configuration) getEventEvidence(c *gin.Context) {
+	var params EventEvidenceParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	exists, err := r.DB.EventExists(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if !exists {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		return
+	}
+	page_out, err := r.DB.QueryEventEvidence(c.Request.Context(), params.ID, *filters, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	evidence := datautils.Transform(page_out.Items, func(sip *db.Sip) EventEvidence {
+		return NewEventEvidence(sip)
+	})
+	writePage(c, evidence, page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getEventSignals godoc
+// @Summary Retrieve Signals derived from an Event
+// @Description Which broader conclusions use this Event as evidence? Returns Signals whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS equivalents. The caller does not need to know which Event-family record was used as the relation target. Returns 404 when the Event does not exist; 200 with an empty collection when it exists but has no Signals.
+// @Tags Events
+// @Produce json
+// @Produce plain
+// @Param id path string true "Event-family record UUID (RFC 4122)." format(uuid)
+// @Param from query string false "Inclusive Signal created_at lower bound (RFC3339 timestamp)." format(date-time)
+// @Param to query string false "Inclusive Signal created_at upper bound (RFC3339 timestamp)." format(date-time)
+// @Param impact_levels query []string false "Match Signal digest.impact_level (CSV)." collectionFormat(csv)
+// @Param impacted_domains query []string false "Match Signal digest.impacted_domains array (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
+// @Success 200 {object} PageResponse[SignalDocument] "Signals derived from this Event"
+// @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
+// @Failure 404 {object} APIError "No Event-family record with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @ID getEventSignals
+// @Router /events/{id}/signals [get]
+func (r *Configuration) getEventSignals(c *gin.Context) {
+	var params EventSignalsParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	exists, err := r.DB.EventExists(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if !exists {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		return
+	}
+	page_out, err := r.DB.QueryDerivedSignals(c.Request.Context(), params.ID, *filters, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getSignals godoc
+// @Summary Search synthesized Signals
+// @Description Which synthesized conclusions or forecasts match my question? Returns signal-kind records. A Signal is returned intelligence, not a saved monitoring definition.
+// @Description **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
+// @Description **Time**: `from`/`to` are inclusive bounds on Signal `created_at`.
+// @Description **Tags**: match on persisted tags uses overlap (any supplied tag).
+// @Tags Signals
+// @Produce json
+// @Produce plain
+// @Param q query string false "Natural-language semantic search query. Max 1024 characters." maxlength(1024)
+// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
+// @Param from query string false "Inclusive Signal created_at lower bound (RFC3339 timestamp)." format(date-time)
+// @Param to query string false "Inclusive Signal created_at upper bound (RFC3339 timestamp)." format(date-time)
+// @Param ids query []string false "Restrict to known Signal IDs (CSV)." collectionFormat(csv)
+// @Param impact_levels query []string false "Match Signal digest.impact_level (CSV)." collectionFormat(csv)
+// @Param impacted_domains query []string false "Match Signal digest.impacted_domains array (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
+// @Param tag_mode query string false "Tag matching mode." Enums(any, all) default(any)
+// @Param sort query string false "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)." Enums(recent, relevance) default(recent)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
+// @Success 200 {object} PageResponse[SignalDocument] "Signal records"
+// @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @ID searchSignals
+// @Router /signals [get]
+func (r *Configuration) getSignals(c *gin.Context) {
+	var params SignalSearchParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QuerySignals(c.Request.Context(), *filters, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// @Summary Retrieve one Signal
+// @Description What is the complete Signal with this UUID? Retrieves one signal-kind record by UUID. The detail payload links to supporting Events instead of inventing inline event references from unstructured digest strings. Returns 404 when no such Signal exists.
+// @Tags Signals
+// @Produce json
+// @Produce plain
+// @Param signal_id path string true "Signal record UUID (RFC 4122)." format(uuid)
+// @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
+// @Success 200 {object} ItemResponse[SignalDocument] "The Signal record"
+// @Failure 400 {object} APIError "Malformed UUID"
+// @Failure 404 {object} APIError "No Signal with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID getSignal
+// @Router /signals/{id} [get]
+func (r *Configuration) getSignal(c *gin.Context) {
+	var params itemParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	signal, err := r.DB.GetSignal(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if signal.IsZero() {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SIGNAL_NOT_FOUND})
+		return
+	}
+	counts, err := r.DB.CountRelations(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writeItem(c, NewDigestDocument(&signal).addSignalDetails(counts), params.ResponseType)
+}
+
+// getSignalEvents godoc
+// @Summary Retrieve Event-family records supporting a Signal
+// @Description Which Event-family records support this Signal? Follows DERIVED_FROM edges in the stored signal-to-event direction and returns raw non-empty flattened digest members from direct Event-family targets. Returns 404 when the Signal does not exist; 200 with an empty collection when it exists but has no supporting Events.
+// @Tags Signals
+// @Produce json
+// @Produce plain
+// @Param id path string true "Signal record UUID (RFC 4122)." format(uuid)
+// @Param from query string false "Inclusive Event created_at lower bound (RFC3339 timestamp)." format(date-time)
+// @Param to query string false "Inclusive Event created_at upper bound (RFC3339 timestamp)." format(date-time)
+// @Param event_types query []string false "Match digest.event_type (CSV)." collectionFormat(csv)
+// @Param impact_levels query []string false "Match digest.impact_level (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
+// @Success 200 {object} PageResponse[EventDocument] "Event-family records supporting this Signal"
+// @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
+// @Failure 404 {object} APIError "No Signal with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @ID getSignalEvents
+// @Router /signals/{signal_id}/events [get]
+func (r *Configuration) getSignalEvents(c *gin.Context) {
+	var params SignalEventsParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	exists, err := r.DB.SignalExists(c.Request.Context(), params.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if !exists {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SIGNAL_NOT_FOUND})
+		return
+	}
+	page_out, err := r.DB.QuerySupportingEvents(c.Request.Context(), params.ID, *filters, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// @Summary List intelligence sources
+// @Description Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.
+// @Tags Sources
+// @Produce json
+// @Param q query string false "Case-insensitive match against site name, domain, or base URL."
+// @Param domains query []string false "Exact domain-name filter (CSV)." collectionFormat(csv)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
+// @Success 200 {object} PageResponse[SourceDocument] "Source records"
+// @Failure 400 {object} APIError "Invalid limit, cursor, or parameters"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID listIntelligenceSources
+// @Router /sources [get]
+func (r *Configuration) getSources(c *gin.Context) {
+	var params SourcesParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QuerySources(c.Request.Context(), params.Q, params.Domains, *page_req)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, page_out.Items, page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getSource godoc
+// @Summary Retrieve one intelligence source
+// @Description What metadata is known about this source? This is provenance metadata. It does not return Events published by the source; use GET /events?source_ids={source_id} for that question. Returns 404 when no such source exists.
+// @Tags Sources
+// @Produce json
+// @Param source_id path string true "Source record UUID (RFC 4122)." format(uuid)
+// @Success 200 {object} ItemResponse[SourceDocument] "The source record"
+// @Failure 400 {object} APIError "Malformed UUID"
+// @Failure 404 {object} APIError "No source with this UUID"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID getIntelligenceSource
+// @Router /sources/{source_id} [get]
+func (r *Configuration) getSource(c *gin.Context) {
+	var item itemParams
+	if err := item.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	source, err := r.DB.GetSource(c.Request.Context(), item.ID)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	if source.IsZero() {
+		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SOURCE_NOT_FOUND})
+		return
+	}
+	writeItem(c, source, item.ResponseType)
 }
 
 // getTags godoc
 // @Summary Discover tag filters for Espresso intelligence
-// @Description Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips.
+// @Description Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.
 // @Description **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
-// @Description **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; multiple tag values are treated as an inclusive AND by those search endpoints.
-// @Description **Response formats**: `response_type=json` returns a JSON string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.
-// @Description **Pagination**: use `offset` to walk the full vocabulary when `limit` is smaller than the total number of tags.
+// @Description **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).
+// @Description **Response formats**: `response_type=json` returns the collection envelope with a `data` string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.
+// @Description **Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.
 // @Tags Tags
 // @Produce json
 // @Produce plain
-// @Param response_type query string false "Output format. json returns a JSON string array; text returns the same tags as comma-separated plain text for lower token cost." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of tags to skip. Default 0." minimum(0)
-// @Success 200 {array} string "Tag strings when response_type=json; comma-separated tags when response_type=text"
-// @Success 204 "No tags found (empty result, not an error)"
-// @Failure 400 {object} ErrorResponse "Invalid limit, offset, or response_type"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
-// @ID listTags
+// @Param q query string false "Case-insensitive substring or prefix match."
+// @Param resource query []string false "Optional kind scope (CSV): event, signal, evidence. action remains gated." collectionFormat(csv)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns comma-separated tags." Enums(json, text) default(json)
+// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
+// @Success 200 {object} CollectionResponse[string] "Tag strings when response_type=json; comma-separated tags when response_type=text"
+// @Failure 400 {object} APIError "Invalid limit, cursor, or response_type"
+// @Failure 401 {object} APIError "Missing or invalid API key"
+// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} APIError "Database unavailable; retry"
+// @ID listIntelligenceTags
 // @Router /tags [get]
 func (r *Configuration) getTags(c *gin.Context) {
-	var params baseQueryParams
-	if err := c.ShouldBindQuery(&params); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var params TagsParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
 		return
 	}
-	data, err := r.DB.GetTags(c.Request.Context(), db.Pagination{Limit: params.Limit, Offset: params.Offset})
-	returnResponse(c, data, err, params.ResponseType)
-}
-
-func convertStringsToUUIDs(strings []string) ([]uuid.UUID, error) {
-	errs := make([]error, 0, len(strings))
-	uuids := make([]uuid.UUID, 0, len(strings))
-	for _, raw := range strings {
-		if id, err := uuid.Parse(raw); err != nil {
-			errs = append(errs, errors.New("invalid id: "+raw))
-		} else {
-			uuids = append(uuids, id)
-		}
-	}
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-	return uuids, nil
-}
-
-func (config *Configuration) extractSipsParams(c *gin.Context) (*db.Condition, *db.Pagination, string) {
-	var input sipsQueryParams
-	if err := c.ShouldBindQuery(&input); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return nil, nil, ""
-	}
-	conditions := db.Condition{
-		Created: input.From,
-		Tags:    input.Tags,
-	}
-	if input.From.IsZero() {
-		conditions.Created = time.Now().AddDate(0, 0, -DEFAULT_WINDOW) // default to last 7 days if no published/trending filter provided
-	}
-	if len(input.IDs) > 0 {
-		ids, err := convertStringsToUUIDs(input.IDs)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return nil, nil, ""
-		}
-		conditions.IDs = ids
-	}
-	if input.Q != "" {
-		conditions.Embedding = config.Embedder.EmbedQuery(c, input.Q)
-		if len(conditions.Embedding) == 0 {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": _EMBEDDER_ERROR})
-			return nil, nil, ""
-		}
-		config.cache.Set(input.Q, conditions.Embedding)
-		distance := (1 - input.Acc) * 2
-		conditions.Distance = &distance
-	}
-	return &conditions, &db.Pagination{Limit: input.Limit, Offset: input.Offset}, input.ResponseType
-}
-
-// getEvents godoc
-// @Summary Search event intelligence
-// @Description Returns event-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
-// @Description **When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.
-// @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
-// @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
-// @Description **Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.
-// @Description **Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.
-// @Tags Events
-// @Produce json
-// @Produce plain
-// @Param ids query []string false "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
-// @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
-// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param from query string false "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
-// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of events to skip. Default 0." minimum(0)
-// @Success 200 {array} Event "Event digests when response_type=json; plain-text event blocks when response_type=text"
-// @Success 204 "No matching events (empty result, not an error)"
-// @Failure 400 {object} ErrorResponse "Invalid query parameters or malformed UUID in ids"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
-// @ID searchEvents
-// @Router /events [get]
-func (r *Configuration) getEvents(c *gin.Context) {
-	conditions, page, response_type := r.extractSipsParams(c)
-	if conditions == nil || page == nil {
-		return
-	}
-	conditions.Kinds = db.EVENTS
-	items, err := r.DB.QuerySips(c.Request.Context(), *conditions, *page)
-	returnResponse(c, items, err, response_type)
-}
-
-// getSignals godoc
-// @Summary Search synthesized signals
-// @Description Returns signal-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.
-// @Description **When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.
-// @Description **Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.
-// @Description **Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.
-// @Description **Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.
-// @Description **Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.
-// @Tags Signals
-// @Produce json
-// @Produce plain
-// @Param ids query []string false "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records." collectionFormat(csv)
-// @Param tags query []string false "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match." collectionFormat(csv)
-// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param from query string false "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted." format(date)
-// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of signals to skip. Default 0." minimum(0)
-// @Success 200 {array} Signal "Signal digests when response_type=json; plain-text signal blocks when response_type=text"
-// @Success 204 "No matching signals (empty result, not an error)"
-// @Failure 400 {object} ErrorResponse "Invalid query parameters or malformed UUID in ids"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
-// @ID searchSignals
-// @Router /signals [get]
-func (r *Configuration) getSignals(c *gin.Context) {
-	conditions, page, response_type := r.extractSipsParams(c)
-	if conditions == nil || page == nil {
-		return
-	}
-	conditions.Kinds = db.SIGNALS
-	items, err := r.DB.QuerySips(c.Request.Context(), *conditions, *page)
-	returnResponse(c, items, err, response_type)
-}
-
-// getRelated godoc
-// @Summary Follow related intelligence records
-// @Description Returns sips linked to one or more source UUIDs through the requested relationship.
-// @Description **When to use**: after searchEvents or searchSignals, call this endpoint to expand context around a known sip, deduplicate equivalent records, or trace derived intelligence.
-// @Description **Relationships**: `same_as` returns equivalent or duplicate records. `derived_from` returns downstream records generated from, or based on, the supplied source sip IDs.
-// @Description **Input**: `ids` is required and must contain one or more RFC 4122 UUID strings. The `relationship` path value must be exactly `same_as` or `derived_from`.
-// @Description **Response shape**: each result is a flattened event or signal digest with `id` and `reported` added by the router. Additional pipeline-specific keys may appear.
-// @Description **Agent format**: use `response_type=text` for compact field-per-line related records; use JSON when the caller needs structured parsing.
-// @Tags Related
-// @Produce json
-// @Produce plain
-// @Param relationship path string true "Relationship to traverse. same_as finds equivalent records; derived_from follows generated intelligence." Enums(same_as, derived_from)
-// @Param ids query []string true "Source sip UUIDs (CSV). Example: b07049b5-54c0-50b0-a620-d3aea3f8a173" collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of related records to skip. Default 0." minimum(0)
-// @Success 200 {array} Event "Related event/signal digests when response_type=json; plain-text related record blocks when response_type=text"
-// @Success 204 "No related sips found (empty result, not an error)"
-// @Failure 400 {object} ErrorResponse "Missing ids, invalid relationship, invalid response_type, or malformed UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
-// @ID getRelatedSips
-// @Router /related/{relationship} [get]
-func (r *Configuration) getRelated(c *gin.Context) {
-	var uri relatedURIParams
-	if err := c.ShouldBindUri(&uri); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	var query relatedQueryParams
-	if err := c.ShouldBindQuery(&query); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if len(query.IDs) == 0 {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "ids is required"})
-		return
-	}
-	ids, err := convertStringsToUUIDs(query.IDs)
+	page, err := params.createPageRequest(c, r)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeError(c, err)
 		return
 	}
-	items, err := r.DB.QueryRelatedSips(
-		c.Request.Context(),
-		db.Condition{
-			IDs:          ids,
-			Relationship: strings.ToUpper(uri.Relationship),
-		},
-		db.Pagination{Limit: query.Limit, Offset: query.Offset},
-	)
-	returnResponse(c, items, err, query.ResponseType)
-}
 
-func returnResponse[T any](c *gin.Context, items []T, err error, response_type string) {
+	page_out, err := r.DB.QueryTags(c.Request.Context(), params.Q, createSipKinds(params.Resource), *page)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": _DB_ERROR})
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	if len(items) == 0 {
-		c.Status(http.StatusNoContent)
-		return
-	}
-	if sips, ok := any(items).([]db.Sip); ok {
-		if response_type == "text" {
-			c.String(http.StatusOK, SipsToText(sips))
-			return
-		}
-		c.JSON(http.StatusOK, sipsToDigest(sips))
-		return
-	} else if tags, ok := any(items).([]string); ok {
-		if response_type == "text" {
-			c.String(http.StatusOK, strings.Join(tags, ", "))
-			return
-		}
-	}
-	c.JSON(http.StatusOK, items)
+	next := encodeNextCursor(page_out.NextCursor)
+	writePage(c, page_out.Items, page.Limit, next, params.ResponseType)
 }
 
-func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
-	if max_concurrent_requests <= 0 {
-		max_concurrent_requests = DEFAULT_CONCURRENCY // default to 100 if not set or invalid
-	}
+func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
 	config := &Configuration{
 		DB:       db,
 		Embedder: embedder,
 		APIKeys:  api_keys,
-		queue:    make(chan int, max_concurrent_requests),
-		cache: otter.Must(&otter.Options[string, []float32]{
-			MaximumSize:      _CACHE_SIZE,
-			ExpiryCalculator: otter.ExpiryAccessing[string, []float32](_CACHE_TTL),
-		}),
+		// cache: otter.Must(&otter.Options[string, []float32]{
+		// 	MaximumSize:      _CACHE_SIZE,
+		// 	ExpiryCalculator: otter.ExpiryAccessing[string, []float32](_CACHE_TTL),
+		// }),
 	}
 
 	router := gin.New()
-	// JSON access logs and recovery using zerolog
 	router.Use(
-		// logger
 		requestLogger,
-		// recovery
 		gin.Recovery(),
-		// cors
 		cors.New(cors.Config{
 			AllowAllOrigins:  true,
 			AllowMethods:     []string{"GET", "OPTIONS"},
@@ -366,21 +745,22 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 		}),
 	)
 
-	// Swagger / OpenAPI endpoints
-	// NOTE: run `swag init` to generate docs (package `docs`) before using the UI.
-	// Serve Swagger UI and point it at the generated spec in assets/docs
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/health", config.health)
-	router.StaticFile("favicon.ico", FAVICON_PATH)
 
-	// protected group
 	protected := router.Group("/")
-	protected.Use(config.apiKeyMiddleware, config.concurrencyMiddleware)
+	protected.Use(config.apiKeyMiddleware)
 	protected.GET("/tags", config.getTags)
 	protected.GET("/events", config.getEvents)
+	protected.GET("/events/:id", config.getEvent)
+	protected.GET("/events/:id/signals", config.getEventSignals)
+	protected.GET("/events/:id/evidence", config.getEventEvidence)
 	protected.GET("/signals", config.getSignals)
-	protected.GET("/related/:relationship", config.getRelated)
+	protected.GET("/signals/:id", config.getSignal)
+	protected.GET("/signals/:id/events", config.getSignalEvents)
+	protected.GET("/sources", config.getSources)
+	protected.GET("/sources/:id", config.getSource)
+
 	return router
 }
 
@@ -396,15 +776,7 @@ func (r *Configuration) apiKeyMiddleware(c *gin.Context) {
 			return
 		}
 	}
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing API Key"})
-}
-
-func (r *Configuration) concurrencyMiddleware(c *gin.Context) {
-	if r.queue != nil {
-		r.queue <- 1
-		defer func() { <-r.queue }()
-	}
-	c.Next()
+	writeError(c, APIError{Code: API_ERROR_UNAUTHORIZED, Message: API_ERROR_MSG_MISSING_API_KEY})
 }
 
 // requestLogger logs request path, query parameters, status and latency in JSON via zerolog
@@ -433,3 +805,5 @@ func requestLogger(c *gin.Context) {
 	}
 	evt.Msg("incoming")
 }
+
+// _WIRING_END_

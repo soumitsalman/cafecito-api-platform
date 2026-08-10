@@ -5,25 +5,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
 )
 
-const testVectorQuery = "market trend changes due to public policy changes"
+// Shared fixtures for db + router integration tests.
 
-var testRelatedIDs = []uuid.UUID{
-	uuid.MustParse("b07049b5-54c0-50b0-a620-d3aea3f8a173"),
-	uuid.MustParse("9c3cc0a2-6eea-5290-9e9b-b5c462aeaa3a"),
-	uuid.MustParse("0e2f7359-d09b-5f5c-b275-07e36b7ef55c"),
-}
+const TEST_VECTOR_QUERY = "market trend changes due to public policy changes"
 
-var testScalarTags = []string{"public_policy", "market_trends", "criminal_investigation"}
+var test_scalar_tags = []string{"us", "japan", "china", "ai"}
 
-var testTextTags = []string{"public_policy", "market_trends"}
-
-var testQueryEmbedding = []float32{
+var test_query_embedding = []float32{
 	-0.1990760862827301,
 	0.0963737741112709,
 	0.05843411013484001,
@@ -348,17 +341,14 @@ var testQueryEmbedding = []float32{
 
 func setupTestDB() *db.Cupboard {
 	db.NoError(godotenv.Load("../.env"))
-	connStr := os.Getenv("PG_CONNECTION_STRING")
-	return db.NewCupboard(context.Background(), connStr)
+	conn_str := os.Getenv("PG_CONNECTION_STRING")
+	return db.NewCupboard(context.Background(), conn_str)
 }
 
-func setupTestEmbedder() *embedding.GRPCEmbedder {
+func setupTestEmbedder() embedding.Embedder {
 	db.NoError(godotenv.Load("../.env"))
-	return embedding.NewGRPCEmbedder(
-		os.Getenv("EMBEDDER_BASE_URL"),
-		os.Getenv("EMBEDDER_API_KEY"),
-		os.Getenv("EMBEDDER_MODEL"),
-	)
+	return embedding.NewHTTPEmbedder("http://localhost:10000", "", "test")
+
 }
 
 func testSearchFrom() time.Time {

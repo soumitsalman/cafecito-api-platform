@@ -23,7 +23,7 @@ List endpoints accept an optional `response_type` query parameter: `json` (defau
 - **Business intelligence data** - Event and signal records with UUIDs, timestamps, and domain specific structured fields
 - **Semantic search** - Natural language search with an adjustable similarity threshold
 - **Tag filtering** - Filter events and signals by scalar tags such as topics, domains, regions, or entities
-- **Relationship traversal** - Follow `same_as` and `derived_from` links between related sips
+- **Relationship traversal** - Follow `SAME_AS` and `DERIVED_FROM` links via `GET /events/{id}/evidence` and `GET /signals/{id}/events`
 - **MCP-friendly responses** - Return normal JSON or flat plain text with `response_type=text`
 
 ## Authentication
@@ -69,7 +69,6 @@ List endpoints flatten each sip's digest and merge **`id`**, **`reported`**, and
 | `GET /espresso/tags` | List tags for filtering events and signals |
 | `GET /espresso/events` | Search events (sorted by created descending) |
 | `GET /espresso/signals` | Search signals (sorted by created descending) |
-| `GET /espresso/related/{relationship}` | Get related sips by relationship |
 
 ## Query parameters
 
@@ -91,16 +90,6 @@ List endpoints flatten each sip's digest and merge **`id`**, **`reported`**, and
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
 | `response_type` | string | `json` returns a string array; `text` returns comma-separated tags |
-| `limit` | integer (1–128) | Page size, default `16` |
-| `offset` | integer | Pagination offset (default `0`) |
-
-### Related sips
-
-| Parameter | Type | Description |
-| --------- | ---- | ----------- |
-| `relationship` | path string | `same_as` or `derived_from` |
-| `ids` | CSV UUIDs | Required source sip UUIDs |
-| `response_type` | string | `json` or `text`, default `json` |
 | `limit` | integer (1–128) | Page size, default `16` |
 | `offset` | integer | Pagination offset (default `0`) |
 
@@ -129,7 +118,6 @@ Hosted MCP tools (same names as REST `operationId`s):
 | `searchEvents` | `GET /espresso/events` |
 | `searchSignals` | `GET /espresso/signals` |
 | `listTags` | `GET /espresso/tags` |
-| `getRelatedSips` | `GET /espresso/related/{relationship}` |
 
 Use `response_type=text` on list endpoints for token-efficient agent consumption. See the [MCP Integration guide](/howtos/mcp-howto) for client setup patterns.
 
@@ -363,50 +351,6 @@ print(resp.text)
 
 ```bash title="cURL"
 curl -s "${BASE_URL}/espresso/signals?q=market+volatility&acc=0.75&limit=5&response_type=text" \
-  -H "Authorization: Bearer ${API_KEY}"
-```
-</CodeTabs>
-
----
-
-### 6. Fetch related sips
-
-<CodeTabs syncKey="espresso-api">
-```js
-const params = new URLSearchParams({
-  ids: "b07049b5-54c0-50b0-a620-d3aea3f8a173",
-  limit: "10",
-});
-
-const res = await fetch(`${BASE_URL}/espresso/related/derived_from?${params}`, {
-  headers: { Authorization: `Bearer ${API_KEY}` },
-});
-
-if (!res.ok) throw new Error(`HTTP ${res.status}`);
-const related = await res.json();
-related?.forEach((sip) => console.log(sip.id, sip.briefing));
-```
-
-```python
-import requests
-
-resp = requests.get(
-    f"{BASE_URL}/espresso/related/derived_from",
-    headers={"Authorization": f"Bearer {API_KEY}"},
-    params={
-        "ids": "b07049b5-54c0-50b0-a620-d3aea3f8a173",
-        "limit": 10,
-    },
-    timeout=30,
-)
-resp.raise_for_status()
-
-for sip in resp.json() or []:
-    print(sip.get("id"), sip.get("briefing"))
-```
-
-```bash title="cURL"
-curl -s "${BASE_URL}/espresso/related/derived_from?ids=b07049b5-54c0-50b0-a620-d3aea3f8a173&limit=10" \
   -H "Authorization: Bearer ${API_KEY}"
 ```
 </CodeTabs>

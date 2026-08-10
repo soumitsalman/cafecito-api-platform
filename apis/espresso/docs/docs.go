@@ -24,7 +24,7 @@ const docTemplate = `{
     "paths": {
         "/events": {
             "get": {
-                "description": "Returns event-kind sips. Searches without ` + "`" + `q` + "`" + ` are sorted by ` + "`" + `created` + "`" + ` descending; semantic searches with ` + "`" + `q` + "`" + ` are ranked by cosine distance, most similar first.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.\n**Search modes**: use ` + "`" + `ids` + "`" + ` for exact UUID lookup, ` + "`" + `tags` + "`" + ` for inclusive-AND tag filtering, ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + ` for semantic search, and ` + "`" + `from` + "`" + ` to set the oldest creation date. These filters can be combined.\n**Default time window**: when ` + "`" + `from` + "`" + ` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with ` + "`" + `id` + "`" + ` and ` + "`" + `reported` + "`" + ` added by the router. Stable fields include ` + "`" + `briefing` + "`" + `, ` + "`" + `event_type` + "`" + `, ` + "`" + `actions` + "`" + `, ` + "`" + `people` + "`" + `, ` + "`" + `regions` + "`" + `, ` + "`" + `cross_domain_impacts` + "`" + `, ` + "`" + `future_outlook` + "`" + `, ` + "`" + `impact_level` + "`" + `, and ` + "`" + `tags` + "`" + `; additional pipeline-specific keys may appear.\n**Agent format**: use ` + "`" + `response_type=text` + "`" + ` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+                "description": "Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.\n**Search modes**: ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + ` for semantic search (default sort becomes ` + "`" + `relevance` + "`" + `); without ` + "`" + `q` + "`" + ` records are sorted by ` + "`" + `created_at` + "`" + ` descending (` + "`" + `recent` + "`" + `).\n**Time**: ` + "`" + `from` + "`" + `/` + "`" + `to` + "`" + ` are inclusive bounds on record ` + "`" + `created_at` + "`" + ` until an occurrence-time field exists. They do not claim Event occurrence time.\n**Tags**: match on persisted tags uses overlap (any supplied tag).\n**Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.\n**Agent format**: use ` + "`" + `response_type=text` + "`" + ` for compact field-per-line records with ` + "`" + `---` + "`" + ` delimiters when feeding an LLM or MCP client.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -32,33 +32,13 @@ const docTemplate = `{
                 "tags": [
                     "Events"
                 ],
-                "summary": "Search event intelligence",
+                "summary": "Search Event-family records",
                 "operationId": "searchEvents",
                 "parameters": [
                     {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records.",
-                        "name": "ids",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match.",
-                        "name": "tags",
-                        "in": "query"
-                    },
-                    {
                         "maxLength": 1024,
                         "type": "string",
-                        "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder.",
+                        "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder. When present, default sort is relevance.",
                         "name": "q",
                         "in": "query"
                     },
@@ -73,9 +53,128 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "format": "date",
-                        "description": "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted.",
+                        "format": "date-time",
+                        "description": "Only include records created on or after this date (RFC3339 timestamp).",
                         "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Only include records created on or before this date (RFC3339 timestamp).",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Restrict to known Event-family IDs (CSV). Prefer the detail route for one ID.",
+                        "name": "ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Allowlisted match against digest.event_type (CSV).",
+                        "name": "event_types",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.impact_level (CSV): low, medium, high.",
+                        "name": "impact_levels",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.companies array (CSV).",
+                        "name": "companies",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.people array (CSV).",
+                        "name": "people",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.products array (CSV).",
+                        "name": "products",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.regions array (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match the persisted source UUID, including direct SAME_AS evidence coverage (CSV).",
+                        "name": "source_ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "any",
+                            "all"
+                        ],
+                        "type": "string",
+                        "default": "any",
+                        "description": "Tag matching mode.",
+                        "name": "tag_mode",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "recent",
+                            "relevance"
+                        ],
+                        "type": "string",
+                        "default": "recent",
+                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
+                        "name": "sort",
                         "in": "query"
                     },
                     {
@@ -85,7 +184,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
+                        "description": "Output format. json returns the collection envelope; text returns compact plain-text records.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -93,40 +192,376 @@ const docTemplate = `{
                         "maximum": 128,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of events to skip. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Event digests when response_type=json; plain-text event blocks when response_type=text",
+                        "description": "Event-family records when response_type=json; plain-text event blocks when response_type=text",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/router.Event"
-                            }
+                            "$ref": "#/definitions/router.EventCollectionResponse"
                         }
                     },
-                    "204": {
-                        "description": "No matching events (empty result, not an error)"
-                    },
                     "400": {
-                        "description": "Invalid query parameters or malformed UUID in ids",
+                        "description": "Invalid query parameters, malformed UUID, or malformed cursor",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{event_id}": {
+            "get": {
+                "description": "What Event-family record has this UUID? Retrieves any record whose kind starts with ` + "`" + `event` + "`" + ` by UUID and returns its raw non-empty flattened digest members plus detail metadata links and relation counts. Returns 404 when no such record exists.",
+                "produces": [
+                    "application/json",
+                    "text/plain"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Retrieve one Event-family record",
+                "operationId": "getEvent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Event-family record UUID (RFC 4122).",
+                        "name": "event_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "text"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format. json returns the detail envelope; text returns a compact plain-text record.",
+                        "name": "response_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The Event-family record",
+                        "schema": {
+                            "$ref": "#/definitions/router.EventDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No Event-family record with this UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{event_id}/evidence": {
+            "get": {
+                "description": "Which source-specific records support this Event? Returns a bare JSON list containing the requested Event and every direct SAME_AS Event-family neighbour in both relation orientations. Each item contains only event_id, created, source_id, url, and base_url. The default scope is direct_same_as: a bounded claim about current data, not a complete transitive equivalence closure.",
+                "produces": [
+                    "application/json",
+                    "text/plain"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Retrieve Event evidence",
+                "operationId": "getEventEvidence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Event-family record UUID (RFC 4122).",
+                        "name": "event_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Restrict evidence to selected sources (CSV).",
+                        "name": "source_ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive evidence created_at lower bound (RFC3339 timestamp).",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive evidence created_at upper bound (RFC3339 timestamp).",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "text"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format. json returns the bare evidence list; text returns the same records as compact plain text.",
+                        "name": "response_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bare Event evidence list",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/router.EventEvidenceItem"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID or invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No Event-family record with this UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{event_id}/signals": {
+            "get": {
+                "description": "Which broader conclusions use this Event as evidence? Returns Signals whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS equivalents. The caller does not need to know which Event-family record was used as the relation target. Returns 404 when the Event does not exist; 200 with an empty collection when it exists but has no Signals.",
+                "produces": [
+                    "application/json",
+                    "text/plain"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Retrieve Signals derived from an Event",
+                "operationId": "getEventSignals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Event-family record UUID (RFC 4122).",
+                        "name": "event_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 1024,
+                        "type": "string",
+                        "description": "Natural-language semantic search query. Max 1024 characters.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.5,
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive Signal created_at lower bound (RFC3339 timestamp).",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive Signal created_at upper bound (RFC3339 timestamp).",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match Signal digest.impact_level (CSV).",
+                        "name": "impact_levels",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match Signal digest.impacted_domains array (CSV).",
+                        "name": "impacted_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "any",
+                            "all"
+                        ],
+                        "type": "string",
+                        "default": "any",
+                        "description": "Tag matching mode.",
+                        "name": "tag_mode",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "recent",
+                            "relevance"
+                        ],
+                        "type": "string",
+                        "default": "recent",
+                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "text"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format. json returns the collection envelope; text returns compact plain-text records.",
+                        "name": "response_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Signals derived from this Event",
+                        "schema": {
+                            "$ref": "#/definitions/router.SignalCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID, invalid cursor, or invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No Event-family record with this UUID",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -170,112 +605,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/related/{relationship}": {
-            "get": {
-                "description": "Returns sips linked to one or more source UUIDs through the requested relationship.\n**When to use**: after searchEvents or searchSignals, call this endpoint to expand context around a known sip, deduplicate equivalent records, or trace derived intelligence.\n**Relationships**: ` + "`" + `same_as` + "`" + ` returns equivalent or duplicate records. ` + "`" + `derived_from` + "`" + ` returns downstream records generated from, or based on, the supplied source sip IDs.\n**Input**: ` + "`" + `ids` + "`" + ` is required and must contain one or more RFC 4122 UUID strings. The ` + "`" + `relationship` + "`" + ` path value must be exactly ` + "`" + `same_as` + "`" + ` or ` + "`" + `derived_from` + "`" + `.\n**Response shape**: each result is a flattened event or signal digest with ` + "`" + `id` + "`" + ` and ` + "`" + `reported` + "`" + ` added by the router. Additional pipeline-specific keys may appear.\n**Agent format**: use ` + "`" + `response_type=text` + "`" + ` for compact field-per-line related records; use JSON when the caller needs structured parsing.",
-                "produces": [
-                    "application/json",
-                    "text/plain"
-                ],
-                "tags": [
-                    "Related"
-                ],
-                "summary": "Follow related intelligence records",
-                "operationId": "getRelatedSips",
-                "parameters": [
-                    {
-                        "enum": [
-                            "same_as",
-                            "derived_from"
-                        ],
-                        "type": "string",
-                        "description": "Relationship to traverse. same_as finds equivalent records; derived_from follows generated intelligence.",
-                        "name": "relationship",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Source sip UUIDs (CSV). Example: b07049b5-54c0-50b0-a620-d3aea3f8a173",
-                        "name": "ids",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "enum": [
-                            "json",
-                            "text"
-                        ],
-                        "type": "string",
-                        "default": "json",
-                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
-                        "name": "response_type",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of related records to skip. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Related event/signal digests when response_type=json; plain-text related record blocks when response_type=text",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/router.Event"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No related sips found (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Missing ids, invalid relationship, invalid response_type, or malformed UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Database unavailable; retry",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/signals": {
             "get": {
-                "description": "Returns signal-kind sips. Searches without ` + "`" + `q` + "`" + ` are sorted by ` + "`" + `created` + "`" + ` descending; semantic searches with ` + "`" + `q` + "`" + ` are ranked by cosine distance, most similar first.\n**When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.\n**Search modes**: use ` + "`" + `ids` + "`" + ` for exact UUID lookup, ` + "`" + `tags` + "`" + ` for inclusive-AND tag filtering, ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + ` for semantic search, and ` + "`" + `from` + "`" + ` to set the oldest creation date. These filters can be combined.\n**Default time window**: when ` + "`" + `from` + "`" + ` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with ` + "`" + `id` + "`" + ` and ` + "`" + `reported` + "`" + ` added by the router. Stable fields include ` + "`" + `briefing` + "`" + `, ` + "`" + `events` + "`" + `, ` + "`" + `drivers` + "`" + `, ` + "`" + `impacts` + "`" + `, ` + "`" + `impacted_domains` + "`" + `, ` + "`" + `forecast` + "`" + `, ` + "`" + `impact_level` + "`" + `, and ` + "`" + `tags` + "`" + `; additional pipeline-specific keys may appear.\n**Agent format**: use ` + "`" + `response_type=text` + "`" + ` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+                "description": "Which synthesized conclusions or forecasts match my question? Returns signal-kind records. A Signal is returned intelligence, not a saved monitoring definition.\n**Search modes**: ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + ` for semantic search (default sort becomes ` + "`" + `relevance` + "`" + `); without ` + "`" + `q` + "`" + ` records are sorted by ` + "`" + `created_at` + "`" + ` descending (` + "`" + `recent` + "`" + `).\n**Time**: ` + "`" + `from` + "`" + `/` + "`" + `to` + "`" + ` are inclusive bounds on Signal ` + "`" + `created_at` + "`" + `.\n**Tags**: match on persisted tags uses overlap (any supplied tag).",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -283,33 +615,13 @@ const docTemplate = `{
                 "tags": [
                     "Signals"
                 ],
-                "summary": "Search synthesized signals",
+                "summary": "Search synthesized Signals",
                 "operationId": "searchSignals",
                 "parameters": [
                     {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records.",
-                        "name": "ids",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match.",
-                        "name": "tags",
-                        "in": "query"
-                    },
-                    {
                         "maxLength": 1024,
                         "type": "string",
-                        "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder.",
+                        "description": "Natural-language semantic search query. Max 1024 characters.",
                         "name": "q",
                         "in": "query"
                     },
@@ -324,9 +636,78 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "format": "date",
-                        "description": "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted.",
+                        "format": "date-time",
+                        "description": "Inclusive Signal created_at lower bound (RFC3339 timestamp).",
                         "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive Signal created_at upper bound (RFC3339 timestamp).",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Restrict to known Signal IDs (CSV).",
+                        "name": "ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match Signal digest.impact_level (CSV).",
+                        "name": "impact_levels",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match Signal digest.impacted_domains array (CSV).",
+                        "name": "impacted_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "any",
+                            "all"
+                        ],
+                        "type": "string",
+                        "default": "any",
+                        "description": "Tag matching mode.",
+                        "name": "tag_mode",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "recent",
+                            "relevance"
+                        ],
+                        "type": "string",
+                        "default": "recent",
+                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
+                        "name": "sort",
                         "in": "query"
                     },
                     {
@@ -336,7 +717,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context.",
+                        "description": "Output format. json returns the collection envelope; text returns compact plain-text records.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -344,34 +725,27 @@ const docTemplate = `{
                         "maximum": 128,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of signals to skip. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Signal digests when response_type=json; plain-text signal blocks when response_type=text",
+                        "description": "Signal records",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/router.Signal"
-                            }
+                            "$ref": "#/definitions/router.SignalCollectionResponse"
                         }
                     },
-                    "204": {
-                        "description": "No matching signals (empty result, not an error)"
-                    },
                     "400": {
-                        "description": "Invalid query parameters or malformed UUID in ids",
+                        "description": "Invalid query parameters, malformed UUID, or malformed cursor",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -397,9 +771,391 @@ const docTemplate = `{
                 }
             }
         },
+        "/signals/{signal_id}": {
+            "get": {
+                "description": "What is the complete Signal with this UUID? Retrieves one signal-kind record by UUID. The detail payload links to supporting Events instead of inventing inline event references from unstructured digest strings. Returns 404 when no such Signal exists.",
+                "produces": [
+                    "application/json",
+                    "text/plain"
+                ],
+                "tags": [
+                    "Signals"
+                ],
+                "summary": "Retrieve one Signal",
+                "operationId": "getSignal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Signal record UUID (RFC 4122).",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "text"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format. json returns the detail envelope; text returns a compact plain-text record.",
+                        "name": "response_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The Signal record",
+                        "schema": {
+                            "$ref": "#/definitions/router.SignalDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No Signal with this UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/signals/{signal_id}/events": {
+            "get": {
+                "description": "Which Event-family records support this Signal? Follows DERIVED_FROM edges in the stored signal-to-event direction and returns raw non-empty flattened digest members from direct Event-family targets. Returns 404 when the Signal does not exist; 200 with an empty collection when it exists but has no supporting Events.",
+                "produces": [
+                    "application/json",
+                    "text/plain"
+                ],
+                "tags": [
+                    "Signals"
+                ],
+                "summary": "Retrieve Event-family records supporting a Signal",
+                "operationId": "getSignalEvents",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Signal record UUID (RFC 4122).",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 1024,
+                        "type": "string",
+                        "description": "Natural-language semantic search query. Max 1024 characters.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.5,
+                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
+                        "name": "acc",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive Event created_at lower bound (RFC3339 timestamp).",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive Event created_at upper bound (RFC3339 timestamp).",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.event_type (CSV).",
+                        "name": "event_types",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match digest.impact_level (CSV).",
+                        "name": "impact_levels",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "any",
+                            "all"
+                        ],
+                        "type": "string",
+                        "default": "any",
+                        "description": "Tag matching mode.",
+                        "name": "tag_mode",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "recent",
+                            "relevance"
+                        ],
+                        "type": "string",
+                        "default": "recent",
+                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "text"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format. json returns the collection envelope; text returns compact plain-text records.",
+                        "name": "response_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event-family records supporting this Signal",
+                        "schema": {
+                            "$ref": "#/definitions/router.EventCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID, invalid cursor, or invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No Signal with this UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database or embedder unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sources": {
+            "get": {
+                "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sources"
+                ],
+                "summary": "List intelligence sources",
+                "operationId": "listIntelligenceSources",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive match against site name, domain, or base URL.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact domain-name filter (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Source records",
+                        "schema": {
+                            "$ref": "#/definitions/router.SourceCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid limit, cursor, or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sources/{source_id}": {
+            "get": {
+                "description": "What metadata is known about this source? This is provenance metadata. It does not return Events published by the source; use GET /events?source_ids={source_id} for that question. Returns 404 when no such source exists.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sources"
+                ],
+                "summary": "Retrieve one intelligence source",
+                "operationId": "getIntelligenceSource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Source record UUID (RFC 4122).",
+                        "name": "source_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The source record",
+                        "schema": {
+                            "$ref": "#/definitions/router.SourceDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No source with this UUID",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Concurrency limit exceeded; retry shortly",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database unavailable; retry",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
-                "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to ` + "`" + `tags` + "`" + ` on ` + "`" + `/events` + "`" + ` and ` + "`" + `/signals` + "`" + `; multiple tag values are treated as an inclusive AND by those search endpoints.\n**Response formats**: ` + "`" + `response_type=json` + "`" + ` returns a JSON string array. ` + "`" + `response_type=text` + "`" + ` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: use ` + "`" + `offset` + "`" + ` to walk the full vocabulary when ` + "`" + `limit` + "`" + ` is smaller than the total number of tags.",
+                "description": "Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to ` + "`" + `tags` + "`" + ` on ` + "`" + `/events` + "`" + ` and ` + "`" + `/signals` + "`" + `; matching uses overlap (any supplied tag).\n**Response formats**: ` + "`" + `response_type=json` + "`" + ` returns the collection envelope with a ` + "`" + `data` + "`" + ` string array. ` + "`" + `response_type=text` + "`" + ` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: cursor-based. Use ` + "`" + `next_cursor` + "`" + ` to continue; ` + "`" + `limit` + "`" + ` default 20, max 128.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -408,8 +1164,24 @@ const docTemplate = `{
                     "Tags"
                 ],
                 "summary": "Discover tag filters for Espresso intelligence",
-                "operationId": "listTags",
+                "operationId": "listIntelligenceTags",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive substring or prefix match.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Optional kind scope (CSV): event, signal, evidence. action remains gated.",
+                        "name": "resource",
+                        "in": "query"
+                    },
                     {
                         "enum": [
                             "json",
@@ -417,7 +1189,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output format. json returns a JSON string array; text returns the same tags as comma-separated plain text for lower token cost.",
+                        "description": "Output format. json returns the collection envelope; text returns comma-separated tags.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -425,16 +1197,15 @@ const docTemplate = `{
                         "maximum": 128,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Page size. Default 20, max 128.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of tags to skip. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -442,17 +1213,11 @@ const docTemplate = `{
                     "200": {
                         "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.StringCollectionResponse"
                         }
                     },
-                    "204": {
-                        "description": "No tags found (empty result, not an error)"
-                    },
                     "400": {
-                        "description": "Invalid limit, offset, or response_type",
+                        "description": "Invalid limit, cursor, or response_type",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -480,214 +1245,210 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "router.APIError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.DigestDocument": {
+            "type": "object",
+            "additionalProperties": {}
+        },
         "router.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
-                    "type": "string",
-                    "example": "invalid id: not-a-uuid"
+                    "$ref": "#/definitions/router.APIError"
                 }
             }
         },
-        "router.Event": {
+        "router.EventCollectionResponse": {
             "type": "object",
             "properties": {
-                "actions": {
+                "data": {
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "2026-06-28 Firefighters died and injuries occurred at Wyoming-Utah border.",
-                        "2026-06-28 Large wildfire destroyed parts of ski resorts."
-                    ]
+                        "$ref": "#/definitions/router.DigestDocument"
+                    }
                 },
-                "briefing": {
-                    "type": "string",
-                    "example": "On June 28, 2026, three U.S. firefighters died while battling rapidly spreading wildfires near the Colorado-Utah border; approximately 100 sq km burned. Temperatures reached 34°C with strong winds, prompting mass evacuations. The Snyder Fire merged with others, causing significant damage to infrastructure like ski resorts. Causes include severe drought and human factors. This incident reflects escalating regional wildfire risks driven by climate change."
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
                 },
-                "companies": {
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.EventDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.DigestDocument"
+                }
+            }
+        },
+        "router.EventEvidenceItem": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "created": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "source_id": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.Pagination": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.ResponseMeta": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.SignalCollectionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "us_federal",
-                        "us_state"
-                    ]
+                        "$ref": "#/definitions/router.DigestDocument"
+                    }
                 },
-                "cross_domain_impacts": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "public_safety: Increased risk of civilian casualties.",
-                        "tourism: Disruption of winter sports facilities.",
-                        "environmental: Habitat loss in mountainous areas."
-                    ]
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
                 },
-                "event_type": {
-                    "type": "string",
-                    "example": "wildfire_outbreak"
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.SignalDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.DigestDocument"
+                }
+            }
+        },
+        "router.SourceCollectionItem": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
                 },
-                "future_outlook": {
-                    "type": "string",
-                    "example": "Continued extreme fire seasons expected without mitigation efforts."
+                "domain_name": {
+                    "type": "string"
                 },
                 "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "091726f8-421a-566d-9db8-339625f2ed9e"
-                },
-                "impact_level": {
-                    "type": "string",
-                    "enum": [
-                        "low",
-                        "medium",
-                        "high"
-                    ],
-                    "example": "high"
-                },
-                "macro_context": {
-                    "type": "string",
-                    "example": "western_us_climate_crisis"
-                },
-                "people": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "firefighter_john_doe",
-                        "governor_polis"
-                    ]
-                },
-                "products": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "petróleo"
-                    ]
-                },
-                "regions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "colorado",
-                        "utah"
-                    ]
-                },
-                "reported": {
-                    "type": "string",
-                    "example": "2026-06-28T22:49:07Z"
+                    "type": "string"
                 },
                 "site_name": {
-                    "type": "string",
-                    "example": "Example News"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "wildfire",
-                        "climate_change",
-                        "us",
-                        "emergency_response"
-                    ]
+                    "type": "string"
                 }
             }
         },
-        "router.Signal": {
+        "router.SourceCollectionResponse": {
             "type": "object",
             "properties": {
-                "briefing": {
-                    "type": "string",
-                    "example": "On 2026-06-02, U.S. lawmakers and the Trump administration debated AI sovereign-wealth and compute-tax proposals amid soaring inflation..."
-                },
-                "drivers": {
+                "data": {
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "High inflation and rising consumer costs driven by supply-chain bottlenecks and geopolitical tensions."
-                    ]
+                        "$ref": "#/definitions/router.SourceCollectionItem"
+                    }
                 },
-                "events": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "2026-06-01: Senator Bernie Sanders introduced a 50% ownership tax on major AI firms"
-                    ]
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
                 },
-                "forecast": {
-                    "type": "string",
-                    "example": "Short-term: Market volatility will persist, AI regulatory scrutiny will intensify, and consumer confidence remains low."
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "router.SourceDetail": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "domain_name": {
+                    "type": "string"
+                },
+                "favicon": {
+                    "type": "string"
                 },
                 "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "example": "e7d7571a-13f0-56f0-8563-50863b79c781"
+                    "type": "string"
                 },
-                "impact_level": {
-                    "type": "string",
-                    "enum": [
-                        "low",
-                        "medium",
-                        "high"
-                    ],
-                    "example": "high"
+                "rss_feed": {
+                    "type": "string"
                 },
-                "impacted_domains": {
+                "site_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.SourceDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.SourceDetail"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "router.StringCollectionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "example": [
-                        "finance",
-                        "technology",
-                        "cybersecurity",
-                        "labor",
-                        "healthcare",
-                        "energy",
-                        "policy"
-                    ]
+                    }
                 },
-                "impacts": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "9.3% market sell-off across tech and financial sectors.",
-                        "Decline in consumer confidence and increased credit-card delinquency."
-                    ]
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
                 },
-                "reported": {
-                    "type": "string",
-                    "example": "2026-06-02T14:02:00-04:00"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "ai_sovereign_wealth_fund",
-                        "ai_taxation",
-                        "compute_tax",
-                        "inflation",
-                        "market_volatility"
-                    ]
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
                 }
             }
         }
@@ -696,12 +1457,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "0.1",
+	Version:          "0.2",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Espresso API & MCP",
-	Description:      "MCP-ready business intelligence over curated \"sips\" for agents, dashboards, and automated research workflows.\nA **sip** is one unit of intelligence. `event` records describe observed business or market developments. `signal` records synthesize higher-level implications from related events and actions. `action` records are lower-level source facts used by the ingestion pipeline.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for time-ordered developments; (3) searchSignals for synthesized implications; (4) getRelatedSips to follow `same_as` duplicates or `derived_from` intelligence chains.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. All sip IDs are UUID strings such as `339366bc-464d-582f-8132-6875ccc814d2`.\nResponse formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same underlying records as compact field-per-line plain text with lower token overhead.",
+	Description:      "MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.\nAn **Event** is any record whose kind starts with `event` (canonical `event`, plus `event:news`, `event:blog`, `event:post`, `event:site`, `event:social`). A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Collections use cursor pagination: `limit` default 20 max 128, and an opaque `cursor` returned as `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.\nResponse formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same non-empty digest members as compact field-per-line plain text with `---` record delimiters. Public Event and Signal payloads do not synthesize storage id, created, kind, representation, or object fields.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -1,8 +1,8 @@
 {
+  "openapi": "3.1.0",
   "info": {
+    "description": "MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.\nAn **Event** is any record whose kind starts with `event` (canonical `event`, plus `event:news`, `event:blog`, `event:post`, `event:site`, `event:social`). A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Collections use cursor pagination: `limit` default 20 max 128, and an opaque `cursor` returned as `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.\nResponse formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same non-empty digest members as compact field-per-line plain text with `---` record delimiters. Public Event and Signal payloads do not synthesize storage id, created, kind, representation, or object fields.",
     "title": "Espresso API & MCP",
-    "description": "MCP-ready business intelligence over curated \"sips\" for agents, dashboards, and automated research workflows.\nA **sip** is one unit of intelligence. `event` records describe observed business or market developments. `signal` records synthesize higher-level implications from related events and actions. `action` records are lower-level source facts used by the ingestion pipeline.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for time-ordered developments; (3) searchSignals for synthesized implications; (4) getRelatedSips to follow `same_as` duplicates or `derived_from` intelligence chains.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. All sip IDs are UUID strings such as `339366bc-464d-582f-8132-6875ccc814d2`.\nResponse formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same underlying records as compact field-per-line plain text with lower token overhead.",
-    "version": "0.1",
     "contact": {
       "name": "Project Cafecito",
       "url": "http://cafecito.tech",
@@ -10,25 +10,25 @@
     },
     "license": {
       "name": "MIT"
-    }
+    },
+    "version": "0.2"
   },
-  "openapi": "3.1.0",
   "tags": [
     {
       "name": "Events",
-      "description": "Event-kind sips — self-contained digests of micro actions and developments"
+      "description": "Event-family records — developments and their source coverage"
     },
     {
       "name": "Signals",
-      "description": "Signal-kind sips — derived intelligence synthesized from related events and actions"
+      "description": "Signal records — synthesized conclusions derived from events"
     },
     {
-      "name": "Related",
-      "description": "Sips linked to source UUIDs through same_as or derived_from relationships"
+      "name": "Sources",
+      "description": "Provenance records keyed by UUID"
     },
     {
       "name": "Tags",
-      "description": "Unique tag strings for filtering events and signals"
+      "description": "Scalar tag vocabulary for filtering events and signals"
     },
     {
       "name": "Health",
@@ -41,370 +41,245 @@
   ],
   "components": {
     "schemas": {
+      "APIError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "DigestDocument": {
+        "type": "object",
+        "additionalProperties": {}
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
           "error": {
-            "type": "string",
-            "title": "Error",
-            "description": "Human-readable error message.",
-            "example": "invalid id: not-a-uuid"
-          }
-        },
-        "required": [
-          "error"
-        ],
-        "title": "ErrorResponse",
-        "description": "Standard JSON error envelope for 4xx and 5xx responses."
-      },
-      "Event": {
-        "type": "object",
-        "title": "Event",
-        "description": "Flattened JSON shape returned for event-kind sips. The handler merges persisted sip metadata (`id`, `reported`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id",
-            "description": "Sip UUID (RFC 4122).",
-            "example": "091726f8-421a-566d-9db8-339625f2ed9e"
-          },
-          "reported": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Reported",
-            "description": "Reported timestamp of the sip (maps from persisted created).",
-            "example": "2026-06-28T22:49:07Z"
-          },
-          "briefing": {
-            "type": "string",
-            "title": "Briefing",
-            "description": "Concise summary of the event.",
-            "example": "On June 28, 2026, three U.S. firefighters died while battling rapidly spreading wildfires near the Colorado-Utah border; approximately 100 sq km burned. Temperatures reached 34°C with strong winds, prompting mass evacuations. The Snyder Fire merged with others, causing significant damage to infrastructure like ski resorts. Causes include severe drought and human factors. This incident reflects escalating regional wildfire risks driven by climate change."
-          },
-          "event_type": {
-            "type": "string",
-            "title": "Event Type",
-            "description": "Category or classification of the event.",
-            "example": "wildfire_outbreak"
-          },
-          "impact_level": {
-            "type": "string",
-            "title": "Impact Level",
-            "description": "Assessed impact severity.",
-            "enum": [
-              "low",
-              "medium",
-              "high"
-            ],
-            "example": "high"
-          },
-          "future_outlook": {
-            "type": "string",
-            "title": "Future Outlook",
-            "description": "Forward-looking assessment of likely developments.",
-            "example": "Continued extreme fire seasons expected without mitigation efforts."
-          },
-          "actions": {
-            "type": "array",
-            "title": "Actions",
-            "description": "Micro actions or developments that compose the event.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "2026-06-28 Firefighters died and injuries occurred at Wyoming-Utah border.",
-              "2026-06-28 Large wildfire destroyed parts of ski resorts."
-            ]
-          },
-          "cross_domain_impacts": {
-            "type": "array",
-            "title": "Cross Domain Impacts",
-            "description": "Effects spanning multiple domains or sectors.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "public_safety: Increased risk of civilian casualties.",
-              "tourism: Disruption of winter sports facilities.",
-              "environmental: Habitat loss in mountainous areas."
-            ]
-          },
-          "companies": {
-            "type": "array",
-            "title": "Companies",
-            "description": "Companies or organizations associated with the event.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "us_federal",
-              "us_state"
-            ]
-          },
-          "products": {
-            "type": "array",
-            "title": "Products",
-            "description": "Products or commodities associated with the event.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "petróleo"
-            ]
-          },
-          "macro_context": {
-            "type": "string",
-            "title": "Macro Context",
-            "description": "Broader macroeconomic or geopolitical context for the event.",
-            "example": "western_us_climate_crisis"
-          },
-          "people": {
-            "type": "array",
-            "title": "People",
-            "description": "People mentioned or involved in the event.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "firefighter_john_doe",
-              "governor_polis"
-            ]
-          },
-          "regions": {
-            "type": "array",
-            "title": "Regions",
-            "description": "Geographic regions associated with the event.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "colorado",
-              "utah"
-            ]
-          },
-          "tags": {
-            "type": "array",
-            "title": "Tags",
-            "description": "Scalar tags for filtering and discovery.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "wildfire",
-              "climate_change",
-              "us",
-              "emergency_response"
-            ]
+            "$ref": "#/components/schemas/APIError"
           }
         }
       },
-      "Signal": {
+      "EventCollectionResponse": {
         "type": "object",
-        "title": "Signal",
-        "description": "Flattened JSON shape returned for signal-kind sips. The handler merges persisted sip metadata (`id`, `reported`) into the digest before responding. Individual records may include additional pipeline-specific keys not listed here.",
         "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DigestDocument"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "EventDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DigestDocument"
+          }
+        }
+      },
+      "EventEvidenceItem": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "created": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ResponseMeta": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string"
+          }
+        }
+      },
+      "SignalCollectionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DigestDocument"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "SignalDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DigestDocument"
+          }
+        }
+      },
+      "SourceCollectionItem": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string"
+          },
+          "domain_name": {
+            "type": "string",
+            "nullable": true
+          },
           "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id",
-            "description": "Sip UUID (RFC 4122).",
-            "example": "e7d7571a-13f0-56f0-8563-50863b79c781"
+            "type": "string"
           },
-          "reported": {
+          "site_name": {
             "type": "string",
-            "format": "date-time",
-            "title": "Reported",
-            "description": "Reported timestamp of the sip (maps from persisted created).",
-            "example": "2026-06-02T14:02:00-04:00"
-          },
-          "briefing": {
-            "type": "string",
-            "title": "Briefing",
-            "description": "Concise summary of the signal.",
-            "example": "On 2026-06-02, U.S. lawmakers and the Trump administration debated AI sovereign-wealth and compute-tax proposals amid soaring inflation..."
-          },
-          "impact_level": {
-            "type": "string",
-            "title": "Impact Level",
-            "description": "Assessed impact severity.",
-            "enum": [
-              "low",
-              "medium",
-              "high"
-            ],
-            "example": "high"
-          },
-          "forecast": {
-            "type": "string",
-            "title": "Forecast",
-            "description": "Forward-looking outlook synthesized from related events.",
-            "example": "Short-term: Market volatility will persist, AI regulatory scrutiny will intensify, and consumer confidence remains low."
-          },
-          "events": {
+            "nullable": true
+          }
+        }
+      },
+      "SourceCollectionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
             "type": "array",
-            "title": "Events",
-            "description": "Related events that contributed to this signal.",
+            "items": {
+              "$ref": "#/components/schemas/SourceCollectionItem"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SourceDetail": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "domain_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "favicon": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "rss_feed": {
+            "type": "string",
+            "nullable": true
+          },
+          "site_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SourceDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SourceDetail"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StringCollectionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
             "items": {
               "type": "string"
-            },
-            "example": [
-              "2026-06-01: Senator Bernie Sanders introduced a 50% ownership tax on major AI firms"
-            ]
+            }
           },
-          "impacts": {
-            "type": "array",
-            "title": "Impacts",
-            "description": "Observed or projected impacts.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "9.3% market sell-off across tech and financial sectors.",
-              "Decline in consumer confidence and increased credit-card delinquency."
-            ]
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
           },
-          "drivers": {
-            "type": "array",
-            "title": "Drivers",
-            "description": "Underlying drivers or catalysts.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "High inflation and rising consumer costs driven by supply-chain bottlenecks and geopolitical tensions."
-            ]
-          },
-          "impacted_domains": {
-            "type": "array",
-            "title": "Impacted Domains",
-            "description": "Business or policy domains affected by the signal.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "finance",
-              "technology",
-              "cybersecurity",
-              "labor",
-              "healthcare",
-              "energy",
-              "policy"
-            ]
-          },
-          "tags": {
-            "type": "array",
-            "title": "Tags",
-            "description": "Scalar tags for filtering and discovery.",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "ai_sovereign_wealth_fund",
-              "ai_taxation",
-              "compute_tax",
-              "inflation",
-              "market_volatility"
-            ]
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
           }
         }
       }
     }
   },
   "paths": {
-    "/espresso/health": {
-      "get": {
-        "summary": "Check API health",
-        "description": "Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable. This endpoint does not require query parameters and returns only service status.",
-        "tags": [
-          "Health"
-        ],
-        "responses": {
-          "200": {
-            "description": "Service is alive",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "alive"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "urlRewriteHandler",
-            "module": "$import(@zuplo/runtime)",
-            "options": {
-              "rewritePattern": "${env.ESPRESSO_BASE_URL}/health"
-            }
-          },
-          "policies": {
-            "inbound": [
-              "infra-rate-limit-inbound",
-              "backend-api-key-inbound"
-            ]
-          }
-        },
-        "operationId": "healthCheck"
-      }
-    },
     "/espresso/events": {
       "get": {
-        "summary": "Search event intelligence",
-        "description": "Returns event-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, market moves, or other observed business events before moving to higher-level signals.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `event_type`, `actions`, `people`, `regions`, `cross_domain_impacts`, `future_outlook`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+        "summary": "Search Event-family records",
+        "description": "Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.\n**Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).\n**Time**: `from`/`to` are inclusive bounds on record `created_at` until an occurrence-time field exists. They do not claim Event occurrence time.\n**Tags**: match on persisted tags uses overlap (any supplied tag).\n**Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.\n**Agent format**: use `response_type=text` for compact field-per-line records with `---` delimiters when feeding an LLM or MCP client.",
         "tags": [
           "Events"
         ],
+        "operationId": "searchEvents",
         "parameters": [
-          {
-            "name": "ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "title": "Ids"
-            },
-            "style": "form",
-            "explode": false,
-            "description": "Exact event sip UUIDs to fetch (CSV). Use when following references or retrieving known records."
-          },
-          {
-            "name": "tags",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "title": "Tags"
-            },
-            "style": "form",
-            "explode": false,
-            "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match."
-          },
           {
             "name": "q",
             "in": "query",
             "required": false,
             "schema": {
               "type": "string",
-              "maxLength": 1024,
-              "title": "Q"
+              "maxLength": 1024
             },
-            "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder."
+            "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder. When present, default sort is relevance."
           },
           {
             "name": "acc",
@@ -412,10 +287,9 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
               "default": 0.5,
-              "title": "Acc"
+              "maximum": 1,
+              "minimum": 0
             },
             "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5."
           },
@@ -425,10 +299,173 @@
             "required": false,
             "schema": {
               "type": "string",
-              "format": "date",
-              "title": "From"
+              "format": "date-time"
             },
-            "description": "Only include events created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted."
+            "description": "Only include records created on or after this date (RFC3339 timestamp)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Only include records created on or before this date (RFC3339 timestamp)."
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Restrict to known Event-family IDs (CSV). Prefer the detail route for one ID.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "event_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Allowlisted match against digest.event_type (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "impact_levels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.impact_level (CSV): low, medium, high.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "companies",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.companies array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "people",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.people array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "products",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.products array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "regions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.regions array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "source_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match the persisted source UUID, including direct SAME_AS evidence coverage (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tag_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "all"
+              ],
+              "default": "any"
+            },
+            "description": "Tag matching mode."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "relevance"
+              ],
+              "default": "recent"
+            },
+            "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)."
           },
           {
             "name": "response_type",
@@ -440,10 +477,9 @@
                 "json",
                 "text"
               ],
-              "default": "json",
-              "title": "Response Type"
+              "default": "json"
             },
-            "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context."
+            "description": "Output format. json returns the collection envelope; text returns compact plain-text records."
           },
           {
             "name": "limit",
@@ -451,35 +487,29 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "default": 20,
               "maximum": 128,
-              "minimum": 1,
-              "default": 16,
-              "title": "Limit"
+              "minimum": 1
             },
-            "description": "Page size. Default 16, max 128."
+            "description": "Page size. Default 20, max 128."
           },
           {
-            "name": "offset",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "title": "Offset"
+              "type": "string"
             },
-            "description": "Number of events to skip. Default 0."
+            "description": "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
           }
         ],
         "responses": {
           "200": {
-            "description": "Event digests when response_type=json; plain-text event blocks when response_type=text",
+            "description": "Event-family records when response_type=json; plain-text event blocks when response_type=text",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Event"
-                  }
+                  "$ref": "#/components/schemas/EventCollectionResponse"
                 }
               },
               "text/plain": {
@@ -489,11 +519,8 @@
               }
             }
           },
-          "204": {
-            "description": "No matching events (empty result, not an error)"
-          },
           "400": {
-            "description": "Invalid query parameters or malformed UUID in ids",
+            "description": "Invalid query parameters, malformed UUID, or malformed cursor",
             "content": {
               "application/json": {
                 "schema": {
@@ -550,83 +577,27 @@
               "backend-api-key-inbound"
             ]
           }
-        },
-        "operationId": "searchEvents"
+        }
       }
     },
-    "/espresso/signals": {
+    "/espresso/events/{event_id}": {
       "get": {
-        "summary": "Search synthesized signals",
-        "description": "Returns signal-kind sips. Searches without `q` are sorted by `created` descending; semantic searches with `q` are ranked by cosine distance, most similar first.\n**When to use**: retrieve synthesized business implications, forecasts, drivers, and cross-event patterns after or instead of searching raw events.\n**Search modes**: use `ids` for exact UUID lookup, `tags` for inclusive-AND tag filtering, `q` + `acc` for semantic search, and `from` to set the oldest creation date. These filters can be combined.\n**Default time window**: when `from` is omitted, the service uses its default recent window, currently about the last 7 days.\n**Response shape**: JSON responses are flattened digest objects with `id` and `reported` added by the router. Stable fields include `briefing`, `events`, `drivers`, `impacts`, `impacted_domains`, `forecast`, `impact_level`, and `tags`; additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line records when feeding an LLM or MCP client. Use JSON when the caller needs structured parsing.",
+        "summary": "Retrieve one Event-family record",
+        "description": "What Event-family record has this UUID? Retrieves any record whose kind starts with `event` by UUID and returns its raw non-empty flattened digest members plus detail metadata links and relation counts. Returns 404 when no such record exists.",
         "tags": [
-          "Signals"
+          "Events"
         ],
+        "operationId": "getEvent",
         "parameters": [
           {
-            "name": "ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "title": "Ids"
-            },
-            "style": "form",
-            "explode": false,
-            "description": "Exact signal sip UUIDs to fetch (CSV). Use when following references or retrieving known records."
-          },
-          {
-            "name": "tags",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "title": "Tags"
-            },
-            "style": "form",
-            "explode": false,
-            "description": "Tag filters (CSV). Multiple values are inclusive AND, so every supplied tag must match."
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
+            "name": "event_id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string",
-              "maxLength": 1024,
-              "title": "Q"
+              "format": "uuid"
             },
-            "description": "Natural-language semantic search query. Max 1024 characters; requires the embedder."
-          },
-          {
-            "name": "acc",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "maximum": 1,
-              "minimum": 0,
-              "default": 0.5,
-              "title": "Acc"
-            },
-            "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5."
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date",
-              "title": "From"
-            },
-            "description": "Only include signals created on or after this date (YYYY-MM-DD). Defaults to the recent window when omitted."
+            "description": "Event-family record UUID (RFC 4122)."
           },
           {
             "name": "response_type",
@@ -638,45 +609,175 @@
                 "json",
                 "text"
               ],
-              "default": "json",
-              "title": "Response Type"
+              "default": "json"
             },
-            "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context."
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 128,
-              "minimum": 1,
-              "default": 16,
-              "title": "Limit"
-            },
-            "description": "Page size. Default 16, max 128."
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "title": "Offset"
-            },
-            "description": "Number of signals to skip. Default 0."
+            "description": "Output format. json returns the detail envelope; text returns a compact plain-text record."
           }
         ],
         "responses": {
           "200": {
-            "description": "Signal digests when response_type=json; plain-text signal blocks when response_type=text",
+            "description": "The Event-family record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDetailResponse"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Event-family record with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/events/${params.event_id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/events/{event_id}/evidence": {
+      "get": {
+        "summary": "Retrieve Event evidence",
+        "description": "Which source-specific records support this Event? Returns a bare JSON list containing the requested Event and every direct SAME_AS Event-family neighbour in both relation orientations. Each item contains only event_id, created, source_id, url, and base_url. The default scope is direct_same_as: a bounded claim about current data, not a complete transitive equivalence closure.",
+        "tags": [
+          "Events"
+        ],
+        "operationId": "getEventEvidence",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Event-family record UUID (RFC 4122)."
+          },
+          {
+            "name": "source_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Restrict evidence to selected sources (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive evidence created_at lower bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive evidence created_at upper bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json"
+            },
+            "description": "Output format. json returns the bare evidence list; text returns the same records as compact plain text."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bare Event evidence list",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Signal"
+                    "$ref": "#/components/schemas/EventEvidenceItem"
                   }
                 }
               },
@@ -687,11 +788,564 @@
               }
             }
           },
-          "204": {
-            "description": "No matching signals (empty result, not an error)"
+          "400": {
+            "description": "Malformed UUID or invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Event-family record with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/events/${params.event_id}/evidence"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/events/{event_id}/signals": {
+      "get": {
+        "summary": "Retrieve Signals derived from an Event",
+        "description": "Which broader conclusions use this Event as evidence? Returns Signals whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS equivalents. The caller does not need to know which Event-family record was used as the relation target. Returns 404 when the Event does not exist; 200 with an empty collection when it exists but has no Signals.",
+        "tags": [
+          "Events"
+        ],
+        "operationId": "getEventSignals",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Event-family record UUID (RFC 4122)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "description": "Natural-language semantic search query. Max 1024 characters."
+          },
+          {
+            "name": "acc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0.5,
+              "maximum": 1,
+              "minimum": 0
+            },
+            "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Signal created_at lower bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Signal created_at upper bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "impact_levels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match Signal digest.impact_level (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "impacted_domains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match Signal digest.impacted_domains array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tag_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "all"
+              ],
+              "default": "any"
+            },
+            "description": "Tag matching mode."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "relevance"
+              ],
+              "default": "recent"
+            },
+            "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json"
+            },
+            "description": "Output format. json returns the collection envelope; text returns compact plain-text records."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 128,
+              "minimum": 1
+            },
+            "description": "Page size. Default 20, max 128."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned as next_cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signals derived from this Event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignalCollectionResponse"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Invalid query parameters or malformed UUID in ids",
+            "description": "Malformed UUID, invalid cursor, or invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Event-family record with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or embedder unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/events/${params.event_id}/signals"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/health": {
+      "get": {
+        "summary": "Check API health",
+        "description": "Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable.",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "alive"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/health"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "infra-rate-limit-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        },
+        "operationId": "healthCheck"
+      }
+    },
+    "/espresso/signals": {
+      "get": {
+        "summary": "Search synthesized Signals",
+        "description": "Which synthesized conclusions or forecasts match my question? Returns signal-kind records. A Signal is returned intelligence, not a saved monitoring definition.\n**Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).\n**Time**: `from`/`to` are inclusive bounds on Signal `created_at`.\n**Tags**: match on persisted tags uses overlap (any supplied tag).",
+        "tags": [
+          "Signals"
+        ],
+        "operationId": "searchSignals",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "description": "Natural-language semantic search query. Max 1024 characters."
+          },
+          {
+            "name": "acc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0.5,
+              "maximum": 1,
+              "minimum": 0
+            },
+            "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Signal created_at lower bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Signal created_at upper bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Restrict to known Signal IDs (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "impact_levels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match Signal digest.impact_level (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "impacted_domains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match Signal digest.impacted_domains array (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tag_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "all"
+              ],
+              "default": "any"
+            },
+            "description": "Tag matching mode."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "relevance"
+              ],
+              "default": "recent"
+            },
+            "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json"
+            },
+            "description": "Output format. json returns the collection envelope; text returns compact plain-text records."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 128,
+              "minimum": 1
+            },
+            "description": "Page size. Default 20, max 128."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned as next_cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signal records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignalCollectionResponse"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters, malformed UUID, or malformed cursor",
             "content": {
               "application/json": {
                 "schema": {
@@ -748,18 +1402,28 @@
               "backend-api-key-inbound"
             ]
           }
-        },
-        "operationId": "searchSignals"
+        }
       }
     },
-    "/espresso/tags": {
+    "/espresso/signals/{signal_id}": {
       "get": {
-        "summary": "Discover tag filters for Espresso intelligence",
-        "description": "Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal sips.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to `tags` on `/espresso/events` and `/espresso/signals`; multiple tag values are treated as an inclusive AND by those search endpoints.\n**Response formats**: `response_type=json` returns a JSON string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: use `offset` to walk the full vocabulary when `limit` is smaller than the total number of tags.",
+        "summary": "Retrieve one Signal",
+        "description": "What is the complete Signal with this UUID? Retrieves one signal-kind record by UUID. The detail payload links to supporting Events instead of inventing inline event references from unstructured digest strings. Returns 404 when no such Signal exists.",
         "tags": [
-          "Tags"
+          "Signals"
         ],
+        "operationId": "getSignal",
         "parameters": [
+          {
+            "name": "signal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Signal record UUID (RFC 4122)."
+          },
           {
             "name": "response_type",
             "in": "query",
@@ -770,46 +1434,18 @@
                 "json",
                 "text"
               ],
-              "default": "json",
-              "title": "Response Type"
+              "default": "json"
             },
-            "description": "Output format. json returns a JSON string array; text returns the same tags as comma-separated plain text for lower token cost."
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 128,
-              "minimum": 1,
-              "default": 16,
-              "title": "Limit"
-            },
-            "description": "Page size. Default 16, max 128."
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "title": "Offset"
-            },
-            "description": "Number of tags to skip. Default 0."
+            "description": "Output format. json returns the detail envelope; text returns a compact plain-text record."
           }
         ],
         "responses": {
           "200": {
-            "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
+            "description": "The Signal record",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/SignalDetailResponse"
                 }
               },
               "text/plain": {
@@ -819,11 +1455,645 @@
               }
             }
           },
-          "204": {
-            "description": "No tags found (empty result, not an error)"
+          "400": {
+            "description": "Malformed UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Signal with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/signals/${params.signal_id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/signals/{signal_id}/events": {
+      "get": {
+        "summary": "Retrieve Event-family records supporting a Signal",
+        "description": "Which Event-family records support this Signal? Follows DERIVED_FROM edges in the stored signal-to-event direction and returns raw non-empty flattened digest members from direct Event-family targets. Returns 404 when the Signal does not exist; 200 with an empty collection when it exists but has no supporting Events.",
+        "tags": [
+          "Signals"
+        ],
+        "operationId": "getSignalEvents",
+        "parameters": [
+          {
+            "name": "signal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Signal record UUID (RFC 4122)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "description": "Natural-language semantic search query. Max 1024 characters."
+          },
+          {
+            "name": "acc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0.5,
+              "maximum": 1,
+              "minimum": 0
+            },
+            "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Event created_at lower bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive Event created_at upper bound (RFC3339 timestamp)."
+          },
+          {
+            "name": "event_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.event_type (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "impact_levels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match digest.impact_level (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "tag_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "all"
+              ],
+              "default": "any"
+            },
+            "description": "Tag matching mode."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "relevance"
+              ],
+              "default": "recent"
+            },
+            "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json"
+            },
+            "description": "Output format. json returns the collection envelope; text returns compact plain-text records."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 128,
+              "minimum": 1
+            },
+            "description": "Page size. Default 20, max 128."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned as next_cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event-family records supporting this Signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventCollectionResponse"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Invalid limit, offset, or response_type",
+            "description": "Malformed UUID, invalid cursor, or invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Signal with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or embedder unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/signals/${params.signal_id}/events"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/sources": {
+      "get": {
+        "summary": "List intelligence sources",
+        "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.",
+        "tags": [
+          "Sources"
+        ],
+        "operationId": "listIntelligenceSources",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive match against site name, domain, or base URL."
+          },
+          {
+            "name": "domains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Exact domain-name filter (CSV).",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 128,
+              "minimum": 1
+            },
+            "description": "Page size. Default 20, max 128."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned as next_cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceCollectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit, cursor, or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/sources"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/sources/{source_id}": {
+      "get": {
+        "summary": "Retrieve one intelligence source",
+        "description": "What metadata is known about this source? This is provenance metadata. It does not return Events published by the source; use GET /events?source_ids={source_id} for that question. Returns 404 when no such source exists.",
+        "tags": [
+          "Sources"
+        ],
+        "operationId": "getIntelligenceSource",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Source record UUID (RFC 4122)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The source record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No source with this UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Concurrency limit exceeded; retry shortly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.ESPRESSO_BASE_URL}/sources/${params.source_id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
+        }
+      }
+    },
+    "/espresso/tags": {
+      "get": {
+        "summary": "Discover tag filters for Espresso intelligence",
+        "description": "Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).\n**Response formats**: `response_type=json` returns the collection envelope with a `data` string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.",
+        "tags": [
+          "Tags"
+        ],
+        "operationId": "listIntelligenceTags",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive substring or prefix match."
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Optional kind scope (CSV): event, signal, evidence. action remains gated.",
+            "style": "form",
+            "explode": false
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "text"
+              ],
+              "default": "json"
+            },
+            "description": "Output format. json returns the collection envelope; text returns comma-separated tags."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 128,
+              "minimum": 1
+            },
+            "description": "Page size. Default 20, max 128."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StringCollectionResponse"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit, cursor, or response_type",
             "content": {
               "application/json": {
                 "schema": {
@@ -880,177 +2150,7 @@
               "backend-api-key-inbound"
             ]
           }
-        },
-        "operationId": "listTags"
-      }
-    },
-    "/espresso/related/{relationship}": {
-      "get": {
-        "summary": "Follow related intelligence records",
-        "description": "Returns sips linked to one or more source UUIDs through the requested relationship.\n**When to use**: after searchEvents or searchSignals, call this endpoint to expand context around a known sip, deduplicate equivalent records, or trace derived intelligence.\n**Relationships**: `same_as` returns equivalent or duplicate records. `derived_from` returns downstream records generated from, or based on, the supplied source sip IDs.\n**Input**: `ids` is required and must contain one or more RFC 4122 UUID strings. The `relationship` path value must be exactly `same_as` or `derived_from`.\n**Response shape**: each result is a flattened event or signal digest with `id` and `reported` added by the router. Additional pipeline-specific keys may appear.\n**Agent format**: use `response_type=text` for compact field-per-line related records; use JSON when the caller needs structured parsing.",
-        "tags": [
-          "Related"
-        ],
-        "parameters": [
-          {
-            "name": "relationship",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "same_as",
-                "derived_from"
-              ],
-              "title": "Relationship"
-            },
-            "description": "Relationship to traverse. same_as finds equivalent records; derived_from follows generated intelligence."
-          },
-          {
-            "name": "ids",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "title": "Ids"
-            },
-            "style": "form",
-            "explode": false,
-            "description": "Source sip UUIDs (CSV). Example: b07049b5-54c0-50b0-a620-d3aea3f8a173"
-          },
-          {
-            "name": "response_type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "json",
-                "text"
-              ],
-              "default": "json",
-              "title": "Response Type"
-            },
-            "description": "Output format. json returns flattened digest objects; text returns compact plain-text records for LLM/MCP context."
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 128,
-              "minimum": 1,
-              "default": 16,
-              "title": "Limit"
-            },
-            "description": "Page size. Default 16, max 128."
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "title": "Offset"
-            },
-            "description": "Number of related records to skip. Default 0."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Related event/signal digests when response_type=json; plain-text related record blocks when response_type=text",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "oneOf": [
-                      {
-                        "$ref": "#/components/schemas/Event"
-                      },
-                      {
-                        "$ref": "#/components/schemas/Signal"
-                      }
-                    ]
-                  }
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "204": {
-            "description": "No related sips found (empty result, not an error)"
-          },
-          "400": {
-            "description": "Missing ids, invalid relationship, invalid response_type, or malformed UUID",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Database unavailable; retry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "urlRewriteHandler",
-            "module": "$import(@zuplo/runtime)",
-            "options": {
-              "rewritePattern": "${env.ESPRESSO_BASE_URL}/related/${params.relationship}"
-            }
-          },
-          "policies": {
-            "inbound": [
-              "zuplo-api-key-inbound",
-              "freeuser-rate-limit-inbound",
-              "freeuser-quota-inbound",
-              "backend-api-key-inbound"
-            ]
-          }
-        },
-        "operationId": "getRelatedSips"
+        }
       }
     },
     "/espresso/mcp": {
@@ -1089,7 +2189,7 @@
             "module": "$import(@zuplo/runtime)",
             "options": {
               "name": "cafecito-espresso-mcp",
-              "version": "0.1",
+              "version": "0.2",
               "operations": [
                 {
                   "file": "./config/espresso.oas.json",
@@ -1097,15 +2197,39 @@
                 },
                 {
                   "file": "./config/espresso.oas.json",
+                  "id": "getEvent"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
+                  "id": "getEventEvidence"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
+                  "id": "getEventSignals"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
                   "id": "searchSignals"
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listTags"
+                  "id": "getSignal"
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getRelatedSips"
+                  "id": "getSignalEvents"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
+                  "id": "listIntelligenceSources"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
+                  "id": "getIntelligenceSource"
+                },
+                {
+                  "file": "./config/espresso.oas.json",
+                  "id": "listIntelligenceTags"
                 }
               ]
             }

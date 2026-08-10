@@ -89,7 +89,6 @@ print(result.final_output)
 | `searchEvents` | `GET /espresso/events` | Search event-kind sips |
 | `searchSignals` | `GET /espresso/signals` | Search signal-kind sips |
 | `listTags` | `GET /espresso/tags` | List tags for filtering events and signals |
-| `getRelatedSips` | `GET /espresso/related/{relationship}` | Traverse `same_as` or `derived_from` links |
 
 Use `response_type=text` on list endpoints when feeding results directly to LLM context — same data, fewer tokens than JSON.
 

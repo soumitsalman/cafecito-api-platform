@@ -25,13 +25,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	connStr := config.GetEnv("PG_CONNECTION_STRING", "", true)
-	cupboard := db.NewCupboard(ctx, connStr)
+	conn_str := config.GetEnv("PG_CONNECTION_STRING", "", true)
+	cupboard := db.NewCupboard(ctx, conn_str)
 	defer cupboard.Close()
 
 	// determine concurrency limit from environment
-	maxStr := config.GetEnv("MAX_CONCURRENT_REQUESTS", "", false)
-	max_requests, err := strconv.Atoi(maxStr)
+	max_str := config.GetEnv("MAX_CONCURRENT_REQUESTS", "", false)
+	max_requests, err := strconv.Atoi(max_str)
 	if err != nil && max_requests < 0 {
 		max_requests = 0
 	}
@@ -44,7 +44,6 @@ func main() {
 			config.GetEnv("EMBEDDER_MODEL", "", false),
 		),
 		config.ParseAPIKeys(os.Getenv("API_KEY")),
-		max_requests,
 	)
 
 	port := config.GetEnv("PORT", DEFAULT_PORT, false)

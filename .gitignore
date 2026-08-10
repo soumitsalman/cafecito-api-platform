@@ -28,3 +28,7 @@ graphify-out
 
 .DS_Store
 .llama-cpp
+
+__pycache__
+
+scripts

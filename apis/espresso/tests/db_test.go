@@ -2,164 +2,160 @@ package espressoapi_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/k0kubun/pp"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var test_ctx = context.Background()
-
-func TestGetTags(t *testing.T) {
+func TestQueryTags(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
-	page := db.Pagination{Limit: 5, Offset: 10}
-	tags, err := pg_cupboard.GetTags(context.Background(), page)
+
+	page, err := pg_cupboard.QueryTags(context.Background(), "academic", []string{db.SIP_KIND_EVENT}, db.PageRequest{Limit: 200})
 	assert.NoError(t, err)
-	pp.Println("TAGS", tags)
+	assert.NotEmpty(t, page.Items)
+	pp.Println("TAGS", page)
 }
 
-func TestRelatedSips(t *testing.T) {
+func TestScalarSearchEvents(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
-	cond := db.Condition{
-		IDs:          testRelatedIDs,
-		Relationship: "SAME_AS",
+
+	filters := db.Filters{
+		Tags:        test_scalar_tags,
+		Regions:     []string{"us", "japan", "china"},
+		CreatedFrom: testSearchFrom(),
 	}
-	page := db.Pagination{}
-	sips, err := pg_cupboard.QueryRelatedSips(context.Background(), cond, page)
+	page, err := pg_cupboard.QueryEvents(context.Background(), filters, db.PageRequest{Limit: 16})
 	assert.NoError(t, err)
-	assert.Greater(t, len(sips), 0)
-	pp.Println("RELATED SIPS", sips)
+	assert.Greater(t, len(page.Items), 0)
+	pp.Println("EVENTS", page)
 }
 
-func TestScalarSearchSips(t *testing.T) {
+func TestScalarSearchSignals(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
-	cond := db.Condition{
-		Tags:    testScalarTags,
-		Created: testSearchFrom(),
-		Kinds:   db.EVENTS,
+
+	filters := db.Filters{
+		Tags:        test_scalar_tags,
+		CreatedFrom: testSearchFrom(),
 	}
-	page := db.Pagination{}
-	sips, err := pg_cupboard.QuerySips(context.Background(), cond, page)
+	page, err := pg_cupboard.QuerySignals(context.Background(), filters, db.PageRequest{Limit: 16})
 	assert.NoError(t, err)
-	assert.Greater(t, len(sips), 0)
-	pp.Println("SIPS", sips)
+	assert.Greater(t, len(page.Items), 0)
+	pp.Println("SIGNALS", page)
 }
 
-func TestTextSearchSips(t *testing.T) {
+func TestVectorSearchEvents(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
-	cond := db.Condition{
-		Tags:    testTextTags,
-		FTS:     true,
-		Created: testSearchFrom(),
+
+	filters := db.Filters{
+		Embedding:   test_query_embedding,
+		Tags:        test_scalar_tags,
+		CreatedFrom: testSearchFrom(),
 	}
-	page := db.Pagination{}
-	sips, err := pg_cupboard.QuerySips(context.Background(), cond, page)
+	page, err := pg_cupboard.QueryEvents(context.Background(), filters, db.PageRequest{Limit: 5})
 	assert.NoError(t, err)
-	assert.Greater(t, len(sips), 0)
-	pp.Println("SIPS", sips)
+	assert.Greater(t, len(page.Items), 0)
+	pp.Println("EVENTS", page.Items)
 }
 
-func TestVectorSearchSips(t *testing.T) {
+func TestVectorSearchSignals(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
-	distance := 0.4
-	cond := db.Condition{
-		Embedding: testQueryEmbedding,
+
+	distance := 0.6
+	filters := db.Filters{
+		Embedding: test_query_embedding,
 		Distance:  &distance,
 	}
-	page := db.Pagination{Limit: 5}
-	sips, err := pg_cupboard.QuerySips(context.Background(), cond, page)
+	page, err := pg_cupboard.QuerySignals(context.Background(), filters, db.PageRequest{Limit: 5})
 	assert.NoError(t, err)
-	assert.Greater(t, len(sips), 0)
-	pp.Println("SIPS", sips)
+	assert.Greater(t, len(page.Items), 0)
+	pp.Println("SIGNALS", page.Items)
 }
 
-func TestBuildVectorSQLUsesHNSWCandidateQuery(t *testing.T) {
-	distance := 0.0
-	conditions := db.Condition{
-		Kinds:     []string{"signal"},
-		Created:   time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC),
-		Tags:      []string{"markets"},
-		Embedding: []float32{0.1, 0.2, 0.3},
-		Distance:  &distance,
-	}
+func TestQuerySources(t *testing.T) {
+	pg_cupboard := setupTestDB()
+	defer pg_cupboard.Close()
 
-	query, params := db.BuildVectorSQL(conditions, db.Pagination{Limit: 16, Offset: 4})
+	page, err := pg_cupboard.QuerySources(context.Background(), "", nil, db.PageRequest{Limit: 5})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, page.Items)
+	pp.Println("SOURCES", page)
 
-	expected_parts := []string{
-		"WITH nearest_results AS MATERIALIZED",
-		"sips.kind = ANY(@kinds)",
-		"sips.created >= @created",
-		"sips.tags && @tags",
-		"ORDER BY sips.embedding <=> @embedding ASC",
-		"LIMIT @candidate_limit",
-		"WHERE distance <= @distance",
-		"ORDER BY distance ASC",
-		"LIMIT @limit",
-		"OFFSET @offset",
-	}
-	for _, part := range expected_parts {
-		if !strings.Contains(query, part) {
-			t.Errorf("query does not contain %q:\n%s", part, query)
-		}
-	}
-
-	expected_candidate_limit := (16 + 4) * config.VECTOR_QUERY_CANDIDATE_LIMIT_MULTIPLIER
-	if got := params["candidate_limit"]; got != expected_candidate_limit {
-		t.Errorf("candidate_limit = %v, want %d", got, expected_candidate_limit)
-	}
-	if got := params["distance"]; got != 0.0 {
-		t.Errorf("distance = %v, want 0", got)
-	}
+	first := page.Items[0]
+	source, err := pg_cupboard.GetSource(context.Background(), first.ID)
+	assert.NoError(t, err)
+	assert.False(t, source.IsZero())
+	assert.Equal(t, first.ID, source.ID)
+	pp.Println("SOURCE", source)
 }
 
-func TestBuildScalarSQLDoesNotHandleEmbedding(t *testing.T) {
-	distance := 0.25
-	query, params := db.BuildScalarSQL(db.SIPS, db.Condition{
-		Embedding: []float32{0.1, 0.2, 0.3},
-		Distance:  &distance,
-	}, db.Pagination{Limit: 16}, "id, created, digest")
+func TestGetEventAndRelations(t *testing.T) {
+	pg_cupboard := setupTestDB()
+	defer pg_cupboard.Close()
 
-	if strings.Contains(query, "<=>") {
-		t.Fatalf("scalar query unexpectedly contains vector distance:\n%s", query)
-	}
-	if _, ok := params["embedding"]; ok {
-		t.Fatal("scalar query unexpectedly includes embedding parameter")
-	}
+	list, err := pg_cupboard.QueryEvents(context.Background(), db.Filters{}, db.PageRequest{Limit: 1})
+	require.NoError(t, err)
+	require.NotEmpty(t, list.Items)
+	event_id := list.Items[0].ID
+
+	event, err := pg_cupboard.GetEvent(context.Background(), event_id)
+	require.NoError(t, err)
+	assert.False(t, event.IsZero())
+	assert.Equal(t, db.SIP_KIND_EVENT, event.Kind)
+
+	exists, err := pg_cupboard.EventExists(context.Background(), event_id)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	evidence, err := pg_cupboard.QueryEventEvidence(context.Background(), event_id, db.Filters{}, db.PageRequest{Limit: 5})
+	assert.NoError(t, err)
+	pp.Println("EVIDENCE", evidence)
+
+	signals, err := pg_cupboard.QueryDerivedSignals(context.Background(), event_id, db.Filters{}, db.PageRequest{Limit: 5})
+	assert.NoError(t, err)
+	pp.Println("DERIVED_SIGNALS", signals)
+
+	counts, err := pg_cupboard.CountRelations(context.Background(), event_id)
+	assert.NoError(t, err)
+	pp.Println("RELATION_COUNTS", counts)
 }
 
-func TestBuildVectorCountSQLKeepsExactDistanceFilterSeparate(t *testing.T) {
-	distance := 0.25
-	query, params := db.BuildVectorCountSQL(db.Condition{
-		Embedding: []float32{0.1, 0.2, 0.3},
-		Distance:  &distance,
-	})
+func TestGetEventNotFound(t *testing.T) {
+	pg_cupboard := setupTestDB()
+	defer pg_cupboard.Close()
 
-	if !strings.Contains(query, "(sips.embedding <=> @embedding) <= @distance") {
-		t.Fatalf("vector count query does not contain distance filter:\n%s", query)
-	}
-	if strings.Contains(query, "ORDER BY") {
-		t.Fatalf("vector count query unexpectedly contains ordering:\n%s", query)
-	}
-	if got := params["distance"]; got != distance {
-		t.Errorf("distance = %v, want %v", got, distance)
-	}
+	event, err := pg_cupboard.GetEvent(context.Background(), uuid.New())
+	assert.NoError(t, err)
+	assert.True(t, event.IsZero())
 }
 
-func TestCountSipsRejectsEmbeddingWithoutDistance(t *testing.T) {
-	pg_cupboard := &db.Cupboard{}
-	count, err := pg_cupboard.CountSips(context.Background(), db.Condition{
-		Embedding: []float32{0.1, 0.2, 0.3},
-	})
+func TestCursorPaginationEvents(t *testing.T) {
+	pg_cupboard := setupTestDB()
+	defer pg_cupboard.Close()
 
-	assert.ErrorIs(t, err, db.ErrVectorDistanceRequired)
-	assert.Zero(t, count)
+	first, err := pg_cupboard.QueryEvents(context.Background(), db.Filters{
+		CreatedFrom: time.Now().AddDate(0, 0, -30),
+	}, db.PageRequest{Limit: 2})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(first.Items), 1)
+
+	if first.NextCursor == nil {
+		t.Skip("not enough events for a second page")
+	}
+
+	second, err := pg_cupboard.QueryEvents(context.Background(), db.Filters{
+		CreatedFrom: time.Now().AddDate(0, 0, -30),
+	}, db.PageRequest{Limit: 2, Cursor: first.NextCursor})
+	require.NoError(t, err)
+	require.NotEmpty(t, second.Items)
+	assert.NotEqual(t, first.Items[0].ID, second.Items[0].ID)
 }
