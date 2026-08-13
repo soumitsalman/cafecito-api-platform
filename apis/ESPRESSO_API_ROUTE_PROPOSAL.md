@@ -155,11 +155,10 @@ members. The stable core is:
 | source_id | sips.source | Null when no source exists. |
 | source | sources join | Optional object with id, domain, name, and url. Omitted when the source reference is null or orphaned. |
 | tags | sips.tags | Present when stored. |
-| summary | digest.briefing | Optional normalized projection. |
+| summary | digest.briefing or digest.summary | Optional normalized projection. |
 | data_quality | Derived | Present only for a known quality condition. |
 
-The API also returns every non-empty digest member at the item root. briefing is
-therefore preserved even when summary is present. Canonical core fields win on
+The API also returns every non-empty digest member at the item root. Canonical core fields win on
 a name conflict. The API exposes kind as a flattened core field; it never exposes embedding, relation direction, or a nested digest object.
 
 ~~~json
@@ -178,7 +177,6 @@ a name conflict. The API exposes kind as a flattened core field; it never expose
   },
   "tags": ["investment_and_capital_markets"],
   "summary": "A normalized briefing.",
-  "briefing": "A normalized briefing.",
   "event_type": "stock_decline",
   "impact_level": "medium",
   "companies": ["example_company"]
@@ -200,7 +198,7 @@ The following digest fields are common intelligence fields, not a closed schema:
 
 | Field | Meaning | Availability |
 |---|---|---|
-| briefing | Narrative explanation of the Event or Signal. Also projected as optional summary. | Common in Events; current on all Signals. |
+| summary | Narrative explanation of the Event or Signal. Also projected as optional summary. | Common in Events; current on all Signals. |
 | drivers | Factors causing the development. | Optional string array. |
 | impacts | Observed or expected effects. | Optional string array. |
 | forecast | Forward-looking expectation. | Optional string. |

@@ -110,8 +110,7 @@ func whereDigest(where *[]string, params pgx.NamedArgs, filters *Filters, prefix
 	}
 }
 
-// buildSipWhere builds the shared structured filter predicates for Event-family and Signal queries.
-// kind_expr is the kind predicate; expand_source_same_as enables the SAME_AS evidence expansion for source_ids (Event-family only).
+// buildSipWhere builds the shared structured filter predicates for Event and Signal queries.
 func buildWhere(filters *Filters, alias string) ([]string, pgx.NamedArgs) {
 	where := []string{}
 	params := pgx.NamedArgs{}
@@ -123,56 +122,9 @@ func buildWhere(filters *Filters, alias string) ([]string, pgx.NamedArgs) {
 	whereSourceIDs(&where, params, filters.SourceIDs, alias)
 	whereKind(&where, params, filters.Kind, alias)
 	whereCreated(&where, params, filters.CreatedFrom, filters.CreatedTo, alias)
-	whereTagsFts(&where, params, filters.Tags, alias)
+	whereTags(&where, params, filters.Tags, alias)
 	whereDigest(&where, params, filters, alias)
 
-	// if len(filters.SourceIDs) > 0 {
-	// 	if expand_source_same_as {
-	// 		where = append(where, `(
-	// 			s.source = ANY(@source_ids)
-	// 			OR EXISTS (
-	// 				SELECT 1
-	// 				FROM relations AS src_same
-	// 				JOIN sips AS evidence
-	// 				  ON evidence.id = CASE
-	// 				      WHEN src_same.from_id = s.id THEN src_same.to_id
-	// 				      ELSE src_same.from_id
-	// 				  END
-	// 				 AND evidence.kind LIKE 'event%'
-	// 				WHERE src_same.relationship = 'SAME_AS'
-	// 				  AND (src_same.from_id = s.id OR src_same.to_id = s.id)
-	// 				  AND evidence.source = ANY(@source_ids)
-	// 			)
-	// 		)`)
-	// 	} else {
-	// 		where = append(where, "s.source = ANY(@source_ids)")
-	// 	}
-	// 	params["source_ids"] = filters.SourceIDs
-	// }
-	// if len(filters.EventTypes) > 0 {
-	// 	where = append(where, "s.digest->>'event_type' = ANY(@event_types)")
-	// 	params["event_types"] = filters.EventTypes
-	// }
-	// if len(filters.ImpactLevels) > 0 {
-	// 	where = append(where, "s.digest->>'impact_level' = ANY(@impact_levels)")
-	// 	params["impact_levels"] = filters.ImpactLevels
-	// }
-	// if len(filters.ImpactedDomains) > 0 {
-	// 	where = append(where, "(s.digest->'impacted_domains') ?| @impacted_domains")
-	// 	params["impacted_domains"] = filters.ImpactedDomains
-	// }
-	// for key, vals := range map[string][]string{
-	// 	"companies": filters.Companies,
-	// 	"people":    filters.People,
-	// 	"products":  filters.Products,
-	// 	"regions":   filters.Regions,
-	// } {
-	// 	if len(vals) > 0 {
-	// 		where = append(where, fmt.Sprintf("(s.digest->'%s') ?| @%s", key, key))
-	// 		params[key] = vals
-	// 	}
-	// }
-	// appendTagWhere(&where, params, filters.Tags, filters.TagMode, "s")
 	return where, params
 }
 
@@ -301,7 +253,7 @@ func (p *Cupboard) QuerySameSips(ctx context.Context, id uuid.UUID, filters Filt
 		WHERE relationship = 'SAME_AS'
 		  AND (from_id = @id OR to_id = @id)
 	)
-	SELECT id, created, kind, source, url, base_url
+	SELECT id, created, kind, tags, source, url, base_url
 	FROM sips
 	INNER JOIN same_scope ON id = anchor_id
 	%s -- cursor AND filters

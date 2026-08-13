@@ -77,28 +77,43 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
 }
 
-// createEventFilters converts EventSearchParams into typed Filters.
-func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
-	filters := &db.Filters{
-		IDs:          p.IDs,
-		SourceIDs:    p.SourceIDs,
-		EventTypes:   p.EventTypes,
-		ImpactLevels: p.ImpactLevels,
-		Companies:    p.Companies,
-		People:       p.People,
-		Products:     p.Products,
-		Regions:      p.Regions,
-		Tags:         p.Tags,
-		CreatedFrom:  p.From,
-		CreatedTo:    p.To,
-	}
+func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = p.To
+	filters.ImpactedDomains = p.ImpactedDomains
+	filters.Tags = p.Tags
+	filters.ImpactLevels = p.ImpactLevels
+	filters.Companies = p.Companies
+	filters.People = p.People
+	filters.Products = p.Products
+	filters.Regions = p.Regions
+	return nil
+}
+
+func (p *vectorSearchParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	if len(p.Q) > 0 {
 		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
 		if len(filters.Embedding) == 0 {
-			return nil, APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
+			return APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
 		}
 		distance := (1 - p.Acc) * 2
 		filters.Distance = &distance
+	}
+	return nil
+}
+
+// createEventFilters converts EventSearchParams into typed Filters.
+func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
+	filters := &db.Filters{
+		IDs:        p.IDs,
+		SourceIDs:  p.SourceIDs,
+		EventTypes: p.EventTypes,
+	}
+	if err := p.sipQueryParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
+	}
+	if err := p.vectorSearchParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
 	}
 	return filters, nil
 }
@@ -106,52 +121,42 @@ func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration)
 // buildSignalFilters converts signalSearchParams into typed SipFilters.
 func (p *SignalSearchParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
 	filters := &db.Filters{
-		IDs:             p.IDs,
-		ImpactLevels:    p.ImpactLevels,
-		ImpactedDomains: p.ImpactedDomains,
-		Tags:            p.Tags,
-		CreatedFrom:     p.From,
-		CreatedTo:       p.To,
+		IDs: p.IDs,
 	}
-	if len(p.Q) > 0 {
-		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
-		if len(filters.Embedding) == 0 {
-			return nil, APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
-		}
-		distance := (1 - p.Acc) * 2
-		filters.Distance = &distance
+	if err := p.sipQueryParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
+	}
+	if err := p.vectorSearchParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
 	}
 	return filters, nil
 }
 
 func (params *EventEvidenceParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
 	filters := &db.Filters{
-		SourceIDs:   params.SourceIDs,
-		CreatedFrom: params.From,
-		CreatedTo:   params.To,
+		SourceIDs: params.SourceIDs,
+	}
+	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
 	}
 	return filters, nil
 }
 
 func (params *EventSignalsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
-	filters := &db.Filters{
-		ImpactLevels:    params.ImpactLevels,
-		ImpactedDomains: params.ImpactedDomains,
-		Tags:            params.Tags,
-		CreatedFrom:     params.From,
-		CreatedTo:       params.To,
+	filters := &db.Filters{}
+	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
 	}
 	return filters, nil
 }
 
 func (params *SignalEventsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
 	filters := &db.Filters{
-		ImpactLevels:    params.ImpactLevels,
-		ImpactedDomains: params.ImpactedDomains,
-		Tags:            params.Tags,
-		EventTypes:      params.EventTypes,
-		CreatedFrom:     params.From,
-		CreatedTo:       params.To,
+		SourceIDs:  params.SourceIDs,
+		EventTypes: params.EventTypes,
+	}
+	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
+		return nil, err
 	}
 	return filters, nil
 }
@@ -170,13 +175,17 @@ func createSipKinds(resources []string) []string {
 }
 
 // writeCollection writes a typed collection envelope as JSON, or compact text when requested.
-func writePage[T any](c *gin.Context, items []T, limit int, next_cursor *string, response_type string) {
+func writePage[T any](c *gin.Context, items []T, limit int, cursor string, next_cursor *string, response_type string) {
 	if items == nil {
 		items = []T{}
 	}
+	var cursor_val *string = nil
+	if cursor != "" {
+		cursor_val = &cursor
+	}
 	response := PageResponse[T]{
 		Data:       items,
-		Pagination: Pagination{Limit: limit, NextCursor: next_cursor},
+		Pagination: Pagination{Limit: limit, Cursor: cursor_val, NextCursor: next_cursor},
 		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
 	}
 	switch response_type {
@@ -281,7 +290,19 @@ func (r *Configuration) getEvents(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	r.shared_queryEvents(c, params)
+}
 
+func (r *Configuration) searchEvents(c *gin.Context) {
+	var params EventSearchParams
+	if err := c.ShouldBindJSON(&params); err != nil {
+		writeError(c, err)
+		return
+	}
+	r.shared_queryEvents(c, params)
+}
+
+func (r *Configuration) shared_queryEvents(c *gin.Context, params EventSearchParams) {
 	page_req, err := params.createPageRequest(c, r)
 	if err != nil {
 		writeError(c, err)
@@ -299,7 +320,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEvent godoc
@@ -397,7 +418,7 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 	evidence := datautils.Transform(page_out.Items, func(sip *db.Sip) EventEvidence {
 		return NewEventEvidence(sip)
 	})
-	writePage(c, evidence, page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, evidence, page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEventSignals godoc
@@ -456,7 +477,7 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getSignals godoc
@@ -512,7 +533,7 @@ func (r *Configuration) getSignals(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // @Summary Retrieve one Signal
@@ -610,7 +631,7 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // @Summary List intelligence sources
@@ -646,7 +667,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getSource godoc
@@ -730,16 +751,16 @@ func (r *Configuration) getTags(c *gin.Context) {
 	items := datautils.Transform(page_out.Items, func(tag *string) db.TagValue {
 		return db.TagValue{Value: *tag}
 	})
-	writePage(c, items, page.Limit, next, params.ResponseType)
+	writePage(c, items, page.Limit, params.Cursor, next, params.ResponseType)
 }
 
 // getEntities godoc
 // @Summary Discover Event entities
-// @Description Returns distinct exact company and person strings stored in Event digests.
+// @Description Returns distinct exact company and people strings stored in Event digests.
 // @Tags Discovery
 // @Produce json
 // @Param q query string false "Case-insensitive substring filter."
-// @Param types query []string false "Entity types: company, person." collectionFormat(csv)
+// @Param types query []string false "Entity types: company, people." collectionFormat(csv)
 // @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor."
@@ -768,7 +789,7 @@ func (r *Configuration) getEntities(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getRegions godoc
@@ -801,7 +822,7 @@ func (r *Configuration) getRegions(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEventTypes godoc
@@ -834,7 +855,7 @@ func (r *Configuration) getEventTypes(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
@@ -854,7 +875,7 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 		gin.Recovery(),
 		cors.New(cors.Config{
 			AllowAllOrigins:  true,
-			AllowMethods:     []string{"GET", "OPTIONS"},
+			AllowMethods:     []string{"GET", "OPTIONS", "POST"},
 			AllowHeaders:     []string{"*"},
 			AllowCredentials: false,
 			MaxAge:           24 * time.Hour,
@@ -871,7 +892,7 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 	protected.GET("/regions", config.getRegions)
 	protected.GET("/event-types", config.getEventTypes)
 	protected.GET("/events", config.getEvents)
-	protected.GET("/events/search", config.getEvents)
+	protected.POST("/events/search", config.searchEvents)
 	protected.GET("/events/:id", config.getEvent)
 	protected.GET("/events/:id/signals", config.getEventSignals)
 	protected.GET("/events/:id/evidence", config.getEventEvidence)

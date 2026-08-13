@@ -12,6 +12,7 @@ import (
 // Pagination is the pagination block returned by every collection response.
 type Pagination struct {
 	Limit      int     `json:"limit"`
+	Cursor     *string `json:"cursor"`
 	NextCursor *string `json:"next_cursor"`
 }
 
@@ -62,11 +63,24 @@ func NewDigestDocumentForSip(sip *db.Sip) DigestDocument {
 	if _, ok := doc["tags"]; !ok {
 		doc["tags"] = sip.Tags
 	}
+	if briefing, ok := doc["briefing"]; ok {
+		doc["summary"] = briefing
+		delete(doc, "briefing")
+	}
 	return doc
 }
 
 func NewDigestDocumentForExtendedSip(sip *db.ExtendedSip) DigestDocument {
 	doc := NewDigestDocumentForSip(&sip.Sip)
+	if sip.URL.Valid {
+		doc["url"] = sip.URL.String
+	}
+	if sip.BaseURL.Valid {
+		doc["base_url"] = sip.BaseURL.String
+	}
+	if sip.SourceID != uuid.Nil {
+		doc["source_id"] = sip.SourceID
+	}
 	doc["source"] = NewSourceDocument(sip.GetSource())
 	return doc
 }
@@ -84,9 +98,9 @@ func (digest DigestDocument) addEventDetails(counts db.RelationCounts) DigestDoc
 		// Action:   fmt.Sprintf("/events/%s/actions", digest["id"]), // TODO: add actions link
 	}
 	digest["counts"] = Counts{
-		Coverage: counts.SameAs,
-		Actions:  counts.DerivedFrom,
+		Evidence: counts.SameAs,
 		Signals:  counts.DerivedTo,
+		Actions:  counts.DerivedFrom,
 	}
 	return digest
 }
@@ -121,9 +135,9 @@ THESE TYPES ARE USED PRIMARILY TO GENERATE THE OPENAPI SPEC
 // metadata is represented explicitly as null when it is unavailable.
 type SourceDocument struct {
 	ID          uuid.UUID `json:"id,omitzero" swaggertype:"string" format:"uuid"`
-	Domain      string    `json:"domain,omitempty"`
-	Name        string    `json:"name,omitempty"`
-	URL         string    `json:"url,omitempty"`
+	Domain      string    `json:"domain"`
+	Name        string    `json:"name"`
+	URL         string    `json:"url"`
 	Description string    `json:"description,omitempty"`
 	FaviconURL  string    `json:"favicon_url,omitempty"`
 	RSSFeedURL  string    `json:"rss_feed_url,omitempty"`
@@ -166,7 +180,7 @@ type Links struct {
 }
 
 type Counts struct {
-	Coverage int64 `json:"coverage,omitzero"`
+	Evidence int64 `json:"evidence,omitzero"`
 	Actions  int64 `json:"actions,omitzero"`
 	Events   int64 `json:"events,omitzero"`
 	Signals  int64 `json:"signals,omitzero"`
@@ -174,17 +188,21 @@ type Counts struct {
 
 // SipEvidenceItem is the explicit bare-list response item for R03.
 type EventEvidence struct {
-	EventID  uuid.UUID `json:"event_id,omitzero"`
-	Created  time.Time `json:"created,omitzero"`
-	SourceID uuid.UUID `json:"source_id,omitzero"`
-	URL      string    `json:"url,omitempty"`
-	BaseURL  string    `json:"base_url,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	Kind     string    `json:"kind"`
+	Created  time.Time `json:"created_at"`
+	Tags     []string  `json:"tags"`
+	SourceID uuid.UUID `json:"source_id"`
+	URL      string    `json:"url"`
+	BaseURL  string    `json:"base_url"`
 }
 
 func NewEventEvidence(sip *db.Sip) EventEvidence {
 	return EventEvidence{
-		EventID:  sip.ID,
+		ID:       sip.ID,
+		Kind:     sip.Kind,
 		Created:  sip.Created,
+		Tags:     sip.Tags,
 		SourceID: sip.SourceID,
 		URL:      sip.URL.String,
 		BaseURL:  sip.BaseURL.String,

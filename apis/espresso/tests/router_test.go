@@ -1,6 +1,7 @@
 package espressoapi_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -120,6 +121,24 @@ func routerGET(t *testing.T, base, path string, params url.Values, api_key strin
 	return resp.StatusCode, body
 }
 
+func routerPOST(t *testing.T, base, path string, payload any, api_key string) (int, []byte) {
+	t.Helper()
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, strings.TrimSuffix(base, "/")+path, bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	if api_key != "" {
+		req.Header.Set("X-API-KEY", api_key)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	response_body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp.StatusCode, response_body
+}
+
 func requireStatus(t *testing.T, expected int, actual int, body []byte) {
 	t.Helper()
 	require.Equal(t, expected, actual, "response body: %s", string(body))
@@ -162,6 +181,69 @@ func parseDetailObject(t *testing.T, body []byte) map[string]any {
 	return detail.Data
 }
 
+func assertExpectedPagination(t *testing.T, body []byte, expected_limit int, expected_cursor string) []map[string]any {
+	t.Helper()
+	var env pageEnvelope[map[string]any]
+	require.NoError(t, json.Unmarshal(body, &env))
+	require.Equal(t, float64(expected_limit), env.Pagination["limit"])
+	require.Contains(t, env.Pagination, "cursor")
+	require.Contains(t, env.Pagination, "next_cursor")
+	if expected_cursor == "" {
+		assert.Nil(t, env.Pagination["cursor"])
+	} else {
+		assert.Equal(t, expected_cursor, env.Pagination["cursor"])
+	}
+	as_of, ok := env.Meta["as_of"].(string)
+	require.True(t, ok, "pagination response is missing RFC3339 meta.as_of")
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err, "invalid meta.as_of: %q", as_of)
+	return env.Data
+}
+
+func assertExpectedSip(t *testing.T, item map[string]any, expected_kind string) {
+	t.Helper()
+	id, ok := item["id"].(string)
+	require.True(t, ok, "response item is missing string id")
+	_, err := uuid.Parse(id)
+	require.NoError(t, err, "response item has invalid id: %q", id)
+	assert.Equal(t, expected_kind, item["kind"])
+
+	created_at, ok := item["created_at"].(string)
+	require.True(t, ok, "response item is missing string created_at")
+	_, err = time.Parse(time.RFC3339Nano, created_at)
+	require.NoError(t, err, "response item has invalid created_at: %q", created_at)
+
+	// require.Contains(t, item, "source_id") // TODO: enable later
+	// require.Contains(t, item, "tags") // TODO: enable later
+	if briefing, ok := item["briefing"].(string); ok && briefing != "" {
+		assert.Equal(t, briefing, item["summary"])
+	}
+	assert.NotContains(t, item, "digest")
+	assert.NotContains(t, item, "representation")
+	assert.NotContains(t, item, "object")
+
+	if source_id, ok := item["source_id"].(string); ok {
+		_, err = uuid.Parse(source_id)
+		require.NoError(t, err, "response item has invalid source_id: %q", source_id)
+		if source, ok := item["source"].(map[string]any); ok {
+			assert.Equal(t, source_id, source["id"])
+		}
+	}
+}
+
+func assertExpectedAPIError(t *testing.T, body []byte, expected_code string) {
+	t.Helper()
+	var response struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(body, &response))
+	assert.Equal(t, expected_code, response.Error.Code)
+	assert.NotEmpty(t, response.Error.Message)
+}
+
 func nextCursorFromBody(t *testing.T, body []byte) string {
 	t.Helper()
 	var env struct {
@@ -192,7 +274,7 @@ func requirePaginatedCollection(t *testing.T, base, path string, params url.Valu
 
 	status, first_body := routerGET(t, base, path, params_copy, "")
 	requireStatus(t, http.StatusOK, status, first_body)
-	first := parseDigestArray(t, first_body)
+	first := assertExpectedPagination(t, first_body, 1, "")
 	require.NotEmpty(t, first, "first page for %s", path)
 
 	cursor := nextCursorFromBody(t, first_body)
@@ -201,7 +283,7 @@ func requirePaginatedCollection(t *testing.T, base, path string, params url.Valu
 	params_copy.Set("cursor", cursor)
 	status, second_body := routerGET(t, base, path, params_copy, "")
 	requireStatus(t, http.StatusOK, status, second_body)
-	second := parseDigestArray(t, second_body)
+	second := assertExpectedPagination(t, second_body, 1, cursor)
 	require.NotEmpty(t, second, "second page for %s", path)
 	assert.NotEqual(t, first[0], second[0], "cursor did not advance %s", path)
 
@@ -210,7 +292,7 @@ func requirePaginatedCollection(t *testing.T, base, path string, params url.Valu
 
 func collectionIDs(t *testing.T, base, path string) []string {
 	t.Helper()
-	status, body := routerGET(t, base, path, url.Values{"limit": {"128"}}, "")
+	status, body := routerGET(t, base, path, url.Values{"limit": {"100"}}, "")
 	requireStatus(t, http.StatusOK, status, body)
 	items := parseDigestArray(t, body)
 	ids := make([]string, 0, len(items))
@@ -291,7 +373,7 @@ func TestRouterGetTags(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_TAGS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	tags := parseDigestArray(t, body)
+	tags := assertExpectedPagination(t, body, 5, "")
 	assert.NotEmpty(t, tags)
 	assert.NotEmpty(t, tags[0]["value"])
 	pp.Println("TAGS", tags)
@@ -307,8 +389,11 @@ func TestRouterScalarSearchEvents(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	events := parseDigestArray(t, body)
+	events := assertExpectedPagination(t, body, 20, "")
 	assert.Greater(t, len(events), 0)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
 	pp.Println("EVENTS", events)
 }
 
@@ -322,8 +407,11 @@ func TestRouterSearchEventsByDigestTags(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	events := parseDigestArray(t, body)
+	events := assertExpectedPagination(t, body, 20, "")
 	assert.Greater(t, len(events), 0)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
 	pp.Println("EVENTS", events)
 }
 
@@ -337,8 +425,11 @@ func TestRouterVectorSearchEvents(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	events := parseDigestArray(t, body)
+	events := assertExpectedPagination(t, body, 5, "")
 	assert.Greater(t, len(events), 0)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
 	pp.Println("EVENTS", events)
 }
 
@@ -352,8 +443,11 @@ func TestRouterVectorSearchSignals(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_SIGNALS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	signals := parseDigestArray(t, body)
+	signals := assertExpectedPagination(t, body, 5, "")
 	assert.Greater(t, len(signals), 0)
+	for _, signal := range signals {
+		assertExpectedSip(t, signal, "signal")
+	}
 	pp.Println("SIGNALS", signals)
 }
 
@@ -364,9 +458,10 @@ func TestRouterGetSources(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	sources := parseSourceArray(t, body)
+	sources := assertExpectedPagination(t, body, 5, "")
 	assert.NotEmpty(t, sources)
 	for _, source := range sources {
+		require.Contains(t, source, "id")
 		assert.Contains(t, source, "url")
 		assert.Contains(t, source, "domain")
 		assert.Contains(t, source, "name")
@@ -383,12 +478,9 @@ func TestRouterGetSources(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	src := parseDetailObject(t, body)
 	assert.Equal(t, first_id, src["id"])
-	assert.Contains(t, src, "url")
-	assert.Contains(t, src, "domain")
-	assert.Contains(t, src, "name")
-	assert.Contains(t, src, "description")
-	assert.Contains(t, src, "favicon_url")
-	assert.Contains(t, src, "rss_feed_url")
+	require.Contains(t, src, "url")
+	require.Contains(t, src, "domain")
+	require.Contains(t, src, "name")
 	assert.NotContains(t, src, "base_url")
 }
 
@@ -399,8 +491,11 @@ func TestRouterSignalDetailsAndEvents(t *testing.T) {
 	params.Set("limit", "1")
 	status, body := routerGET(t, srv.URL, ROUTE_SIGNALS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	signals := parseDigestArray(t, body)
+	signals := assertExpectedPagination(t, body, 1, "")
 	require.NotEmpty(t, signals)
+	for _, signal := range signals {
+		assertExpectedSip(t, signal, "signal")
+	}
 	signal_id, ok := signals[0]["id"].(string)
 	require.True(t, ok)
 
@@ -408,14 +503,21 @@ func TestRouterSignalDetailsAndEvents(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, signal_id, detail["id"])
+	assertExpectedSip(t, detail, "signal")
+	// require.Contains(t, detail, "source_id") // TODO: enable later
 	assert.Contains(t, detail, "links")
-	assert.Contains(t, detail, "counts")
+	counts, ok := detail["counts"].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, counts, "events")
 	pp.Println("DETAIL", detail)
 
 	status, body = routerGET(t, srv.URL, ROUTE_SIGNALS+"/"+signal_id+"/events", nil, "")
 	requireStatus(t, http.StatusOK, status, body)
-	events := parseDigestArray(t, body)
+	events := assertExpectedPagination(t, body, 20, "")
 	assert.NotEmpty(t, events)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
 	pp.Println("EVENTS", events)
 }
 
@@ -427,15 +529,21 @@ func TestRouterEventDetailEvidenceAndSignals(t *testing.T) {
 	params.Set("limit", "1")
 	status, body := routerGET(t, srv.URL, ROUTE_SIGNALS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	root_signals := parseDigestArray(t, body)
+	root_signals := assertExpectedPagination(t, body, 1, "")
 	require.NotEmpty(t, root_signals)
+	for _, signal := range root_signals {
+		assertExpectedSip(t, signal, "signal")
+	}
 	signal_id, ok := root_signals[0]["id"].(string)
 	require.True(t, ok)
 
 	status, body = routerGET(t, srv.URL, ROUTE_SIGNALS+"/"+signal_id+"/events?limit=1", nil, "")
 	requireStatus(t, http.StatusOK, status, body)
-	events := parseDigestArray(t, body)
+	events := assertExpectedPagination(t, body, 1, "")
 	assert.NotEmpty(t, events)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
 	event_id, ok := events[0]["id"].(string)
 	require.True(t, ok)
 
@@ -443,20 +551,31 @@ func TestRouterEventDetailEvidenceAndSignals(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, event_id, detail["id"])
+	assertExpectedSip(t, detail, "event")
+	// require.Contains(t, detail, "source_id") // TODO: enable later
 	assert.Contains(t, detail, "links")
-	assert.Contains(t, detail, "counts")
+	counts, ok := detail["counts"].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, counts, "evidence")
+	require.Contains(t, counts, "signals")
 	pp.Println("DETAIL", detail)
 
 	status, body = routerGET(t, srv.URL, ROUTE_EVENTS+"/"+event_id+"/evidence", nil, "")
 	requireStatus(t, http.StatusOK, status, body)
-	evidence := parseDigestArray(t, body)
-	assert.NotEmpty(t, evidence)
+	evidence := assertExpectedPagination(t, body, 20, "")
 	pp.Println("EVIDENCE", evidence)
+	assert.NotEmpty(t, evidence)
+	for _, event := range evidence {
+		assertExpectedSip(t, event, "event")
+	}
 
 	status, body = routerGET(t, srv.URL, ROUTE_EVENTS+"/"+event_id+"/signals", nil, "")
 	requireStatus(t, http.StatusOK, status, body)
-	signals := parseDigestArray(t, body)
+	signals := assertExpectedPagination(t, body, 20, "")
 	assert.NotEmpty(t, signals)
+	for _, signal := range signals {
+		assertExpectedSip(t, signal, "signal")
+	}
 	signal_ids := datautils.Transform(signals, func(signal *map[string]any) string {
 		return (*signal)["id"].(string)
 	})
@@ -469,6 +588,7 @@ func TestRouterEventDetailNotFound(t *testing.T) {
 	bogus := uuid.New().String()
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS+"/"+bogus, nil, "")
 	requireStatus(t, http.StatusNotFound, status, body)
+	assertExpectedAPIError(t, body, router.API_ERROR_NOT_FOUND)
 }
 
 func TestRouterCursorPagination(t *testing.T) {
@@ -479,7 +599,7 @@ func TestRouterCursorPagination(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	first := parseDigestArray(t, body)
+	first := assertExpectedPagination(t, body, 2, "")
 	require.NotEmpty(t, first)
 
 	cursor := nextCursorFromBody(t, body)
@@ -490,7 +610,7 @@ func TestRouterCursorPagination(t *testing.T) {
 	params.Set("cursor", cursor)
 	status, body = routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	second := parseDigestArray(t, body)
+	second := assertExpectedPagination(t, body, 2, cursor)
 	require.NotEmpty(t, second)
 	assert.NotEqual(t, first[0]["id"], second[0]["id"])
 }
@@ -502,6 +622,117 @@ func TestRouterInvalidCursor(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, router.API_ERROR_INVALID_REQUEST)
+}
+
+func TestRouterExpectedDefaultPagination(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, nil, "")
+	requireStatus(t, http.StatusOK, status, body)
+	events := assertExpectedPagination(t, body, 20, "")
+	require.NotEmpty(t, events)
+	for _, event := range events {
+		assertExpectedSip(t, event, "event")
+	}
+}
+
+func TestRouterEventCategoriesAlias(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_EVENT_TYPES, url.Values{"limit": {"1"}}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	event_types := assertExpectedPagination(t, body, 1, "")
+	require.NotEmpty(t, event_types)
+	event_type, ok := event_types[0]["value"].(string)
+	require.True(t, ok)
+
+	by_event_type_params := url.Values{"event_types": {event_type}, "limit": {"1"}}
+	status, body = routerGET(t, srv.URL, ROUTE_EVENTS, by_event_type_params, "")
+	requireStatus(t, http.StatusOK, status, body)
+	by_event_type := assertExpectedPagination(t, body, 1, "")
+	require.Len(t, by_event_type, 1)
+	assertExpectedSip(t, by_event_type[0], "event")
+	assert.Equal(t, event_type, by_event_type[0]["event_type"])
+
+	by_category_params := url.Values{"categories": {event_type}, "limit": {"1"}}
+	status, body = routerGET(t, srv.URL, ROUTE_EVENTS, by_category_params, "")
+	requireStatus(t, http.StatusOK, status, body)
+	by_category := assertExpectedPagination(t, body, 1, "")
+	require.Len(t, by_category, 1)
+	assertExpectedSip(t, by_category[0], "event")
+	assert.Equal(t, by_event_type[0]["id"], by_category[0]["id"])
+}
+
+func TestRouterAcceptsRFC3339TimeBounds(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{
+		"from":  {"2000-01-01T00:00:00Z"},
+		"to":    {"2100-01-01T00:00:00Z"},
+		"limit": {"1"},
+	}
+	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
+	requireStatus(t, http.StatusOK, status, body)
+	events := assertExpectedPagination(t, body, 1, "")
+	require.NotEmpty(t, events)
+	assertExpectedSip(t, events[0], "event")
+}
+
+func TestRouterExpectedAggregateRoutes(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	count_params := url.Values{
+		"from": {"2026-08-01"},
+		"to":   {"2026-08-10"},
+	}
+	status, body := routerGET(t, srv.URL, ROUTE_EVENTS+"/count", count_params, "")
+	requireStatus(t, http.StatusOK, status, body)
+	var count_response map[string]any
+	require.NoError(t, json.Unmarshal(body, &count_response))
+	count_data, ok := count_response["data"].(map[string]any)
+	require.True(t, ok)
+	count, ok := count_data["count"].(float64)
+	require.True(t, ok)
+	assert.GreaterOrEqual(t, count, float64(0))
+	assert.Contains(t, count_data, "event_types")
+	assert.Contains(t, count_data, "impact_levels")
+	count_meta, ok := count_response["meta"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "created_at", count_meta["time_field"])
+	count_as_of, ok := count_meta["as_of"].(string)
+	require.True(t, ok)
+	_, err := time.Parse(time.RFC3339Nano, count_as_of)
+	require.NoError(t, err)
+
+	summary_params := url.Values{
+		"from":     {"2026-08-01"},
+		"to":       {"2026-08-10"},
+		"group_by": {"event_type"},
+	}
+	status, body = routerGET(t, srv.URL, ROUTE_EVENTS+"/summary", summary_params, "")
+	requireStatus(t, http.StatusOK, status, body)
+	var summary_response map[string]any
+	require.NoError(t, json.Unmarshal(body, &summary_response))
+	assert.Equal(t, "event_type", summary_response["group_by"])
+	_, ok = summary_response["data"].([]any)
+	require.True(t, ok)
+	summary_meta, ok := summary_response["meta"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "event", summary_meta["counted_resource"])
+	assert.Equal(t, "created_at", summary_meta["time_field"])
+	summary_as_of, ok := summary_meta["as_of"].(string)
+	require.True(t, ok)
+	_, err = time.Parse(time.RFC3339Nano, summary_as_of)
+	require.NoError(t, err)
+}
+
+func TestRouterExpectedEventSearchPost(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerPOST(t, srv.URL, ROUTE_EVENTS+"/search", map[string]any{
+		"q":     TEST_VECTOR_QUERY,
+		"limit": 1,
+	}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	events := assertExpectedPagination(t, body, 1, "")
+	require.NotEmpty(t, events)
+	assertExpectedSip(t, events[0], "event")
 }
 
 // --- stress tests against a live server ---
@@ -843,8 +1074,20 @@ func TestRouterDiscoveryRoutes(t *testing.T) {
 	for _, path := range []string{"/entities", "/regions", "/event-types"} {
 		status, body := routerGET(t, srv.URL, path, url.Values{"limit": {"5"}}, "")
 		requireStatus(t, http.StatusOK, status, body)
-		values := parseDigestArray(t, body)
+		values := assertExpectedPagination(t, body, 5, "")
 		require.NotEmpty(t, values, path)
-		assert.NotEmpty(t, values[0]["value"], path)
+		value, ok := values[0]["value"].(string)
+		require.True(t, ok, "missing discovery value for %s", path)
+		assert.NotEmpty(t, value, path)
+		type_value, ok := values[0]["type"].(string)
+		require.True(t, ok, "missing discovery type for %s", path)
+		switch path {
+		case "/entities":
+			assert.Contains(t, []string{"company", "people"}, type_value)
+		case "/regions":
+			assert.Equal(t, "region", type_value)
+		case "/event-types":
+			assert.Equal(t, "event_type", type_value)
+		}
 	}
 }

@@ -1,339 +1,342 @@
 # Espresso API Capability Gap Analysis
 
-Last updated: 2026-08-12T21:30:57-04:00
-Assessment basis: source review of Espresso, then go test ./... in apis/espresso (passes).
+Last updated: 2026-08-13T09:52:53-04:00
+Live capture window: 2026-08-12T21:51:04-04:00 through 2026-08-12T21:54:44-04:00.
 
 ## References
 
 - Target: [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md)
-- Industry baseline: [INDUSTRY_EVENT_API_ROUTE_REFERENCE.md](INDUSTRY_EVENT_API_ROUTE_REFERENCE.md)
-- Reviewed: apis/espresso/router/params.go, routes.go, responses.go; apis/espresso/db/queries.go, types.go.
+- Industry reference: [INDUSTRY_EVENT_API_ROUTE_REFERENCE.md](INDUSTRY_EVENT_API_ROUTE_REFERENCE.md)
+- Follow strictly [AGENTS.md](AGENTS.md)
 
-Gateway paths add /espresso; routes below are backend paths.
+## Method
 
-## Shared Facts
+This is a historical live-run assessment. Espresso was started locally on
+http://127.0.0.1:18081 using apis/espresso/.env, and every target path below
+was requested. The expected payload is the target-contract projection of the
+same live record; the actual payload is a field-preserving excerpt of the HTTP
+body received. The source tree has changed since this capture, so current-code findings override any conflicting historical payload excerpt. Arbitrary digest arrays and long briefing text are elided only
+where they do not affect the gap. All stable IDs, timestamps, status codes, and shown response fields are from the live capture; as_of is response-generated and therefore shown as RFC3339 in target projections.
 
-The proposal conflicts on kind: Section 3.3 requires it; Section 6 says to hide
-it. Expected payloads use Section 3.3. This is a proposal correction, not an
-implementation gap.
+The target proposal has a contradiction about kind: Section 3.3 requires it in
+the stable resource core and Section 6 says to hide it. Expected payloads
+follow Section 3.3. This is a proposal decision, not an Espresso gap.
 
-All current collection routes have this parameter gap.
+All collection excerpts show a shared envelope difference: target pagination
+includes cursor and uses default limit 20; live Espresso returns no cursor and
+the binder default is limit 16. Individual live requests intentionally used
+limit=1.
 
-Expected: limit 1-100 (default 20), cursor, response_type=json|yaml|toon;
-search routes also accept date or RFC 3339 from/to and sort=recent|relevance.
+## V1 Scope Clarification
 
-Actual: limit form-default is 16, maximum is 128, and there is no minimum;
-from/to accepts only YYYY-MM-DD; no handler binds sort. json, yaml, and toon
-are implemented.
+- Routes lack `sort` and RFC 3339 date-time values for `from`/`to` query params
+- `/events/:id/signals`, `/signals/:id/events`, `/events/:id/evidence` lack `q` query param
+- Events and Signals collection response payload omits url, base_url, source_id and source fields. They will exist ONLY in the details payload such as `/events/:id` and `/signals/:id`
+- `/events/:id/signals`, `/signals/:id/events` will NOT expand search scope using `SAME_AS` of the anchor event id
 
-Expected collection payload:
-~~~json
-{"data":[],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
-~~~
-Actual collection payload:
-~~~json
-{"data":[],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
-~~~
-Runtime correctly omits success, but does not emit pagination.cursor.
+These will all be considered for future extension
 
-Event and Signal collection SQL selects only id, kind, created, tags, digest.
-It cannot emit url, base_url, source_id, or source. Its mapper does not project
-briefing to summary, reconcile digest tags with sips tags, or convert a
-year-0001 timestamp to null plus data_quality.created_at=unknown.
+## System Constraints
+- Signals and some events are computed internally; Lacks source info
+- Signals search (`/signals`, `/events/:id/signals`) lack `source_id` query param. 
 
-## Route Analysis
+## Finding Status
+
+- **V1 accepted deferral:** no implementation work is required for V1. This applies to sort, RFC 3339 date-time input, relation q, and Event/Signal collection URL and Source fields.
+- **Implementation gap:** behavior contradicts the published V1 contract and needs a code or contract change.
+- **Future data-quality work:** only applies to the known year-0001 created_at sentinel. The required decision is to exclude those records from collections and return null plus data_quality.created_at=unknown on details, as specified by the proposal.
+- **No gap:** the scalar JSONB filters for event_type and impact_level are settled, valid filters. Do not replace them with ->> / = ANY. The contradictory proposal text must be reconciled separately.
+
+## Route Results
 
 ### R01 GET /events
 
-Expected parameters: ids, event_types, categories, impact_levels, companies,
-people, products, regions, entities, source_ids, tags, q, from, to, sort,
-limit, cursor, response_type.
+**Live request:** GET /events?event_types=binary_detection&limit=1 returned
+200 and Event b95db348-0de3-5759-86c5-843deb2aaf63.
 
-Actual parameters: ids, event_types, impact_levels, companies, people,
-products, regions, source_ids, tags, q, extra acc, date-only from/to, limit,
-cursor, response_type.
+**Query gap:** categories is the event_types compatibility alias and entities is a convenience filter across companies and people. Neither binds today, so callers must send event_types and separate companies/people filters instead. sort and RFC 3339 from/to are V1-accepted deferrals; the live 400 is expected V1 behavior. acc and impacted_domains are accepted implementation extensions.
 
-Expected payload:
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","briefing":"optional","...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"b95db348-0de3-5759-86c5-843deb2aaf63","kind":"event","created_at":"2026-08-09T13:39:55-04:00","tags":["paris","earth_sciences_and_natural_resources"],"summary":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","briefing":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","event_type":"binary_detection","companies":["observatoire_de_paris","american_association_of_variable_star_observers"],"regions":["paris","chile"]}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"timestamp","tags":[],"...digest":"members"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"b95db348-0de3-5759-86c5-843deb2aaf63","kind":"event","created_at":"2026-08-09T13:39:55-04:00","briefing":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","event_type":"binary_detection","companies":["observatoire_de_paris","american_association_of_variable_star_observers"],"regions":["paris","chile"],"tags":["paris","earth_sciences_and_natural_resources","stellar_evolution","satellite_systems_and_space_operations","observatoire_de_paris","chile","american_association_of_variable_star_observers"]}],"pagination":{"limit":1,"next_cursor":null},"meta":{"as_of":"2026-08-13T01:53:24.973088031Z"}}
 ~~~
-Gap: categories, entities, sort absent; acc extra. Stable URL and Source,
-summary, quality, and cursor fields are absent. Tags use tags_fts instead of
-array overlap. event_type and impact_level use JSONB ?| instead of ->> = ANY.
+**Payload gap:** Collection URL and Source omission is V1-accepted. The only data-quality follow-up is the year-0001 sentinel policy; currently a sentinel would be returned as a literal timestamp rather than excluded or marked. Tag overlap and scalar JSONB filters are valid current behavior.
 
 ### R02 GET /events/{event_id}
 
-Expected parameters: response_type.
-Actual parameters: response_type.
+**Live request:** GET /events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3 returned 200.
 
-Expected payload:
+**Query gap:** NONE. Both expect and accept only response_type.
+
+**Expected payload:**
 ~~~json
-{"data":{"id":"uuid","kind":"event","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","links":{"evidence":"/events/uuid/evidence","signals":"/events/uuid/signals"},"counts":{"evidence":3,"signals":2}}}
+{"data":{"id":"6fe7144a-aa51-5fa1-a2dd-dd906c583fe3","kind":"event","created_at":"2026-08-10T01:07:00-04:00","url":"https://www.thecooldown.com/sustainable-food/us-home-bakers-stock-up-flour-prices/","base_url":"www.thecooldown.com","source_id":null,"tags":["and_reuse_food","home"],"summary":"On August 10, 2026, the USDA revised its wheat supply outlooks...","briefing":"On August 10, 2026, the USDA revised its wheat supply outlooks...","links":{"evidence":"/events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/evidence","signals":"/events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/signals"},"counts":{"evidence":1,"signals":0}}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":{"id":"uuid","kind":"event","created_at":"timestamp","tags":[],"...digest":"members","source":{"id":"uuid","url":"optional"},"links":{"evidence":"/events/uuid/evidence","signals":"/events/uuid/signals"},"counts":{"coverage":3,"actions":0,"signals":2}}}
+{"data":{"id":"6fe7144a-aa51-5fa1-a2dd-dd906c583fe3","kind":"event","created_at":"2026-08-10T01:07:00-04:00","briefing":"On August 10, 2026, the USDA revised its wheat supply outlooks...","forecast":"Supply decline continues into next year","tags":["and_reuse_food","home","change_the_way_you_buy"],"source":{"url":"www.thecooldown.com"},"links":{"evidence":"/events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/evidence","signals":"/events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/signals"},"counts":{"coverage":1}}}
 ~~~
-Gap: GetSip inner-joins sources, giving false 404s for null or orphan source
-references. Top-level URL, base URL, source ID, summary, and quality are
-absent. evidence is named coverage and unsupported actions is added.
+**Payload gap:** The displayed body is historical. Current code now projects url, base_url, source_id, and summary on details. coverage replaces evidence. GetSip inner-joins sources, so a null or orphan Source is falsely 404.
 
 ### R03 GET /events/{event_id}/evidence
 
-Expected parameters: source_ids, from, to, limit, cursor, response_type; no q
-or sort.
-Actual parameters: the same names, but date-only from/to and shared pagination.
+**Live request:** GET /events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/evidence?limit=1
+returned 200.
 
-Expected payload:
+**Query gap:** source_ids is intended to restrict only SAME_AS neighbours. The current SQL applies the common source predicate after it combines the anchor and neighbours, so an anchor from a different source can be removed. Fix the query to preserve the requested id unconditionally and apply source_ids only to the neighbour branch. Date-only from/to is a V1-accepted deferral.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","tags":[],"...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"6fe7144a-aa51-5fa1-a2dd-dd906c583fe3","kind":"event","created_at":"2026-08-10T01:07:00-04:00","url":"https://www.thecooldown.com/sustainable-food/us-home-bakers-stock-up-flour-prices/","base_url":"www.thecooldown.com","source_id":null,"tags":["and_reuse_food","home"],"briefing":"On August 10, 2026, the USDA revised its wheat supply outlooks..."}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"event_id":"uuid","created":"timestamp","source_id":"uuid","url":"optional","base_url":"optional"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"event_id":"6fe7144a-aa51-5fa1-a2dd-dd906c583fe3","created":"2026-08-10T01:07:00-04:00","url":"https://www.thecooldown.com/sustainable-food/us-home-bakers-stock-up-flour-prices/","base_url":"www.thecooldown.com"}],"pagination":{"limit":1,"next_cursor":null},"meta":{"as_of":"2026-08-13T01:53:07.690795687Z"}}
 ~~~
-Gap: source_ids filters the anchor, so the required requested Event can vanish.
-The narrow payload uses event_id and created and omits kind, tags, digest,
-source object, and quality fields.
+**Payload gap:** Live evidence uses event_id and created and omits kind, tags, digest fields, and Source. The specific future data-quality work is year-0001 handling; no generic quality object is required for ordinary evidence rows.
 
 ### R04 GET /events/{event_id}/signals
 
-Expected parameters: ids, impact_levels, impacted_domains, source_ids, tags,
-q, from, to, sort, limit, cursor, response_type.
-Actual parameters: impact_levels, impacted_domains, tags, date-only from/to,
-limit, cursor, response_type.
+**Live request:** GET /events/6fe7144a-aa51-5fa1-a2dd-dd906c583fe3/signals?limit=1
+returned 200 with an empty collection.
 
-Expected payload:
+**Query gap:** ids and source_ids are missing target filters. q and sort are V1-accepted deferrals, and date-only from/to is expected V1 behavior. The remaining functional gap is relation scope: query direct SAME_AS neighbours before finding DERIVED_FROM Signals.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"signal","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload: a valid Event ID returns 404 because the handler verifies a
-Signal. With a Signal ID on this Event path, it filters results as kind=event
-and returns Event items.
-
-Gap: route semantics are inverted. ids, source_ids, q, sort, and SAME_AS
-expansion are absent, and the target Signal payload is unreachable.
+**Actual payload:**
+~~~json
+{"data":[],"pagination":{"limit":1,"next_cursor":null},"meta":{"as_of":"2026-08-13T01:53:07.727441715Z"}}
+~~~
+**Payload gap:** Collection URL and Source omission is V1-accepted. The remaining future data-quality work is to apply the year-0001 sentinel policy consistently when this route returns a Signal.
 
 ### R05 GET /signals
 
-Expected parameters: ids, impact_levels, impacted_domains, tags, q, from, to,
-sort, limit, cursor, response_type.
-Actual parameters: those names except sort, plus acc, date-only from/to, limit,
-cursor, response_type.
+**Live request:** GET /signals?limit=1 returned 200 and Signal
+ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6.
 
-Expected payload:
+**Query gap:** NONE for V1. sort and RFC 3339 from/to are accepted deferrals; acc is an implementation extension. Tags use persisted-array overlap, and impact_levels uses the settled valid scalar JSONB filter.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"signal","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6","kind":"signal","created_at":"2026-08-09T13:39:55-04:00","tags":["chile","portugal"],"summary":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","briefing":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","impact_level":"high","impacted_domains":["astronomy","astrobiology","theoretical_model_validation"]}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"signal","created_at":"timestamp","tags":[],"...digest":"members"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6","kind":"signal","created_at":"2026-08-09T13:39:55-04:00","briefing":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","confidence":"high","impact_level":"high","impacted_domains":["astronomy","astrobiology","theoretical_model_validation"],"tags":["chile","portugal","paris","la_silla","eso"]}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6ImVmOGUwMzU4LTJiZjQtNTRlNy05MWQ1LWMyYTFhMTUwZjZmNiIsImMiOiIyMDI2LTA4LTA5VDEzOjM5OjU1LTA0OjAwIn0"},"meta":{"as_of":"2026-08-13T01:51:04.08525812Z"}}
 ~~~
-Gap: sort is absent; acc is extra; time and pagination differ. URL, Source,
-summary, quality, and cursor are absent. Tags use full-text matching, and
-impact_levels uses the wrong scalar JSONB predicate.
+**Payload gap:** Collection URL and Source omission is V1-accepted. The only future quality work is year-0001 sentinel handling. pagination.cursor remains a V1 contract gap.
 
 ### R06 GET /signals/{signal_id}
 
-Expected parameters: response_type.
-Actual parameters: response_type.
+**Live request:** GET /signals/ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6 returned 200.
 
-Expected payload:
+**Query gap:** NONE. Both expect and accept only response_type.
+
+**Expected payload:**
 ~~~json
-{"data":{"id":"uuid","kind":"signal","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","links":{"events":"/signals/uuid/events"},"counts":{"events":4}}}
+{"data":{"id":"ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6","kind":"signal","created_at":"2026-08-09T13:39:55-04:00","source_id":"ee2e48b1-98b1-5019-895c-1c56f8eb9db2","source":{"id":"ee2e48b1-98b1-5019-895c-1c56f8eb9db2"},"tags":["chile","portugal"],"summary":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","briefing":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","links":{"events":"/signals/ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6/events"},"counts":{"events":7}}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":{"id":"uuid","kind":"signal","created_at":"timestamp","tags":[],"...digest":"members","source":{"id":"uuid","url":"optional"},"links":{"events":"/signals/uuid/events"},"counts":{"events":4}}}
+{"data":{"id":"ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6","kind":"signal","created_at":"2026-08-09T13:39:55-04:00","briefing":"On July 29, 2026, ESA/VLT achieved six sigma visibility breakthrough...","confidence":"high","impact_level":"high","source":{"id":"ee2e48b1-98b1-5019-895c-1c56f8eb9db2"},"tags":["chile","portugal","paris","la_silla","eso"],"links":{"events":"/signals/ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6/events"},"counts":{"events":7}}}
 ~~~
-Gap: inner Source join can give a false 404. Top-level URL, base URL, source
-ID, summary projection, and sentinel-time quality handling are absent.
+**Payload gap:** The displayed body is historical. Current code projects url, base_url, source_id, and summary on details, but deletes briefing; the target requires both summary and briefing. The remaining data-quality work is year-0001 sentinel handling. The inner Source join can falsely 404 an orphan reference.
 
 ### R07 GET /signals/{signal_id}/events
 
-Expected parameters: ids, event_types, categories, impact_levels, companies,
-people, products, regions, entities, source_ids, tags, q, from, to, sort,
-limit, cursor, response_type.
-Actual parameters: event_types, impact_levels, undocumented impacted_domains,
-tags, date-only from/to, limit, cursor, response_type.
+**Live request:** GET /signals/ef8e0358-2bf4-54e7-91d5-c2a1a150f6f6/events?limit=1
+returned 200.
 
-Expected payload:
+**Query gap:** Direct DERIVED_FROM traversal works. ids, categories, and entities do not bind. companies, people, products, regions, and source_ids bind but SignalEventsParams.createFilters drops them before SQL; add them to db.Filters there. q and sort are V1-accepted deferrals; date-only from/to is expected V1 behavior. impacted_domains is a non-target Event filter.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"summary":"optional","...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"b95db348-0de3-5759-86c5-843deb2aaf63","kind":"event","created_at":"2026-08-09T13:39:55-04:00","tags":["paris","earth_sciences_and_natural_resources"],"summary":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","briefing":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","event_type":"binary_detection"}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"timestamp","tags":[],"...digest":"members"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"b95db348-0de3-5759-86c5-843deb2aaf63","kind":"event","created_at":"2026-08-09T13:39:55-04:00","briefing":"On August 9, 2026, astronomers detected evidence supporting Betelgeuse...","event_type":"binary_detection","companies":["observatoire_de_paris","american_association_of_variable_star_observers"],"regions":["paris","chile"],"tags":["paris","earth_sciences_and_natural_resources","stellar_evolution","satellite_systems_and_space_operations","observatoire_de_paris","chile","american_association_of_variable_star_observers"]}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6ImI5NWRiMzQ4LTBkZTMtNTc1OS04NmM1LTg0M2RlYjJhYWY2MyIsImMiOiIyMDI2LTA4LTA5VDEzOjM5OjU1LTA0OjAwIn0"},"meta":{"as_of":"2026-08-13T01:53:24.973088031Z"}}
 ~~~
-Gap: direct DERIVED_FROM traversal is correct. ids, categories, entity-array
-filters, entities, source_ids, q, and sort are absent; impacted_domains is not
-a target Event filter. Relation output omits URL, base URL, source ID, Source,
-summary, and quality fields.
+**Payload gap:** Collection URL and Source omission is V1-accepted. The only future quality work is year-0001 sentinel handling. pagination.cursor remains a V1 contract gap.
 
 ### R08 GET /sources
 
-Expected parameters: q, domains, limit, cursor, response_type.
-Actual parameters: the same names, with shared actual pagination.
+**Live request:** GET /sources?limit=1 returned 200.
 
-Expected payload:
+**Query gap:** q, domains, limit, cursor, and response_type are bound. Action: change default limit from 16 to 20, enforce 1-100 instead of only max=128, and echo the request cursor in pagination.cursor.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","domain":"example.com-or-null","name":"example-or-null","url":"https://example.com","description":"text-or-null","favicon_url":"url-or-null","rss_feed_url":"url-or-null"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"52860efa-d345-58c4-8037-a9f3ae8987c0","domain":"30000000000000004","name":null,"url":"0.30000000000000004.com","description":null,"favicon_url":"https://0.30000000000000004.com/favicon.ico","rss_feed_url":null}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"id":"uuid","domain":"optional","name":"optional","url":"https://example.com","description":"optional","favicon_url":"optional","rss_feed_url":"optional"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"52860efa-d345-58c4-8037-a9f3ae8987c0","domain":"30000000000000004","url":"0.30000000000000004.com","favicon_url":"https://0.30000000000000004.com/favicon.ico"}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6bnVsbCwiayI6IjAuMzAwMDAwMDAwMDAwMDAwMDQuY29tIn0"},"meta":{"as_of":"2026-08-13T01:51:04.109728759Z"}}
 ~~~
-Gap: field names and search match, but unavailable optional fields are omitted,
-not null. Pagination differs.
+**Payload gap:** Target null Source fields are omitted by omitempty.
 
 ### R09 GET /sources/{source_id}
 
-Expected parameters: response_type.
-Actual parameters: response_type.
+**Live request:** GET /sources/52860efa-d345-58c4-8037-a9f3ae8987c0 returned 200.
 
-Expected payload:
+**Query gap:** NONE. Both expect and accept only response_type.
+
+**Expected payload:**
 ~~~json
-{"data":{"id":"uuid","domain":"example.com-or-null","name":"example-or-null","url":"https://example.com","description":"text-or-null","favicon_url":"url-or-null","rss_feed_url":"url-or-null"}}
+{"data":{"id":"52860efa-d345-58c4-8037-a9f3ae8987c0","domain":"30000000000000004","name":null,"url":"0.30000000000000004.com","description":null,"favicon_url":"https://0.30000000000000004.com/favicon.ico","rss_feed_url":null}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":{"id":"uuid","domain":"optional","name":"optional","url":"https://example.com","description":"optional","favicon_url":"optional","rss_feed_url":"optional"}}
+{"data":{"id":"52860efa-d345-58c4-8037-a9f3ae8987c0","domain":"30000000000000004","url":"0.30000000000000004.com","favicon_url":"https://0.30000000000000004.com/favicon.ico"}}
 ~~~
-Gap: public names and route behavior match. Optional Source values are omitted,
-not null.
+**Payload gap:** Target null Source fields are omitted.
 
 ### R11 GET /tags
 
-Expected parameters: q, resource=event,signal, limit, cursor, response_type.
-Actual parameters: q, CSV resource, limit, cursor, response_type.
+**Live request:** GET /tags?limit=1 returned 200.
 
-Expected payload:
+**Query gap:** q, resource, limit, cursor, and response_type are bound. Action: apply the common pagination correction: default 20, range 1-100, and echo pagination.cursor.
+
+**Expected payload:**
 ~~~json
-{"data":[{"value":"tag"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"\n\nmy_wife_quitter_job_episode_script_analysis"}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"value":"tag"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"\n\nmy_wife_quitter_job_episode_script_analysis"}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6bnVsbCwiayI6IlxuXG5teV93aWZlX3F1aXR0ZXJfam9iX2VwaXNvZGVfc2NyaXB0X2FuYWx5c2lzIn0"},"meta":{"as_of":"2026-08-13T01:51:31.989277294Z"}}
 ~~~
-Gap: item payload and resource scope conform. Limit and cursor response
-contract do not.
+**Payload gap:** Only shared limit/cursor envelope differences.
 
 ### R12 GET /entities
 
-Expected parameters: q, types=company,person, limit, cursor, response_type.
-Actual parameters: q, types=company,person,product,stock_ticker, limit,
-cursor, response_type.
+**Live requests:** GET /entities?limit=1 returned 200.
 
-Expected payload:
+**Query gap:** TBD
+
+**Expected payload:**
 ~~~json
-{"data":[{"value":"name","type":"company-or-person"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"007_first_light","type":"company"}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload when types is omitted:
+**Actual payload:**
 ~~~json
-{"data":[{"value":"name","type":"company-or-people"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"007_first_light","type":"company"}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwMDdfZmlyc3RfbGlnaHQiLCJ0eXBlIjoiY29tcGFueSJ9fQ"},"meta":{"as_of":"2026-08-13T01:52:24.247286918Z"}}
 ~~~
-Gap: product and stock_ticker are outside target. types=person passes binding
-but QueryEventTags recognizes people, not person, so it fails. Person output
-uses people, not person. Pagination differs.
+**Payload gap:** Default company response matches. Person output is type people,
+not person; the target request spelling produces
+{"error":{"code":"db_unavailable","message":"It's not you, it's us. Retry in a bit."}}.
 
 ### R13 GET /regions
 
-Expected parameters: q, limit, cursor, response_type.
-Actual parameters: the same names, with shared actual pagination.
+**Live request:** GET /regions?limit=1 returned 200.
 
-Expected payload:
+**Query gap:** All target parameters are bound. Action: apply the common pagination correction: default 20, range 1-100, and echo pagination.cursor.
+
+**Expected payload:**
 ~~~json
-{"data":[{"value":"region","type":"region"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"0","type":"region"}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"value":"region","type":"region"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"0","type":"region"}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwIiwidHlwZSI6InJlZ2lvbiJ9fQ"},"meta":{"as_of":"2026-08-13T01:52:29.751667796Z"}}
 ~~~
-Gap: route, parameters, and item payload conform. Shared limit and
-pagination.cursor gaps remain.
+**Payload gap:** Only shared limit/cursor envelope differences.
 
 ### R14 GET /event-types
 
-Expected parameters: q, limit, cursor, response_type.
-Actual parameters: the same names, with shared actual pagination.
+**Live request:** GET /event-types?limit=1 returned 200.
 
-Expected payload:
+**Query gap:** All target parameters are bound. Action: apply the common pagination correction: default 20, range 1-100, and echo pagination.cursor.
+
+**Expected payload:**
 ~~~json
-{"data":[{"value":"stock_decline","type":"event_type"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"0_60_mph_acceleration","type":"event_type"}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload:
+**Actual payload:**
 ~~~json
-{"data":[{"value":"stock_decline","type":"event_type"}],"pagination":{"limit":16,"next_cursor":"opaque-or-null"},"meta":{"as_of":"RFC3339"}}
+{"data":[{"value":"0_60_mph_acceleration","type":"event_type"}],"pagination":{"limit":1,"next_cursor":"eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwXzYwX21waF9hY2NlbGVyYXRpb24iLCJ0eXBlIjoiZXZlbnRfdHlwZSJ9fQ"},"meta":{"as_of":"2026-08-13T01:54:44.523440127Z"}}
 ~~~
-Gap: route, parameters, and item payload conform. Shared limit and
-pagination.cursor gaps remain.
+**Payload gap:** Only shared limit/cursor envelope differences.
 
 ### R16 GET /events/count
 
-Expected parameters: Event filters except q; this is not paginated.
-Actual parameters: none; route is not registered.
+**Live request:** GET /events/count returned 400 because registered /events/:id
+captures count.
 
-Expected payload:
+**Query gap:** Expected Event filters except q. Actual has no count binding;
+the path is an invalid UUID.
+
+**Expected payload:**
 ~~~json
-{"data":{"count":42,"event_types":{"stock_decline":12},"impact_levels":{"high":17}},"meta":{"time_field":"created_at","as_of":"RFC3339"}}
+{"data":{"count":42,"event_types":{"stock_decline":12},"impact_levels":{"high":17,"medium":25}},"meta":{"time_field":"created_at","as_of":"RFC3339"}}
 ~~~
-Actual payload: none; path is unregistered.
-Gap: route, aggregate query, bindings, and response model are absent.
+**Actual payload:**
+~~~json
+{"error":{"code":"invalid_request","message":"invalid UUID length: 5"}}
+~~~
+**Payload gap:** Aggregate payload is absent.
 
 ### R17 GET /events/summary
 
-Expected parameters: bounded from/to, required
-group_by=created_day|event_type|impact_level|source|tag|region. This is not paginated.
-Actual parameters: none; route is not registered.
+**Live request:** GET /events/summary?from=2026-08-01&to=2026-08-10&group_by=event_type
+returned 400 because /events/:id captures summary.
 
-Expected payload:
+**Query gap:** Expected bounded from/to and required group_by. Actual has no
+summary binding and treats summary as an invalid UUID.
+
+**Expected payload:**
 ~~~json
 {"group_by":"event_type","data":[{"key":"stock_decline","event_count":12}],"meta":{"counted_resource":"event","time_field":"created_at","as_of":"RFC3339"}}
 ~~~
-Actual payload: none; path is unregistered.
-Gap: route, bounded-window validation, grouping, aggregate query, and response
-model are absent.
+**Actual payload:**
+~~~json
+{"error":{"code":"invalid_request","message":"invalid UUID length: 7"}}
+~~~
+**Payload gap:** Grouped aggregate payload is absent.
 
 ### R18 POST /events/search
 
-Expected request body:
-~~~json
-{"q":"semiconductor demand weakness","filters":{"from":"2026-08-01T00:00:00Z","impact_levels":["high"],"tags":["guidance"]},"limit":20,"cursor":null}
-~~~
-Actual request handling: no POST route; CORS allows only GET and OPTIONS.
+**Live request:** POST /events/search with {"q":"wheat","limit":1} returned 404.
 
-Expected payload:
+**Query gap:** Expected JSON q, filters, limit, cursor. Actual has no POST
+registration or JSON binding; CORS allows only GET and OPTIONS.
+
+**Expected payload:**
 ~~~json
-{"data":[{"id":"uuid","kind":"event","created_at":"RFC3339-or-null","url":"optional","base_url":"optional","source_id":"uuid-or-null","source":{},"tags":[],"...digest":"members"}],"pagination":{"limit":20,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
+{"data":[{"id":"6fe7144a-aa51-5fa1-a2dd-dd906c583fe3","kind":"event","created_at":"2026-08-10T01:07:00-04:00","tags":["and_reuse_food","home"],"summary":"On August 10, 2026, the USDA revised its wheat supply outlooks...","briefing":"On August 10, 2026, the USDA revised its wheat supply outlooks..."}],"pagination":{"limit":1,"cursor":null,"next_cursor":null},"meta":{"as_of":"RFC3339"}}
 ~~~
-Actual payload: none; path is unregistered.
-Gap: POST registration, JSON binding, Event filters, vector execution, and
-target response are absent.
+**Actual payload:**
+~~~text
+404 page not found
+~~~
+**Payload gap:** No route payload exists.
 
 ### R22 GET /actions and Action relation routes
 
-Expected request and payload: no published route or payload; Actions are
-reserved because no Action data exists.
-Actual request and payload: no Action route is registered.
-Gap: none for the reserved publication state. Actions remain an upstream-data
-gap.
+**Live request:** GET /actions returned 404.
 
-## Cross-Route Gaps
+**Query gap:** NONE. R22 is reserved and specifies no published Action request parameters.
 
-- Vector SQL does not require embedding IS NOT NULL.
-- Generated Swagger and gateway OpenAPI still advertise obsolete text output,
-  Event-family kinds, and parameters that request binders do not implement.
-- Runtime reads API_KEY, while the target platform configuration is API_KEYS.
+**Expected payload:** none. R22 is reserved until Action data exists.
+
+**Actual payload:**
+~~~text
+404 page not found
+~~~
+**Payload gap:** NONE. R22 is reserved; the live 404 is consistent with no published Action route. Actions remain an upstream-data capability gap.
 
 ## Verification
 
-1. First pass: compared target routes with request binders, handler
-   registrations, response writers, and SQL projections.
-2. Second pass: removed stale claims that Espresso does not compile, that
-   runtime success is a gap, that R03 needs evidence-role metadata, and that
-   R13 or R14 item types are wrong.
-3. Third pass: ran go test ./... in apis/espresso; all packages passed.
+1. Fresh source review of route binding, response mapping, SQL selection, and
+   route registration.
+2. Live HTTP capture of every target route, including discovery,
+   aggregate-name collisions, POST, and Actions.
+3. Targeted probes for category alias, sort, RFC 3339 time, and person entity
+   type. go test ./... was run in apis/espresso earlier in this session and
+   passed; this revision is documentation-only.

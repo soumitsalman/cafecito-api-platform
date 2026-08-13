@@ -25,3 +25,10 @@ cd apis/espresso && go test ./tests/...
 - `digest->'event_type' ?| @event_types` and `impact_level` are valid PostgreSQL JSONB scalar filters.
 - Do not report these filters as a gap or replace them with `->>` / `= ANY(...)`.
 - Current stored kinds are only `event` and `signal`.
+
+
+## Schema Definitions
+### Espresso
+- EspressoDB/Cupboard stores events and signals in `sips` table; relationship (SAME_AS, DERVIED_FROM) between events and signals in 'relations` table; Sources in `sources` table.
+- Each `source` column in `sips` match `id` column in `sources`
+- `source` column in `sips` IS NULLABLE; applies to signals and some events that are computed internally rather than sourced from external publishers

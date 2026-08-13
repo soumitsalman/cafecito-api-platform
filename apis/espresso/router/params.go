@@ -29,7 +29,7 @@ type itemParams struct {
 
 // base cursor-pagination params for all list queries.
 type paginationParams struct {
-	Limit  int    `form:"limit,default=16" binding:"max=128"`
+	Limit  int    `form:"limit,default=20" binding:"min=1,max=100"`
 	Cursor string `form:"cursor"`
 	responseTypeParams
 }
@@ -46,16 +46,16 @@ type sipQueryParams struct {
 	ImpactedDomains []string  `form:"impacted_domains" collection_format:"csv" binding:"max=128"`
 	ImpactLevels    []string  `form:"impact_levels" collection_format:"csv" binding:"max=128"`
 	Tags            []string  `form:"tags" collection_format:"csv" binding:"max=128"`
+	Companies       []string  `form:"companies" collection_format:"csv" binding:"max=128"`
+	People          []string  `form:"people" collection_format:"csv" binding:"max=128"`
+	Products        []string  `form:"products" collection_format:"csv" binding:"max=128"`
+	Regions         []string  `form:"regions" collection_format:"csv" binding:"max=128"`
 }
 
 // eventSearchParams holds filter and search parameters for GET /events.
 type EventSearchParams struct {
 	IDs        []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	EventTypes []string    `form:"event_types" collection_format:"csv" binding:"max=128"`
-	Companies  []string    `form:"companies" collection_format:"csv" binding:"max=128"`
-	People     []string    `form:"people" collection_format:"csv" binding:"max=128"`
-	Products   []string    `form:"products" collection_format:"csv" binding:"max=128"`
-	Regions    []string    `form:"regions" collection_format:"csv" binding:"max=128"`
 	SourceIDs  []uuid.UUID `form:"source_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	sipQueryParams
 	vectorSearchParams
@@ -72,10 +72,9 @@ type SignalSearchParams struct {
 
 // eventEvidenceParams holds parameters for GET /events/{id}/evidence.
 type EventEvidenceParams struct {
-	From      time.Time   `form:"from" time_format:"2006-01-02"`
-	To        time.Time   `form:"to" time_format:"2006-01-02"`
 	SourceIDs []uuid.UUID `form:"source_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	pathIDParams
+	sipQueryParams
 	paginationParams
 }
 
@@ -88,7 +87,8 @@ type EventSignalsParams struct {
 
 // signalEventsParams holds parameters for GET /signals/{id}/events.
 type SignalEventsParams struct {
-	EventTypes []string `form:"event_types" collection_format:"csv" binding:"max=128"`
+	SourceIDs  []uuid.UUID `form:"source_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
+	EventTypes []string    `form:"event_types" collection_format:"csv" binding:"max=128"`
 	pathIDParams
 	sipQueryParams
 	paginationParams
@@ -110,7 +110,7 @@ type TagsParams struct {
 
 type EntitiesParams struct {
 	Q     string   `form:"q" binding:"max=1024"`
-	Types []string `form:"types" collection_format:"csv" binding:"max=3,dive,oneof=company person product stock_ticker"`
+	Types []string `form:"types" collection_format:"csv" binding:"max=3,dive,oneof=company people product"`
 	paginationParams
 }
 
@@ -144,9 +144,11 @@ func (params *SignalSearchParams) shouldBind(c *gin.Context) error {
 }
 
 func (params *EventEvidenceParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(params); err != nil {
+	path_params := pathIDParams{}
+	if err := c.ShouldBindUri(&path_params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
+	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
@@ -154,9 +156,11 @@ func (params *EventEvidenceParams) shouldBind(c *gin.Context) error {
 }
 
 func (params *EventSignalsParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(params); err != nil {
+	path_params := pathIDParams{}
+	if err := c.ShouldBindUri(&path_params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
+	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
@@ -164,9 +168,11 @@ func (params *EventSignalsParams) shouldBind(c *gin.Context) error {
 }
 
 func (params *SignalEventsParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(params); err != nil {
+	path_params := pathIDParams{}
+	if err := c.ShouldBindUri(&path_params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
+	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}
