@@ -235,25 +235,14 @@ func buildVectorSearchQuery(filters *Filters, page *PageRequest) (string, pgx.Na
 	return fmt.Sprintf(expr_fmt, inner_where_expr, outer_where_expr), params
 }
 
-// QueryEvents returns Event-family records (kind = 'event') matching the filters.
-func (p *Cupboard) QueryEvents(ctx context.Context, filters Filters, page PageRequest) (Page[Sip], error) {
-	filters.Kind = SIP_KIND_EVENT
-	return p.querySips(ctx, &filters, &page)
-}
-
-// QuerySignals returns Signal records (kind = 'signal') matching the filters.
-func (p *Cupboard) QuerySignals(ctx context.Context, filters Filters, page PageRequest) (Page[Sip], error) {
-	filters.Kind = SIP_KIND_SIGNAL
-	return p.querySips(ctx, &filters, &page)
-}
-
-func (p *Cupboard) querySips(ctx context.Context, filters *Filters, page *PageRequest) (Page[Sip], error) {
+// QuerySips returns Sip records matching the filters.
+func (p *Cupboard) QuerySips(ctx context.Context, filters Filters, page PageRequest) (Page[Sip], error) {
 	// sip fields to return id, created, kind, tags, digest
 	expr, params := "", pgx.NamedArgs{}
 	if len(filters.Embedding) > 0 {
-		expr, params = buildVectorSearchQuery(filters, page)
+		expr, params = buildVectorSearchQuery(&filters, &page)
 	} else {
-		expr, params = buildScalarQuery(filters, page)
+		expr, params = buildScalarQuery(&filters, &page)
 	}
 	rows, err := fetchAll[Sip](ctx, p.db, expr, params)
 	if err != nil {
@@ -261,51 +250,39 @@ func (p *Cupboard) querySips(ctx context.Context, filters *Filters, page *PageRe
 	}
 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor {
 		if len(filters.Embedding) > 0 {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Distance: &s.Distance}
+			return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Distance: &s.Distance.Float64}
 		} else {
 			return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Created: &s.Created}
 		}
 	}), nil
 }
 
-// GetEvent retrieves one Event-family record by UUID. Returns (Zero, nil) when not found.
-func (p *Cupboard) GetEvent(ctx context.Context, id uuid.UUID) (Sip, error) {
-	return p.getSip(ctx, id, SIP_KIND_EVENT)
-}
-
-// GetEvent retrieves one Event-family record by UUID. Returns (Zero, nil) when not found.
-func (p *Cupboard) GetSignal(ctx context.Context, id uuid.UUID) (Sip, error) {
-	return p.getSip(ctx, id, SIP_KIND_SIGNAL)
-}
-
-func (p *Cupboard) getSip(ctx context.Context, id uuid.UUID, kind string) (Sip, error) {
+// GetSip retrieves one Sip record by UUID and optional kind. Returns (Zero, nil) when not found.
+func (p *Cupboard) GetSip(ctx context.Context, id uuid.UUID, kind string) (ExtendedSip, error) {
 	// sip fields to return id, kind, created, tags, digest, source, url, base_url
-	query := "SELECT id, kind, created, tags, digest, source, url, base_url FROM sips WHERE id = @id"
+	query := `SELECT 
+		s.id, s.kind, s.created, s.tags, s.digest, s.source, s.url, s.base_url, 
+		src.domain_name, src.site_name, src.description, src.favicon, src.rss_feed
+	FROM sips s
+	LEFT JOIN sources src ON s.source = src.id
+	WHERE s.id = @id`
 	params := pgx.NamedArgs{"id": id}
-	if len(kind) > 0 {
-		query += " AND kind = @kind"
+	if kind != "" {
+		query += " AND s.kind = @kind"
 		params["kind"] = kind
 	}
-	sip, err := fetchOne[Sip](ctx, p.db, query+" LIMIT 1", params)
+	sip, err := fetchOne[ExtendedSip](ctx, p.db, query+" LIMIT 1", params)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Sip{}, nil
+		return ExtendedSip{}, nil
 	}
 	return sip, err
 }
 
-func (p *Cupboard) EventExists(ctx context.Context, id uuid.UUID) (bool, error) {
-	return p.sipExists(ctx, id, SIP_KIND_EVENT)
-}
-
-func (p *Cupboard) SignalExists(ctx context.Context, id uuid.UUID) (bool, error) {
-	return p.sipExists(ctx, id, SIP_KIND_SIGNAL)
-}
-
-// SipExists checks if a Sip record exists with the given id and kind.
-func (p *Cupboard) sipExists(ctx context.Context, id uuid.UUID, kind string) (bool, error) {
+// SipExists checks if a Sip record exists with the given id and optional kind.
+func (p *Cupboard) SipExists(ctx context.Context, id uuid.UUID, kind string) (bool, error) {
 	query := "SELECT 1 FROM sips WHERE id = @id"
 	params := pgx.NamedArgs{"id": id}
-	if len(kind) > 0 {
+	if kind != "" {
 		query += " AND kind = @kind"
 		params["kind"] = kind
 	}
@@ -313,10 +290,10 @@ func (p *Cupboard) sipExists(ctx context.Context, id uuid.UUID, kind string) (bo
 	return fetchOneScalar[bool](ctx, p.db, query, params)
 }
 
-// QueryEventEvidence returns events that are SAME_AS the given id.
-func (p *Cupboard) QueryEventEvidence(ctx context.Context, event_id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
+// QuerySameSips returns sips that are SAME_AS the given id.
+func (p *Cupboard) QuerySameSips(ctx context.Context, id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
 	expr_fmt := `
-	WITH event_scope AS (
+	WITH same_scope AS (
 		SELECT @id AS anchor_id
 		UNION
 		SELECT CASE WHEN from_id = @id THEN to_id ELSE from_id END
@@ -324,9 +301,9 @@ func (p *Cupboard) QueryEventEvidence(ctx context.Context, event_id uuid.UUID, f
 		WHERE relationship = 'SAME_AS'
 		  AND (from_id = @id OR to_id = @id)
 	)
-	SELECT id, created, source, url, base_url
+	SELECT id, created, kind, source, url, base_url
 	FROM sips
-	INNER JOIN event_scope ON id = anchor_id
+	INNER JOIN same_scope ON id = anchor_id
 	%s -- cursor AND filters
 	ORDER BY created DESC, id DESC
 	LIMIT @limit`
@@ -342,7 +319,7 @@ func (p *Cupboard) QueryEventEvidence(ctx context.Context, event_id uuid.UUID, f
 		where_expr = "WHERE " + strings.Join(where, " AND ")
 	}
 
-	params["id"] = event_id
+	params["id"] = id
 	params["limit"] = page.Limit + 1
 	rows, err := fetchAll[Sip](ctx, p.db, fmt.Sprintf(expr_fmt, where_expr), params)
 	if err != nil {
@@ -353,24 +330,24 @@ func (p *Cupboard) QueryEventEvidence(ctx context.Context, event_id uuid.UUID, f
 	}), nil
 }
 
-// QueryDerivedSignals returns Signals derived from the Event.
-func (p *Cupboard) QueryDerivedSignals(ctx context.Context, event_id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
+// QueryDerivedSips returns Sips derived from the Sip.
+func (p *Cupboard) QueryDerivedSips(ctx context.Context, id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
 	anchor_expr := `
 	SELECT from_id AS anchor_id 
 	FROM relations 
 	WHERE relationship = 'DERIVED_FROM' AND to_id = @anchor_id
 	`
-	return p.queryDerivedRelations(ctx, anchor_expr, &event_id, &filters, &page)
+	return p.queryDerivedRelations(ctx, anchor_expr, &id, &filters, &page)
 }
 
-// QueryDerivedEvents returns Events which were used for deriving the Signal.
-func (p *Cupboard) QuerySupportingEvents(ctx context.Context, signal_id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
+// QueryDerivedSips returns Sips which were used for deriving the Sip.
+func (p *Cupboard) QuerySupportingSips(ctx context.Context, id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
 	anchor_expr := `
 	SELECT to_id AS anchor_id 
 	FROM relations 
 	WHERE relationship = 'DERIVED_FROM' AND from_id = @anchor_id
 	`
-	return p.queryDerivedRelations(ctx, anchor_expr, &signal_id, &filters, &page)
+	return p.queryDerivedRelations(ctx, anchor_expr, &id, &filters, &page)
 }
 
 func (p *Cupboard) queryDerivedRelations(ctx context.Context, anchor_expr string, anchor_id *uuid.UUID, filters *Filters, page *PageRequest) (Page[Sip], error) {
@@ -428,188 +405,10 @@ func (p *Cupboard) CountRelations(ctx context.Context, id uuid.UUID) (RelationCo
 	return fetchOne[RelationCounts](ctx, p.db, query, pgx.NamedArgs{"anchor_id": id})
 }
 
-// CountSignalEvents returns the direct Event-family targets of a Signal.
-func (p *Cupboard) CountSignalEvents(ctx context.Context, signal_id uuid.UUID) (int64, error) {
-	query := `SELECT COUNT(DISTINCT e.id)
-	FROM relations AS r
-	JOIN sips AS e ON e.id = r.to_id AND e.kind LIKE 'event%'
-	WHERE r.relationship = 'DERIVED_FROM' AND r.from_id = @signal_id`
-	return fetchOneScalar[int64](ctx, p.db, query, pgx.NamedArgs{"signal_id": signal_id})
-}
-
-// // QueryEventEvidence returns the requested Event and every direct SAME_AS Event-family neighbour.
-// func (p *Cupboard) QueryEventEvidence(ctx context.Context, event_id uuid.UUID, filters SipFilters) ([]EvidenceRow, error) {
-// 	params := pgx.NamedArgs{"event_id": event_id}
-// 	where := []string{"s.kind LIKE 'event%'"}
-// 	if len(filters.SourceIDs) > 0 {
-// 		where = append(where, "s.source = ANY(@source_ids)")
-// 		params["source_ids"] = filters.SourceIDs
-// 	}
-// 	whereCreated(&where, params, filters.CreatedFrom, filters.CreatedTo)
-// 	query := `WITH evidence_ids AS (
-// 		SELECT @event_id::uuid AS id
-// 		UNION
-// 		SELECT CASE WHEN r.from_id = @event_id THEN r.to_id ELSE r.from_id END
-// 		FROM relations AS r
-// 		WHERE r.relationship = 'SAME_AS'
-// 		  AND (r.from_id = @event_id OR r.to_id = @event_id)
-// 	)
-// 	SELECT s.id AS event_id, s.created, s.source AS source_id, s.url, s.base_url
-// 	FROM evidence_ids AS e
-// 	JOIN sips AS s ON s.id = e.id
-// 	WHERE ` + strings.Join(where, " AND ") + `
-// 	ORDER BY s.created DESC, s.id DESC`
-// 	return fetchAll[EvidenceRow](ctx, p.db, query, params)
-// }
-
-// // QueryEventSignals returns Signals derived from the Event or its direct SAME_AS equivalents.
-// func (p *Cupboard) QueryEventSignals(ctx context.Context, event_id uuid.UUID, filters SipFilters, page PageRequest) (Page[Sip], error) {
-// 	sort := effectiveSort(filters)
-// 	params := pgx.NamedArgs{"event_id": event_id}
-// 	where := []string{"s.kind = 'signal'"}
-// 	if len(filters.ImpactLevels) > 0 {
-// 		where = append(where, "s.digest->>'impact_level' = ANY(@impact_levels)")
-// 		params["impact_levels"] = filters.ImpactLevels
-// 	}
-// 	if len(filters.ImpactedDomains) > 0 {
-// 		where = append(where, "(s.digest->'impacted_domains') ?| @impacted_domains")
-// 		params["impacted_domains"] = filters.ImpactedDomains
-// 	}
-// 	appendTagWhere(&where, params, filters.Tags, filters.TagMode, "s")
-// 	whereCreated(&where, params, filters.CreatedFrom, filters.CreatedTo)
-
-// 	if sort == SortRelevance && len(filters.Embedding) > 0 {
-// 		params["embedding"] = pgvector.NewVector(filters.Embedding)
-// 		if filters.Distance != nil {
-// 			where = append(where, "s.embedding <=> @embedding <= @distance")
-// 			params["distance"] = *filters.Distance
-// 		}
-// 		if cp, p2 := cursorPredicate(page.Cursor, sort, "s", params); cp != "" {
-// 			where = append(where, cp)
-// 			params = p2
-// 		}
-// 		params["limit_plus_one"] = page.Limit + 1
-// 		query := `WITH event_scope AS (
-// 			SELECT @event_id::uuid AS id
-// 			UNION
-// 			SELECT CASE WHEN r.from_id = @event_id THEN r.to_id ELSE r.from_id END
-// 			FROM relations AS r
-// 			WHERE r.relationship = 'SAME_AS'
-// 			  AND (r.from_id = @event_id OR r.to_id = @event_id)
-// 		)
-// 		SELECT DISTINCT ` + sipReadFields("s") + `, s.embedding <=> @embedding AS distance
-// 		FROM event_scope AS scope
-// 		JOIN sips AS scope_event ON scope_event.id = scope.id AND scope_event.kind LIKE 'event%'
-// 		JOIN relations AS derived
-// 		  ON derived.relationship = 'DERIVED_FROM' AND derived.to_id = scope.id
-// 		JOIN sips AS s ON s.id = derived.from_id
-// 		WHERE ` + strings.Join(where, " AND ") + `
-// 		ORDER BY distance ASC, s.id ASC
-// 		LIMIT @limit_plus_one`
-// 		rows, err := fetchAll[Sip](ctx, p.db, query, params)
-// 		if err != nil {
-// 			return Page[Sip]{}, err
-// 		}
-// 		return finalizePage(rows, page.Limit, func(s Sip) *Cursor { return sipCursor(s, SortRelevance) }), nil
-// 	}
-
-// 	sort = SortRecent
-// 	if cp, p2 := cursorPredicate(page.Cursor, sort, "s", params); cp != "" {
-// 		where = append(where, cp)
-// 		params = p2
-// 	}
-// 	params["limit_plus_one"] = page.Limit + 1
-// 	query := `WITH event_scope AS (
-// 		SELECT @event_id::uuid AS id
-// 		UNION
-// 		SELECT CASE WHEN r.from_id = @event_id THEN r.to_id ELSE r.from_id END
-// 		FROM relations AS r
-// 		WHERE r.relationship = 'SAME_AS'
-// 		  AND (r.from_id = @event_id OR r.to_id = @event_id)
-// 	)
-// 	SELECT DISTINCT ` + sipReadFields("s") + `
-// 	FROM event_scope AS scope
-// 	JOIN sips AS scope_event ON scope_event.id = scope.id AND scope_event.kind LIKE 'event%'
-// 	JOIN relations AS derived
-// 	  ON derived.relationship = 'DERIVED_FROM' AND derived.to_id = scope.id
-// 	JOIN sips AS s ON s.id = derived.from_id
-// 	WHERE ` + strings.Join(where, " AND ") + `
-// 	ORDER BY s.created DESC, s.id DESC
-// 	LIMIT @limit_plus_one`
-// 	rows, err := fetchAll[Sip](ctx, p.db, query, params)
-// 	if err != nil {
-// 		return Page[Sip]{}, err
-// 	}
-// 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor { return sipCursor(s, SortRecent) }), nil
-// }
-
-// // QuerySignalEvents returns Event-family records targeted by a Signal DERIVED_FROM edge.
-// func (p *Cupboard) QuerySignalEvents(ctx context.Context, signal_id uuid.UUID, filters Filters, page PageRequest) (Page[Sip], error) {
-// 	sort := effectiveSort(filters)
-// 	params := pgx.NamedArgs{"signal_id": signal_id}
-// 	where := []string{"e.kind LIKE 'event%'"}
-// 	if len(filters.EventTypes) > 0 {
-// 		where = append(where, "e.digest->>'event_type' = ANY(@event_types)")
-// 		params["event_types"] = filters.EventTypes
-// 	}
-// 	if len(filters.ImpactLevels) > 0 {
-// 		where = append(where, "e.digest->>'impact_level' = ANY(@impact_levels)")
-// 		params["impact_levels"] = filters.ImpactLevels
-// 	}
-// 	appendTagWhere(&where, params, filters.Tags, filters.TagMode, "e")
-// 	appendTimeWhereAlias(&where, params, filters.CreatedFrom, filters.CreatedTo, "e")
-
-// 	if sort == SortRelevance && len(filters.Embedding) > 0 {
-// 		params["embedding"] = pgvector.NewVector(filters.Embedding)
-// 		if filters.Distance != nil {
-// 			where = append(where, "e.embedding <=> @embedding <= @distance")
-// 			params["distance"] = *filters.Distance
-// 		}
-// 		if cp, p2 := cursorPredicate(page.Cursor, sort, "e", params); cp != "" {
-// 			where = append(where, cp)
-// 			params = p2
-// 		}
-// 		params["limit_plus_one"] = page.Limit + 1
-// 		query := `SELECT DISTINCT ` + sipReadFields("e") + `, e.embedding <=> @embedding AS distance
-// 		FROM relations AS r
-// 		JOIN sips AS e ON e.id = r.to_id
-// 		WHERE r.relationship = 'DERIVED_FROM'
-// 		  AND r.from_id = @signal_id
-// 		  AND ` + strings.Join(where, " AND ") + `
-// 		ORDER BY distance ASC, e.id ASC
-// 		LIMIT @limit_plus_one`
-// 		rows, err := fetchAll[Sip](ctx, p.db, query, params)
-// 		if err != nil {
-// 			return Page[Sip]{}, err
-// 		}
-// 		return finalizePage(rows, page.Limit, func(s Sip) *Cursor { return sipCursor(s, SortRelevance) }), nil
-// 	}
-
-// 	sort = SortRecent
-// 	if cp, p2 := cursorPredicate(page.Cursor, sort, "e", params); cp != "" {
-// 		where = append(where, cp)
-// 		params = p2
-// 	}
-// 	params["limit_plus_one"] = page.Limit + 1
-// 	query := `SELECT DISTINCT ` + sipReadFields("e") + `
-// 	FROM relations AS r
-// 	JOIN sips AS e ON e.id = r.to_id
-// 	WHERE r.relationship = 'DERIVED_FROM'
-// 	  AND r.from_id = @signal_id
-// 	  AND ` + strings.Join(where, " AND ") + `
-// 	ORDER BY e.created DESC, e.id DESC
-// 	LIMIT @limit_plus_one`
-// 	rows, err := fetchAll[Sip](ctx, p.db, query, params)
-// 	if err != nil {
-// 		return Page[Sip]{}, err
-// 	}
-// 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor { return sipCursor(s, SortRecent) }), nil
-// }
-
 // QuerySources returns source records matching the optional query and domain filters.
 func (p *Cupboard) QuerySources(ctx context.Context, q string, domains []string, page PageRequest) (Page[Source], error) {
 	expr_fmt := `
-	SELECT id, base_url, domain_name, site_name
+	SELECT id, base_url, domain_name, site_name, description, favicon, rss_feed
 	FROM sources
 	WHERE base_url > @c_base_url -- base_url is 1:1 with id
 		%s -- q
@@ -627,7 +426,7 @@ func (p *Cupboard) QuerySources(ctx context.Context, q string, domains []string,
 		"limit":      page.Limit + 1,
 	}
 	if len(q) > 0 {
-		q_expr = "AND (site_name ILIKE '%' || @q || '%' OR base_url ILIKE '%' || @q || '%')"
+		q_expr = "AND (domain_name ILIKE '%' || @q || '%' OR site_name ILIKE '%' || @q || '%' OR base_url ILIKE '%' || @q || '%')"
 		params["q"] = strings.TrimSpace(q)
 	}
 	if len(domains) > 0 {
@@ -694,7 +493,115 @@ func (p *Cupboard) QueryTags(ctx context.Context, q string, kinds []string, page
 	if err != nil {
 		return Page[string]{}, err
 	}
-	return finalizePage(rows, page.Limit, func(tag string) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, TextKey: &tag}
+	return finalizePage(rows, page.Limit, func(item string) *Cursor {
+		return &Cursor{Version: _CURSOR_VERSION, TextKey: &item}
+	}), nil
+}
+
+// eventTagQueries defines the SQL source for each supported Event discovery type.
+// The query fragments are static and selected only from the allowlisted constants.
+var eventTagQueries = map[string]string{
+	EVENT_TAG_TYPE_REGION: `
+		SELECT jsonb_array_elements_text(COALESCE(digest->'regions', '[]'::jsonb)) AS value,
+		       'region' AS type
+		FROM sips
+		WHERE kind = 'event'
+	`,
+	EVENT_TAG_TYPE_PEOPLE: `
+		SELECT jsonb_array_elements_text(COALESCE(digest->'people', '[]'::jsonb)) AS value,
+		       'people' AS type
+		FROM sips
+		WHERE kind = 'event'
+	`,
+	EVENT_TAG_TYPE_PRODUCT: `
+		SELECT jsonb_array_elements_text(COALESCE(digest->'products', '[]'::jsonb)) AS value,
+		       'product' AS type
+		FROM sips
+		WHERE kind = 'event'
+	`,
+	EVENT_TAG_TYPE_COMPANY: `
+		SELECT jsonb_array_elements_text(COALESCE(digest->'companies', '[]'::jsonb)) AS value,
+		       'company' AS type
+		FROM sips
+		WHERE kind = 'event'
+	`,
+	EVENT_TAG_TYPE_STOCK_TICKER: `
+		SELECT jsonb_array_elements_text(COALESCE(digest->'stock_tickers', '[]'::jsonb)) AS value,
+		       'stock_ticker' AS type
+		FROM sips
+		WHERE kind = 'event'
+	`,
+	EVENT_TAG_TYPE_EVENT_TYPE: `
+		SELECT digest->>'event_type' AS value,
+		       'event_type' AS type
+		FROM sips
+		WHERE kind = 'event'
+		  AND digest->>'event_type' IS NOT NULL
+		  AND digest->>'event_type' <> ''
+	`,
+}
+
+var allEventTagTypes = []string{
+	EVENT_TAG_TYPE_REGION,
+	EVENT_TAG_TYPE_PEOPLE,
+	EVENT_TAG_TYPE_PRODUCT,
+	EVENT_TAG_TYPE_COMPANY,
+	EVENT_TAG_TYPE_STOCK_TICKER,
+	EVENT_TAG_TYPE_EVENT_TYPE,
+}
+
+// QueryEventTags returns one common discovery payload for any requested Event
+// digest types. Results are ordered by value first and type second.
+func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string, page PageRequest) (Page[TagValue], error) {
+	if len(types) == 0 {
+		types = allEventTagTypes
+	}
+
+	values_queries := make([]string, 0, len(types))
+	seen_types := make(map[string]struct{}, len(types))
+	for _, tag_type := range types {
+		if _, seen := seen_types[tag_type]; seen {
+			continue
+		}
+
+		values_query, ok := eventTagQueries[tag_type]
+		if !ok {
+			return Page[TagValue]{}, fmt.Errorf("unsupported event tag type: %s", tag_type)
+		}
+
+		seen_types[tag_type] = struct{}{}
+		values_queries = append(values_queries, values_query)
+	}
+
+	params := pgx.NamedArgs{
+		"cursor_value": "",
+		"cursor_type":  "",
+		"limit":        page.Limit + 1,
+	}
+	where := []string{"(value, type) > (@cursor_value, @cursor_type)"}
+	if page.Cursor != nil && page.Cursor.EventTag != nil {
+		params["cursor_value"] = page.Cursor.EventTag.Value
+		params["cursor_type"] = page.Cursor.EventTag.Type
+	}
+	if q = strings.TrimSpace(q); q != "" {
+		where = append(where, "value ILIKE '%' || @q || '%'")
+		params["q"] = q
+	}
+
+	query := fmt.Sprintf(
+		"WITH values AS (%s) SELECT DISTINCT value, type FROM values WHERE %s ORDER BY value ASC, type ASC LIMIT @limit",
+		strings.Join(values_queries, " UNION ALL "),
+		strings.Join(where, " AND "),
+	)
+	rows, err := fetchAll[TagValue](ctx, p.db, query, params)
+	if err != nil {
+		return Page[TagValue]{}, err
+	}
+
+	return finalizePage(rows, page.Limit, func(item TagValue) *Cursor {
+		return &Cursor{
+			Version:  _CURSOR_VERSION,
+			EventTag: &item,
+		}
 	}), nil
 }

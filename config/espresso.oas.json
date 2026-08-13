@@ -164,20 +164,13 @@
       "SourceCollectionItem": {
         "type": "object",
         "properties": {
-          "base_url": {
-            "type": "string"
-          },
-          "domain_name": {
-            "type": "string",
-            "nullable": true
-          },
-          "id": {
-            "type": "string"
-          },
-          "site_name": {
-            "type": "string",
-            "nullable": true
-          }
+          "description": {"type": "string", "nullable": true},
+          "domain": {"type": "string", "nullable": true},
+          "favicon_url": {"type": "string", "nullable": true},
+          "id": {"type": "string", "format": "uuid"},
+          "name": {"type": "string", "nullable": true},
+          "rss_feed_url": {"type": "string", "nullable": true},
+          "url": {"type": "string"}
         }
       },
       "SourceCollectionResponse": {
@@ -203,32 +196,13 @@
       "SourceDetail": {
         "type": "object",
         "properties": {
-          "base_url": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "domain_name": {
-            "type": "string",
-            "nullable": true
-          },
-          "favicon": {
-            "type": "string",
-            "nullable": true
-          },
-          "id": {
-            "type": "string"
-          },
-          "rss_feed": {
-            "type": "string",
-            "nullable": true
-          },
-          "site_name": {
-            "type": "string",
-            "nullable": true
-          }
+          "description": {"type": "string", "nullable": true},
+          "domain": {"type": "string", "nullable": true},
+          "favicon_url": {"type": "string", "nullable": true},
+          "id": {"type": "string", "format": "uuid"},
+          "name": {"type": "string", "nullable": true},
+          "rss_feed_url": {"type": "string", "nullable": true},
+          "url": {"type": "string"}
         }
       },
       "SourceDetailResponse": {
@@ -242,13 +216,18 @@
           }
         }
       },
-      "StringCollectionResponse": {
+      "DiscoveryValueCollectionResponse": {
         "type": "object",
         "properties": {
           "data": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "object",
+              "required": ["value"],
+              "properties": {
+                "value": {"type": "string"},
+                "type": {"type": "string", "enum": ["company", "person"]}
+              }
             }
           },
           "meta": {
@@ -1783,7 +1762,7 @@
     "/espresso/sources": {
       "get": {
         "summary": "List intelligence sources",
-        "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.",
+        "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs.",
         "tags": [
           "Sources"
         ],
@@ -1796,7 +1775,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Case-insensitive match against site name, domain, or base URL."
+            "description": "Case-insensitive match against domain, site name, or base URL."
           },
           {
             "name": "domains",
@@ -1832,6 +1811,17 @@
               "type": "string"
             },
             "description": "Opaque pagination cursor returned as next_cursor."
+          }
+          ,{
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "yaml", "toon"],
+              "default": "json"
+            },
+            "description": "Output format: json, yaml, or toon."
           }
         ],
         "responses": {
@@ -1924,6 +1914,17 @@
               "format": "uuid"
             },
             "description": "Source record UUID (RFC 4122)."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "yaml", "toon"],
+              "default": "json"
+            },
+            "description": "Output format: json, yaml, or toon."
           }
         ],
         "responses": {
@@ -2008,7 +2009,7 @@
         }
       }
     },
-    "/espresso/tags": {
+    "/espresso/entities":{"get":{"summary":"Discover Event entities","description":"Returns distinct Event company and person strings.","tags":["Discovery"],"operationId":"listIntelligenceEntities","parameters":[{"name":"q","in":"query","schema":{"type":"string"}},{"name":"types","in":"query","schema":{"type":"array","items":{"type":"string","enum":["company","person"]}},"style":"form","explode":false},{"name":"response_type","in":"query","schema":{"type":"string","enum":["json","yaml","toon"],"default":"json"}},{"name":"limit","in":"query","schema":{"type":"integer","default":16,"minimum":1,"maximum":128}},{"name":"cursor","in":"query","schema":{"type":"string"}}],"responses":{"200":{"description":"Discovery values","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiscoveryValueCollectionResponse"}}}},"400":{"description":"Invalid request","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}},"500":{"description":"Database unavailable","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}}},"x-zuplo-route":{"corsPolicy":"none","handler":{"export":"urlRewriteHandler","module":"$import(@zuplo/runtime)","options":{"rewritePattern":"${env.ESPRESSO_BASE_URL}/entities"}},"policies":{"inbound":["zuplo-api-key-inbound","freeuser-rate-limit-inbound","freeuser-quota-inbound","backend-api-key-inbound"]}}}},"/espresso/regions":{"get":{"summary":"Discover Event regions","description":"Returns distinct Event region strings.","tags":["Discovery"],"operationId":"listIntelligenceRegions","parameters":[{"name":"q","in":"query","schema":{"type":"string"}},{"name":"response_type","in":"query","schema":{"type":"string","enum":["json","yaml","toon"],"default":"json"}},{"name":"limit","in":"query","schema":{"type":"integer","default":16,"minimum":1,"maximum":128}},{"name":"cursor","in":"query","schema":{"type":"string"}}],"responses":{"200":{"description":"Discovery values","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiscoveryValueCollectionResponse"}}}},"400":{"description":"Invalid request","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}},"500":{"description":"Database unavailable","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}}},"x-zuplo-route":{"corsPolicy":"none","handler":{"export":"urlRewriteHandler","module":"$import(@zuplo/runtime)","options":{"rewritePattern":"${env.ESPRESSO_BASE_URL}/regions"}},"policies":{"inbound":["zuplo-api-key-inbound","freeuser-rate-limit-inbound","freeuser-quota-inbound","backend-api-key-inbound"]}}}},"/espresso/event-types":{"get":{"summary":"Discover Event types","description":"Returns distinct Event event_type values.","tags":["Discovery"],"operationId":"listIntelligenceEventTypes","parameters":[{"name":"q","in":"query","schema":{"type":"string"}},{"name":"response_type","in":"query","schema":{"type":"string","enum":["json","yaml","toon"],"default":"json"}},{"name":"limit","in":"query","schema":{"type":"integer","default":16,"minimum":1,"maximum":128}},{"name":"cursor","in":"query","schema":{"type":"string"}}],"responses":{"200":{"description":"Discovery values","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiscoveryValueCollectionResponse"}}}},"400":{"description":"Invalid request","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}},"500":{"description":"Database unavailable","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}}},"x-zuplo-route":{"corsPolicy":"none","handler":{"export":"urlRewriteHandler","module":"$import(@zuplo/runtime)","options":{"rewritePattern":"${env.ESPRESSO_BASE_URL}/event-types"}},"policies":{"inbound":["zuplo-api-key-inbound","freeuser-rate-limit-inbound","freeuser-quota-inbound","backend-api-key-inbound"]}}}},"/espresso/tags": {
       "get": {
         "summary": "Discover tag filters for Espresso intelligence",
         "description": "Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).\n**Response formats**: `response_type=json` returns the collection envelope with a `data` string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.",
@@ -2036,7 +2037,7 @@
                 "type": "string"
               }
             },
-            "description": "Optional kind scope (CSV): event, signal, evidence. action remains gated.",
+            "description": "Optional kind scope (CSV): event, signal.",
             "style": "form",
             "explode": false
           },
@@ -2052,7 +2053,7 @@
               ],
               "default": "json"
             },
-            "description": "Output format. json returns the collection envelope; text returns comma-separated tags."
+            "description": "Output format: json, yaml, or toon."
           },
           {
             "name": "limit",
@@ -2078,11 +2079,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
+            "description": "Discovery value objects.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringCollectionResponse"
+                  "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
                 }
               },
               "text/plain": {

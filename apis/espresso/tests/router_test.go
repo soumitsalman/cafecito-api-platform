@@ -31,10 +31,15 @@ const (
 	MAX_CONCURRENCY = 10000
 	HTTP_TIMEOUT    = 10 * time.Minute
 
-	ROUTE_TAGS    = "/tags"
-	ROUTE_EVENTS  = "/events"
-	ROUTE_SIGNALS = "/signals"
-	ROUTE_SOURCES = "/sources"
+	ROUTE_DOCS        = "/docs/index.html"
+	ROUTE_HEALTH      = "/health"
+	ROUTE_TAGS        = "/tags"
+	ROUTE_ENTITIES    = "/entities"
+	ROUTE_REGIONS     = "/regions"
+	ROUTE_EVENT_TYPES = "/event-types"
+	ROUTE_EVENTS      = "/events"
+	ROUTE_SIGNALS     = "/signals"
+	ROUTE_SOURCES     = "/sources"
 )
 
 // stressEndpoint describes one API endpoint and its optional query params (router/routes.go).
@@ -171,6 +176,112 @@ func nextCursorFromBody(t *testing.T, body []byte) string {
 	return *env.Pagination.NextCursor
 }
 
+func cloneURLValues(params url.Values) url.Values {
+	params_copy := make(url.Values, len(params))
+	for key, values := range params {
+		params_copy[key] = append([]string(nil), values...)
+	}
+	return params_copy
+}
+
+func requirePaginatedCollection(t *testing.T, base, path string, params url.Values) []map[string]any {
+	t.Helper()
+	params_copy := cloneURLValues(params)
+	params_copy.Del("cursor")
+	params_copy.Set("limit", "1")
+
+	status, first_body := routerGET(t, base, path, params_copy, "")
+	requireStatus(t, http.StatusOK, status, first_body)
+	first := parseDigestArray(t, first_body)
+	require.NotEmpty(t, first, "first page for %s", path)
+
+	cursor := nextCursorFromBody(t, first_body)
+	require.NotEmpty(t, cursor, "expected next_cursor for %s", path)
+
+	params_copy.Set("cursor", cursor)
+	status, second_body := routerGET(t, base, path, params_copy, "")
+	requireStatus(t, http.StatusOK, status, second_body)
+	second := parseDigestArray(t, second_body)
+	require.NotEmpty(t, second, "second page for %s", path)
+	assert.NotEqual(t, first[0], second[0], "cursor did not advance %s", path)
+
+	return first
+}
+
+func collectionIDs(t *testing.T, base, path string) []string {
+	t.Helper()
+	status, body := routerGET(t, base, path, url.Values{"limit": {"128"}}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	items := parseDigestArray(t, body)
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		id, ok := item["id"].(string)
+		require.True(t, ok, "missing id in %s response item", path)
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func findPaginatedRelationPath(t *testing.T, base, collection_path, suffix string) string {
+	t.Helper()
+	for _, id := range collectionIDs(t, base, collection_path) {
+		path := collection_path + "/" + id + suffix
+		status, body := routerGET(t, base, path, url.Values{"limit": {"1"}}, "")
+		if status == http.StatusOK && nextCursorFromBody(t, body) != "" {
+			return path
+		}
+	}
+	require.Failf(t, "missing paginated relation fixture", "no %s%s collection has a next cursor", collection_path, suffix)
+	return ""
+}
+
+func TestRouterHealth(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_HEALTH, nil, "")
+	requireStatus(t, http.StatusOK, status, body)
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(body, &response))
+	assert.Equal(t, "alive", response["status"])
+}
+
+func TestRouterDocs(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_DOCS, nil, "")
+	requireStatus(t, http.StatusOK, status, body)
+}
+
+func TestRouterPaginatedCollectionRoutes(t *testing.T) {
+	srv := newTestHTTPServer(t)
+
+	for _, route := range []string{
+		ROUTE_TAGS,
+		ROUTE_ENTITIES,
+		ROUTE_REGIONS,
+		ROUTE_EVENT_TYPES,
+		ROUTE_EVENTS,
+		ROUTE_SIGNALS,
+		ROUTE_SOURCES,
+	} {
+		t.Run(route, func(t *testing.T) {
+			requirePaginatedCollection(t, srv.URL, route, url.Values{})
+		})
+	}
+
+	for _, relation := range []struct {
+		collection_path string
+		suffix          string
+	}{
+		{collection_path: ROUTE_EVENTS, suffix: "/evidence"},
+		{collection_path: ROUTE_EVENTS, suffix: "/signals"},
+		{collection_path: ROUTE_SIGNALS, suffix: "/events"},
+	} {
+		t.Run(relation.collection_path+"/:id"+relation.suffix, func(t *testing.T) {
+			path := findPaginatedRelationPath(t, srv.URL, relation.collection_path, relation.suffix)
+			requirePaginatedCollection(t, srv.URL, path, url.Values{})
+		})
+	}
+}
+
 func TestRouterGetTags(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
@@ -180,8 +291,9 @@ func TestRouterGetTags(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_TAGS, params, "")
 	requireStatus(t, http.StatusOK, status, body)
-	tags := parseStringArray(t, body)
+	tags := parseDigestArray(t, body)
 	assert.NotEmpty(t, tags)
+	assert.NotEmpty(t, tags[0]["value"])
 	pp.Println("TAGS", tags)
 }
 
@@ -254,6 +366,15 @@ func TestRouterGetSources(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	sources := parseSourceArray(t, body)
 	assert.NotEmpty(t, sources)
+	for _, source := range sources {
+		assert.Contains(t, source, "url")
+		assert.Contains(t, source, "domain")
+		assert.Contains(t, source, "name")
+		assert.Contains(t, source, "description")
+		assert.Contains(t, source, "favicon_url")
+		assert.Contains(t, source, "rss_feed_url")
+		assert.NotContains(t, source, "base_url")
+	}
 	pp.Println("SOURCES", sources)
 
 	first_id, ok := sources[0]["id"].(string)
@@ -262,6 +383,13 @@ func TestRouterGetSources(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	src := parseDetailObject(t, body)
 	assert.Equal(t, first_id, src["id"])
+	assert.Contains(t, src, "url")
+	assert.Contains(t, src, "domain")
+	assert.Contains(t, src, "name")
+	assert.Contains(t, src, "description")
+	assert.Contains(t, src, "favicon_url")
+	assert.Contains(t, src, "rss_feed_url")
+	assert.NotContains(t, src, "base_url")
 }
 
 func TestRouterSignalDetailsAndEvents(t *testing.T) {
@@ -708,4 +836,15 @@ func TestStressVectorSearch(t *testing.T) {
 
 	wg.Wait()
 	printStressSummary(t, results)
+}
+
+func TestRouterDiscoveryRoutes(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for _, path := range []string{"/entities", "/regions", "/event-types"} {
+		status, body := routerGET(t, srv.URL, path, url.Values{"limit": {"5"}}, "")
+		requireStatus(t, http.StatusOK, status, body)
+		values := parseDigestArray(t, body)
+		require.NotEmpty(t, values, path)
+		assert.NotEmpty(t, values[0]["value"], path)
+	}
 }

@@ -34,7 +34,7 @@ func TestNewDigestDocumentIncludesSipFields(t *testing.T) {
 		}),
 	}
 
-	doc := router.NewDigestDocument(&sip)
+	doc := router.NewDigestDocumentForSip(&sip)
 	require.NotNil(t, doc)
 	assert.Equal(t, id, doc["id"])
 	assert.Equal(t, created, doc["created_at"])
@@ -45,7 +45,7 @@ func TestNewDigestDocumentIncludesSipFields(t *testing.T) {
 }
 
 func TestNewDigestDocumentRejectsNonObject(t *testing.T) {
-	doc := router.NewDigestDocument(&db.Sip{Digest: json.RawMessage(`[]`)})
+	doc := router.NewDigestDocumentForSip(&db.Sip{Digest: json.RawMessage(`[]`)})
 	assert.Nil(t, doc)
 }
 
@@ -115,4 +115,22 @@ func TestNewDigestDocuments(t *testing.T) {
 	require.Len(t, docs, 1)
 	assert.Equal(t, "rates stay high", docs[0]["thesis"])
 	assert.Equal(t, sips[0].ID, docs[0]["id"])
+}
+
+func TestNewSourceDocumentUsesPublicFieldNames(t *testing.T) {
+	id := uuid.New()
+	doc := router.NewSourceDocument(&db.Source{ID: id, BaseURL: "https://example.com"})
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+
+	var fields map[string]any
+	require.NoError(t, json.Unmarshal(raw, &fields))
+	assert.Equal(t, id.String(), fields["id"])
+	assert.Equal(t, "https://example.com", fields["url"])
+	assert.Contains(t, fields, "domain")
+	assert.Contains(t, fields, "name")
+	assert.Contains(t, fields, "description")
+	assert.Contains(t, fields, "favicon_url")
+	assert.Contains(t, fields, "rss_feed_url")
+	assert.NotContains(t, fields, "base_url")
 }

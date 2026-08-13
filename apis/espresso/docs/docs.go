@@ -22,6 +22,152 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/entities": {
+            "get": {
+                "description": "Returns distinct exact company and person strings stored in Event digests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Discover Event entities",
+                "operationId": "listIntelligenceEntities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive substring filter.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity types: company, person.",
+                        "name": "types",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "yaml",
+                            "toon"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format.",
+                        "name": "response_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.DiscoveryValueCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/event-types": {
+            "get": {
+                "description": "Returns distinct exact event_type values stored in Event digests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Discover Event types",
+                "operationId": "listIntelligenceEventTypes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive substring filter.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "yaml",
+                            "toon"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format.",
+                        "name": "response_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.DiscoveryValueCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/events": {
             "get": {
                 "description": "Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.\n**When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.\n**Search modes**: ` + "`" + `q` + "`" + ` + ` + "`" + `acc` + "`" + ` for semantic search (default sort becomes ` + "`" + `relevance` + "`" + `); without ` + "`" + `q` + "`" + ` records are sorted by ` + "`" + `created_at` + "`" + ` descending (` + "`" + `recent` + "`" + `).\n**Time**: ` + "`" + `from` + "`" + `/` + "`" + `to` + "`" + ` are inclusive bounds on record ` + "`" + `created_at` + "`" + ` until an occurrence-time field exists. They do not claim Event occurrence time.\n**Tags**: match on persisted tags uses overlap (any supplied tag).\n**Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.\n**Agent format**: use ` + "`" + `response_type=text` + "`" + ` for compact field-per-line records with ` + "`" + `---` + "`" + ` delimiters when feeding an LLM or MCP client.",
@@ -157,30 +303,9 @@ const docTemplate = `{
                     },
                     {
                         "enum": [
-                            "any",
-                            "all"
-                        ],
-                        "type": "string",
-                        "default": "any",
-                        "description": "Tag matching mode.",
-                        "name": "tag_mode",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "recent",
-                            "relevance"
-                        ],
-                        "type": "string",
-                        "default": "recent",
-                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
-                        "name": "sort",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
                             "json",
-                            "text"
+                            "yaml",
+                            "toon"
                         ],
                         "type": "string",
                         "default": "json",
@@ -208,31 +333,31 @@ const docTemplate = `{
                     "200": {
                         "description": "Event-family records when response_type=json; plain-text event blocks when response_type=text",
                         "schema": {
-                            "$ref": "#/definitions/router.EventCollectionResponse"
+                            "$ref": "#/definitions/router.SipCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid query parameters, malformed UUID, or malformed cursor",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database or embedder unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -275,43 +400,43 @@ const docTemplate = `{
                     "200": {
                         "description": "The Event-family record",
                         "schema": {
-                            "$ref": "#/definitions/router.EventDetailResponse"
+                            "$ref": "#/definitions/router.SipItemResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No Event-family record with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
             }
         },
-        "/events/{event_id}/evidence": {
+        "/events/{id}/evidence": {
             "get": {
                 "description": "Which source-specific records support this Event? Returns a bare JSON list containing the requested Event and every direct SAME_AS Event-family neighbour in both relation orientations. Each item contains only event_id, created, source_id, url, and base_url. The default scope is direct_same_as: a bounded claim about current data, not a complete transitive equivalence closure.",
                 "produces": [
@@ -328,7 +453,7 @@ const docTemplate = `{
                         "type": "string",
                         "format": "uuid",
                         "description": "Event-family record UUID (RFC 4122).",
-                        "name": "event_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     },
@@ -370,48 +495,45 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Bare Event evidence list",
+                        "description": "Event evidence collection",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/router.EventEvidenceItem"
-                            }
+                            "$ref": "#/definitions/router.EventEvidenceCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID or invalid parameters",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No Event-family record with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
             }
         },
-        "/events/{event_id}/signals": {
+        "/events/{id}/signals": {
             "get": {
                 "description": "Which broader conclusions use this Event as evidence? Returns Signals whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS equivalents. The caller does not need to know which Event-family record was used as the relation target. Returns 404 when the Event does not exist; 200 with an empty collection when it exists but has no Signals.",
                 "produces": [
@@ -428,25 +550,9 @@ const docTemplate = `{
                         "type": "string",
                         "format": "uuid",
                         "description": "Event-family record UUID (RFC 4122).",
-                        "name": "event_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "maxLength": 1024,
-                        "type": "string",
-                        "description": "Natural-language semantic search query. Max 1024 characters.",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1,
-                        "minimum": 0,
-                        "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
-                        "name": "acc",
-                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -494,28 +600,6 @@ const docTemplate = `{
                     },
                     {
                         "enum": [
-                            "any",
-                            "all"
-                        ],
-                        "type": "string",
-                        "default": "any",
-                        "description": "Tag matching mode.",
-                        "name": "tag_mode",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "recent",
-                            "relevance"
-                        ],
-                        "type": "string",
-                        "default": "recent",
-                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
-                        "name": "sort",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
                             "json",
                             "text"
                         ],
@@ -545,37 +629,37 @@ const docTemplate = `{
                     "200": {
                         "description": "Signals derived from this Event",
                         "schema": {
-                            "$ref": "#/definitions/router.SignalCollectionResponse"
+                            "$ref": "#/definitions/router.SipCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID, invalid cursor, or invalid parameters",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No Event-family record with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database or embedder unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -600,6 +684,74 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/regions": {
+            "get": {
+                "description": "Returns distinct exact region strings stored in Event digests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "Discover Event regions",
+                "operationId": "listIntelligenceRegions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive substring filter.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "yaml",
+                            "toon"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format.",
+                        "name": "response_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 128,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 16,
+                        "description": "Page size. Default 16, max 128.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque pagination cursor.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.DiscoveryValueCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -741,37 +893,37 @@ const docTemplate = `{
                     "200": {
                         "description": "Signal records",
                         "schema": {
-                            "$ref": "#/definitions/router.SignalCollectionResponse"
+                            "$ref": "#/definitions/router.SipCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid query parameters, malformed UUID, or malformed cursor",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database or embedder unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
             }
         },
-        "/signals/{signal_id}": {
+        "/signals/{id}": {
             "get": {
                 "description": "What is the complete Signal with this UUID? Retrieves one signal-kind record by UUID. The detail payload links to supporting Events instead of inventing inline event references from unstructured digest strings. Returns 404 when no such Signal exists.",
                 "produces": [
@@ -808,37 +960,37 @@ const docTemplate = `{
                     "200": {
                         "description": "The Signal record",
                         "schema": {
-                            "$ref": "#/definitions/router.SignalDetailResponse"
+                            "$ref": "#/definitions/router.SipItemResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No Signal with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -861,25 +1013,9 @@ const docTemplate = `{
                         "type": "string",
                         "format": "uuid",
                         "description": "Signal record UUID (RFC 4122).",
-                        "name": "signal_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "maxLength": 1024,
-                        "type": "string",
-                        "description": "Natural-language semantic search query. Max 1024 characters.",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1,
-                        "minimum": 0,
-                        "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.",
-                        "name": "acc",
-                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -927,28 +1063,6 @@ const docTemplate = `{
                     },
                     {
                         "enum": [
-                            "any",
-                            "all"
-                        ],
-                        "type": "string",
-                        "default": "any",
-                        "description": "Tag matching mode.",
-                        "name": "tag_mode",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "recent",
-                            "relevance"
-                        ],
-                        "type": "string",
-                        "default": "recent",
-                        "description": "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q).",
-                        "name": "sort",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
                             "json",
                             "text"
                         ],
@@ -978,37 +1092,37 @@ const docTemplate = `{
                     "200": {
                         "description": "Event-family records supporting this Signal",
                         "schema": {
-                            "$ref": "#/definitions/router.EventCollectionResponse"
+                            "$ref": "#/definitions/router.SipCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID, invalid cursor, or invalid parameters",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No Signal with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database or embedder unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -1016,7 +1130,7 @@ const docTemplate = `{
         },
         "/sources": {
             "get": {
-                "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.",
+                "description": "Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs.",
                 "produces": [
                     "application/json"
                 ],
@@ -1028,7 +1142,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Case-insensitive match against site name, domain, or base URL.",
+                        "description": "Case-insensitive match against domain, site name, or base URL.",
                         "name": "q",
                         "in": "query"
                     },
@@ -1056,6 +1170,18 @@ const docTemplate = `{
                         "description": "Opaque pagination cursor returned as next_cursor.",
                         "name": "cursor",
                         "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "yaml",
+                            "toon"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format: json, yaml, or toon.",
+                        "name": "response_type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1068,25 +1194,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid limit, cursor, or parameters",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -1111,43 +1237,55 @@ const docTemplate = `{
                         "name": "source_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "json",
+                            "yaml",
+                            "toon"
+                        ],
+                        "type": "string",
+                        "default": "json",
+                        "description": "Output format: json, yaml, or toon.",
+                        "name": "response_type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "The source record",
                         "schema": {
-                            "$ref": "#/definitions/router.SourceDetailResponse"
+                            "$ref": "#/definitions/router.SourceItemResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "404": {
                         "description": "No source with this UUID",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -1155,7 +1293,7 @@ const docTemplate = `{
         },
         "/tags": {
             "get": {
-                "description": "Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to ` + "`" + `tags` + "`" + ` on ` + "`" + `/events` + "`" + ` and ` + "`" + `/signals` + "`" + `; matching uses overlap (any supplied tag).\n**Response formats**: ` + "`" + `response_type=json` + "`" + ` returns the collection envelope with a ` + "`" + `data` + "`" + ` string array. ` + "`" + `response_type=text` + "`" + ` returns one comma-separated plain-text string for lower-token MCP context.\n**Pagination**: cursor-based. Use ` + "`" + `next_cursor` + "`" + ` to continue; ` + "`" + `limit` + "`" + ` default 20, max 128.",
+                "description": "Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag value objects extracted from Event and Signal records.\n**When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.\n**Filter behavior**: tags returned here can be passed to ` + "`" + `tags` + "`" + ` on ` + "`" + `/events` + "`" + ` and ` + "`" + `/signals` + "`" + `; matching uses overlap (any supplied tag).\n**Response formats**: ` + "`" + `response_type` + "`" + ` accepts json, yaml, or toon. JSON returns a collection of ` + "`" + `{ \"value\": \"tag\" }` + "`" + ` objects.\n**Pagination**: cursor-based. Use ` + "`" + `next_cursor` + "`" + ` to continue; ` + "`" + `limit` + "`" + ` default 20, max 128.",
                 "produces": [
                     "application/json",
                     "text/plain"
@@ -1178,7 +1316,7 @@ const docTemplate = `{
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Optional kind scope (CSV): event, signal, evidence. action remains gated.",
+                        "description": "Optional kind scope (CSV): event, signal.",
                         "name": "resource",
                         "in": "query"
                     },
@@ -1189,7 +1327,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output format. json returns the collection envelope; text returns comma-separated tags.",
+                        "description": "Output format: json, yaml, or toon.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -1211,33 +1349,33 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tag strings when response_type=json; comma-separated tags when response_type=text",
+                        "description": "Tag value objects",
                         "schema": {
-                            "$ref": "#/definitions/router.StringCollectionResponse"
+                            "$ref": "#/definitions/router.DiscoveryValueCollectionResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid limit, cursor, or response_type",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid API key",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "429": {
                         "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     },
                     "500": {
                         "description": "Database unavailable; retry",
                         "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
+                            "$ref": "#/definitions/router.APIError"
                         }
                     }
                 }
@@ -1245,15 +1383,22 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "db.DiscoveryValue": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "router.APIError": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string"
-                },
-                "details": {
-                    "type": "object",
-                    "additionalProperties": {}
                 },
                 "message": {
                     "type": "string"
@@ -1264,21 +1409,13 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": {}
         },
-        "router.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "$ref": "#/definitions/router.APIError"
-                }
-            }
-        },
-        "router.EventCollectionResponse": {
+        "router.DiscoveryValueCollectionResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/router.DigestDocument"
+                        "$ref": "#/definitions/db.DiscoveryValue"
                     }
                 },
                 "meta": {
@@ -1289,15 +1426,7 @@ const docTemplate = `{
                 }
             }
         },
-        "router.EventDetailResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/router.DigestDocument"
-                }
-            }
-        },
-        "router.EventEvidenceItem": {
+        "router.EventEvidence": {
             "type": "object",
             "properties": {
                 "base_url": {
@@ -1314,6 +1443,23 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "router.EventEvidenceCollectionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.EventEvidence"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
                 }
             }
         },
@@ -1336,7 +1482,7 @@ const docTemplate = `{
                 }
             }
         },
-        "router.SignalCollectionResponse": {
+        "router.SipCollectionResponse": {
             "type": "object",
             "properties": {
                 "data": {
@@ -1353,28 +1499,11 @@ const docTemplate = `{
                 }
             }
         },
-        "router.SignalDetailResponse": {
+        "router.SipItemResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "$ref": "#/definitions/router.DigestDocument"
-                }
-            }
-        },
-        "router.SourceCollectionItem": {
-            "type": "object",
-            "properties": {
-                "base_url": {
-                    "type": "string"
-                },
-                "domain_name": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "site_name": {
-                    "type": "string"
                 }
             }
         },
@@ -1384,7 +1513,7 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/router.SourceCollectionItem"
+                        "$ref": "#/definitions/router.SourceDocument"
                     }
                 },
                 "meta": {
@@ -1398,57 +1527,41 @@ const docTemplate = `{
                 }
             }
         },
-        "router.SourceDetail": {
+        "router.SourceDocument": {
             "type": "object",
             "properties": {
-                "base_url": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
-                "domain_name": {
+                "domain": {
                     "type": "string"
                 },
-                "favicon": {
+                "favicon_url": {
                     "type": "string"
                 },
                 "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
                     "type": "string"
                 },
-                "rss_feed": {
+                "rss_feed_url": {
                     "type": "string"
                 },
-                "site_name": {
+                "url": {
                     "type": "string"
                 }
             }
         },
-        "router.SourceDetailResponse": {
+        "router.SourceItemResponse": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/router.SourceDetail"
+                    "$ref": "#/definitions/router.SourceDocument"
                 },
                 "success": {
                     "type": "boolean"
-                }
-            }
-        },
-        "router.StringCollectionResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/router.ResponseMeta"
-                },
-                "pagination": {
-                    "$ref": "#/definitions/router.Pagination"
                 }
             }
         }

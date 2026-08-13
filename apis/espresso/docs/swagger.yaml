@@ -1,39 +1,33 @@
 definitions:
+  db.DiscoveryValue:
+    properties:
+      type:
+        type: string
+      value:
+        type: string
+    type: object
   router.APIError:
     properties:
       code:
         type: string
-      details:
-        additionalProperties: {}
-        type: object
       message:
         type: string
     type: object
   router.DigestDocument:
     additionalProperties: {}
     type: object
-  router.ErrorResponse:
-    properties:
-      error:
-        $ref: '#/definitions/router.APIError'
-    type: object
-  router.EventCollectionResponse:
+  router.DiscoveryValueCollectionResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/router.DigestDocument'
+          $ref: '#/definitions/db.DiscoveryValue'
         type: array
       meta:
         $ref: '#/definitions/router.ResponseMeta'
       pagination:
         $ref: '#/definitions/router.Pagination'
     type: object
-  router.EventDetailResponse:
-    properties:
-      data:
-        $ref: '#/definitions/router.DigestDocument'
-    type: object
-  router.EventEvidenceItem:
+  router.EventEvidence:
     properties:
       base_url:
         type: string
@@ -45,6 +39,17 @@ definitions:
         type: string
       url:
         type: string
+    type: object
+  router.EventEvidenceCollectionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/router.EventEvidence'
+        type: array
+      meta:
+        $ref: '#/definitions/router.ResponseMeta'
+      pagination:
+        $ref: '#/definitions/router.Pagination'
     type: object
   router.Pagination:
     properties:
@@ -58,7 +63,7 @@ definitions:
       as_of:
         type: string
     type: object
-  router.SignalCollectionResponse:
+  router.SipCollectionResponse:
     properties:
       data:
         items:
@@ -69,27 +74,16 @@ definitions:
       pagination:
         $ref: '#/definitions/router.Pagination'
     type: object
-  router.SignalDetailResponse:
+  router.SipItemResponse:
     properties:
       data:
         $ref: '#/definitions/router.DigestDocument'
-    type: object
-  router.SourceCollectionItem:
-    properties:
-      base_url:
-        type: string
-      domain_name:
-        type: string
-      id:
-        type: string
-      site_name:
-        type: string
     type: object
   router.SourceCollectionResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/router.SourceCollectionItem'
+          $ref: '#/definitions/router.SourceDocument'
         type: array
       meta:
         $ref: '#/definitions/router.ResponseMeta'
@@ -98,40 +92,30 @@ definitions:
       success:
         type: boolean
     type: object
-  router.SourceDetail:
+  router.SourceDocument:
     properties:
-      base_url:
-        type: string
       description:
         type: string
-      domain_name:
+      domain:
         type: string
-      favicon:
+      favicon_url:
         type: string
       id:
+        format: uuid
         type: string
-      rss_feed:
+      name:
         type: string
-      site_name:
+      rss_feed_url:
+        type: string
+      url:
         type: string
     type: object
-  router.SourceDetailResponse:
+  router.SourceItemResponse:
     properties:
       data:
-        $ref: '#/definitions/router.SourceDetail'
+        $ref: '#/definitions/router.SourceDocument'
       success:
         type: boolean
-    type: object
-  router.StringCollectionResponse:
-    properties:
-      data:
-        items:
-          type: string
-        type: array
-      meta:
-        $ref: '#/definitions/router.ResponseMeta'
-      pagination:
-        $ref: '#/definitions/router.Pagination'
     type: object
 info:
   contact:
@@ -149,6 +133,108 @@ info:
   title: Espresso API & MCP
   version: "0.2"
 paths:
+  /entities:
+    get:
+      description: Returns distinct exact company and person strings stored in Event
+        digests.
+      operationId: listIntelligenceEntities
+      parameters:
+      - description: Case-insensitive substring filter.
+        in: query
+        name: q
+        type: string
+      - collectionFormat: csv
+        description: 'Entity types: company, person.'
+        in: query
+        items:
+          type: string
+        name: types
+        type: array
+      - default: json
+        description: Output format.
+        enum:
+        - json
+        - yaml
+        - toon
+        in: query
+        name: response_type
+        type: string
+      - default: 16
+        description: Page size. Default 16, max 128.
+        in: query
+        maximum: 128
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque pagination cursor.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/router.APIError'
+      summary: Discover Event entities
+      tags:
+      - Discovery
+  /event-types:
+    get:
+      description: Returns distinct exact event_type values stored in Event digests.
+      operationId: listIntelligenceEventTypes
+      parameters:
+      - description: Case-insensitive substring filter.
+        in: query
+        name: q
+        type: string
+      - default: json
+        description: Output format.
+        enum:
+        - json
+        - yaml
+        - toon
+        in: query
+        name: response_type
+        type: string
+      - default: 16
+        description: Page size. Default 16, max 128.
+        in: query
+        maximum: 128
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque pagination cursor.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/router.APIError'
+      summary: Discover Event types
+      tags:
+      - Discovery
   /events:
     get:
       description: |-
@@ -251,29 +337,13 @@ paths:
           type: string
         name: tags
         type: array
-      - default: any
-        description: Tag matching mode.
-        enum:
-        - any
-        - all
-        in: query
-        name: tag_mode
-        type: string
-      - default: recent
-        description: Sort order. recent=created_at desc (default), relevance=semantic
-          distance asc (requires q).
-        enum:
-        - recent
-        - relevance
-        in: query
-        name: sort
-        type: string
       - default: json
         description: Output format. json returns the collection envelope; text returns
           compact plain-text records.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
@@ -297,23 +367,23 @@ paths:
           description: Event-family records when response_type=json; plain-text event
             blocks when response_type=text
           schema:
-            $ref: '#/definitions/router.EventCollectionResponse'
+            $ref: '#/definitions/router.SipCollectionResponse'
         "400":
           description: Invalid query parameters, malformed UUID, or malformed cursor
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Search Event-family records
       tags:
       - Events
@@ -347,31 +417,31 @@ paths:
         "200":
           description: The Event-family record
           schema:
-            $ref: '#/definitions/router.EventDetailResponse'
+            $ref: '#/definitions/router.SipItemResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No Event-family record with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve one Event-family record
       tags:
       - Events
-  /events/{event_id}/evidence:
+  /events/{id}/evidence:
     get:
       description: 'Which source-specific records support this Event? Returns a bare
         JSON list containing the requested Event and every direct SAME_AS Event-family
@@ -384,7 +454,7 @@ paths:
       - description: Event-family record UUID (RFC 4122).
         format: uuid
         in: path
-        name: event_id
+        name: id
         required: true
         type: string
       - collectionFormat: csv
@@ -418,35 +488,33 @@ paths:
       - text/plain
       responses:
         "200":
-          description: Bare Event evidence list
+          description: Event evidence collection
           schema:
-            items:
-              $ref: '#/definitions/router.EventEvidenceItem'
-            type: array
+            $ref: '#/definitions/router.EventEvidenceCollectionResponse'
         "400":
           description: Malformed UUID or invalid parameters
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No Event-family record with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve Event evidence
       tags:
       - Events
-  /events/{event_id}/signals:
+  /events/{id}/signals:
     get:
       description: Which broader conclusions use this Event as evidence? Returns Signals
         whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS
@@ -458,21 +526,9 @@ paths:
       - description: Event-family record UUID (RFC 4122).
         format: uuid
         in: path
-        name: event_id
+        name: id
         required: true
         type: string
-      - description: Natural-language semantic search query. Max 1024 characters.
-        in: query
-        maxLength: 1024
-        name: q
-        type: string
-      - default: 0.5
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
-        in: query
-        maximum: 1
-        minimum: 0
-        name: acc
-        type: number
       - description: Inclusive Signal created_at lower bound (RFC3339 timestamp).
         format: date-time
         in: query
@@ -505,23 +561,6 @@ paths:
           type: string
         name: tags
         type: array
-      - default: any
-        description: Tag matching mode.
-        enum:
-        - any
-        - all
-        in: query
-        name: tag_mode
-        type: string
-      - default: recent
-        description: Sort order. recent=created_at desc (default), relevance=semantic
-          distance asc (requires q).
-        enum:
-        - recent
-        - relevance
-        in: query
-        name: sort
-        type: string
       - default: json
         description: Output format. json returns the collection envelope; text returns
           compact plain-text records.
@@ -549,27 +588,27 @@ paths:
         "200":
           description: Signals derived from this Event
           schema:
-            $ref: '#/definitions/router.SignalCollectionResponse'
+            $ref: '#/definitions/router.SipCollectionResponse'
         "400":
           description: Malformed UUID, invalid cursor, or invalid parameters
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No Event-family record with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve Signals derived from an Event
       tags:
       - Events
@@ -591,6 +630,53 @@ paths:
       summary: Check API health
       tags:
       - Health
+  /regions:
+    get:
+      description: Returns distinct exact region strings stored in Event digests.
+      operationId: listIntelligenceRegions
+      parameters:
+      - description: Case-insensitive substring filter.
+        in: query
+        name: q
+        type: string
+      - default: json
+        description: Output format.
+        enum:
+        - json
+        - yaml
+        - toon
+        in: query
+        name: response_type
+        type: string
+      - default: 16
+        description: Page size. Default 16, max 128.
+        in: query
+        maximum: 128
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque pagination cursor.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/router.APIError'
+      summary: Discover Event regions
+      tags:
+      - Discovery
   /signals:
     get:
       description: |-
@@ -695,27 +781,27 @@ paths:
         "200":
           description: Signal records
           schema:
-            $ref: '#/definitions/router.SignalCollectionResponse'
+            $ref: '#/definitions/router.SipCollectionResponse'
         "400":
           description: Invalid query parameters, malformed UUID, or malformed cursor
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Search synthesized Signals
       tags:
       - Signals
-  /signals/{signal_id}:
+  /signals/{id}:
     get:
       description: What is the complete Signal with this UUID? Retrieves one signal-kind
         record by UUID. The detail payload links to supporting Events instead of inventing
@@ -745,27 +831,27 @@ paths:
         "200":
           description: The Signal record
           schema:
-            $ref: '#/definitions/router.SignalDetailResponse'
+            $ref: '#/definitions/router.SipItemResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No Signal with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve one Signal
       tags:
       - Signals
@@ -781,21 +867,9 @@ paths:
       - description: Signal record UUID (RFC 4122).
         format: uuid
         in: path
-        name: signal_id
+        name: id
         required: true
         type: string
-      - description: Natural-language semantic search query. Max 1024 characters.
-        in: query
-        maxLength: 1024
-        name: q
-        type: string
-      - default: 0.5
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
-        in: query
-        maximum: 1
-        minimum: 0
-        name: acc
-        type: number
       - description: Inclusive Event created_at lower bound (RFC3339 timestamp).
         format: date-time
         in: query
@@ -828,23 +902,6 @@ paths:
           type: string
         name: tags
         type: array
-      - default: any
-        description: Tag matching mode.
-        enum:
-        - any
-        - all
-        in: query
-        name: tag_mode
-        type: string
-      - default: recent
-        description: Sort order. recent=created_at desc (default), relevance=semantic
-          distance asc (requires q).
-        enum:
-        - recent
-        - relevance
-        in: query
-        name: sort
-        type: string
       - default: json
         description: Output format. json returns the collection envelope; text returns
           compact plain-text records.
@@ -872,27 +929,27 @@ paths:
         "200":
           description: Event-family records supporting this Signal
           schema:
-            $ref: '#/definitions/router.EventCollectionResponse'
+            $ref: '#/definitions/router.SipCollectionResponse'
         "400":
           description: Malformed UUID, invalid cursor, or invalid parameters
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No Signal with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve Event-family records supporting a Signal
       tags:
       - Signals
@@ -901,10 +958,10 @@ paths:
       description: Which source records can I filter by or cite? Returns provenance
         records keyed by UUID. Optional source metadata may be null; missing optional
         metadata is not an error and the API does not fabricate names, domains, or
-        URLs. JSON only initially.
+        URLs.
       operationId: listIntelligenceSources
       parameters:
-      - description: Case-insensitive match against site name, domain, or base URL.
+      - description: Case-insensitive match against domain, site name, or base URL.
         in: query
         name: q
         type: string
@@ -926,6 +983,15 @@ paths:
         in: query
         name: cursor
         type: string
+      - default: json
+        description: 'Output format: json, yaml, or toon.'
+        enum:
+        - json
+        - yaml
+        - toon
+        in: query
+        name: response_type
+        type: string
       produces:
       - application/json
       responses:
@@ -936,19 +1002,19 @@ paths:
         "400":
           description: Invalid limit, cursor, or parameters
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: List intelligence sources
       tags:
       - Sources
@@ -965,43 +1031,52 @@ paths:
         name: source_id
         required: true
         type: string
+      - default: json
+        description: 'Output format: json, yaml, or toon.'
+        enum:
+        - json
+        - yaml
+        - toon
+        in: query
+        name: response_type
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: The source record
           schema:
-            $ref: '#/definitions/router.SourceDetailResponse'
+            $ref: '#/definitions/router.SourceItemResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "404":
           description: No source with this UUID
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Retrieve one intelligence source
       tags:
       - Sources
   /tags:
     get:
       description: |-
-        Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.
+        Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag value objects extracted from Event and Signal records.
         **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
         **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).
-        **Response formats**: `response_type=json` returns the collection envelope with a `data` string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.
+        **Response formats**: `response_type` accepts json, yaml, or toon. JSON returns a collection of `{ "value": "tag" }` objects.
         **Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.
       operationId: listIntelligenceTags
       parameters:
@@ -1010,16 +1085,14 @@ paths:
         name: q
         type: string
       - collectionFormat: csv
-        description: 'Optional kind scope (CSV): event, signal, evidence. action remains
-          gated.'
+        description: 'Optional kind scope (CSV): event, signal.'
         in: query
         items:
           type: string
         name: resource
         type: array
       - default: json
-        description: Output format. json returns the collection envelope; text returns
-          comma-separated tags.
+        description: 'Output format: json, yaml, or toon.'
         enum:
         - json
         - text
@@ -1043,26 +1116,25 @@ paths:
       - text/plain
       responses:
         "200":
-          description: Tag strings when response_type=json; comma-separated tags when
-            response_type=text
+          description: Tag value objects
           schema:
-            $ref: '#/definitions/router.StringCollectionResponse'
+            $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
           description: Invalid limit, cursor, or response_type
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.ErrorResponse'
+            $ref: '#/definitions/router.APIError'
       summary: Discover tag filters for Espresso intelligence
       tags:
       - Tags

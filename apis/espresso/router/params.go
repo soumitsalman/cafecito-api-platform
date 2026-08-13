@@ -104,7 +104,18 @@ type SourcesParams struct {
 // tagsParams holds parameters for GET /tags.
 type TagsParams struct {
 	Q        string   `form:"q" binding:"max=1024"`
-	Resource []string `form:"resource" collection_format:"csv" binding:"max=128"`
+	Resource []string `form:"resource" collection_format:"csv" binding:"max=128,dive,oneof=event signal"`
+	paginationParams
+}
+
+type EntitiesParams struct {
+	Q     string   `form:"q" binding:"max=1024"`
+	Types []string `form:"types" collection_format:"csv" binding:"max=3,dive,oneof=company person product stock_ticker"`
+	paginationParams
+}
+
+type DiscoveryParams struct {
+	Q string `form:"q" binding:"max=1024"`
 	paginationParams
 }
 
@@ -170,6 +181,20 @@ func (params *SourcesParams) shouldBind(c *gin.Context) error {
 }
 
 func (params *TagsParams) shouldBind(c *gin.Context) error {
+	if err := c.ShouldBindQuery(params); err != nil {
+		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+	}
+	return nil
+}
+
+func (params *EntitiesParams) shouldBind(c *gin.Context) error {
+	if err := c.ShouldBindQuery(params); err != nil {
+		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+	}
+	return nil
+}
+
+func (params *DiscoveryParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
 		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
 	}

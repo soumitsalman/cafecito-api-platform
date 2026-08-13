@@ -18,6 +18,15 @@ const (
 	SIP_KIND_SIGNAL = "signal"
 )
 
+const (
+	EVENT_TAG_TYPE_REGION       = "region"
+	EVENT_TAG_TYPE_PEOPLE       = "people"
+	EVENT_TAG_TYPE_PRODUCT      = "product"
+	EVENT_TAG_TYPE_COMPANY      = "company"
+	EVENT_TAG_TYPE_STOCK_TICKER = "stock_ticker"
+	EVENT_TAG_TYPE_EVENT_TYPE   = "event_type"
+)
+
 // Sip is the storage-shaped unit of information in Espresso.
 //
 // The database layer returns storage-shaped records and leaves public JSON naming to
@@ -27,15 +36,13 @@ type Sip struct {
 	ID       uuid.UUID       `db:"id" json:"id" swaggertype:"string" format:"uuid" example:"339366bc-464d-582f-8132-6875ccc814d2"`
 	Kind     string          `db:"kind" json:"kind" example:"event"`
 	Created  time.Time       `db:"created" json:"created_at" example:"2026-05-19T06:00:00Z"`
-	SourceID uuid.UUID       `db:"source" json:"source_id,omitempty" swaggertype:"string" format:"uuid"`
 	Tags     []string        `db:"tags" json:"tags"`
 	Digest   json.RawMessage `db:"digest" swaggertype:"object" json:"digest,omitempty"`
 	URL      sql.NullString  `db:"url" json:"url,omitempty"`
+	SourceID uuid.UUID       `db:"source" json:"source_id,omitempty" swaggertype:"string" format:"uuid"`
 	BaseURL  sql.NullString  `db:"base_url" json:"base_url,omitempty"`
-
 	// Distance is the embedding distance for semantic (relevance) queries. It is not persisted
-	// and not exposed in public JSON; it is only used to build relevance cursors.
-	Distance float64 `db:"distance" json:"-"`
+	Distance sql.NullFloat64 `db:"distance" json:"-"`
 }
 
 func (sip *Sip) IsZero() bool {
@@ -53,17 +60,38 @@ func (sip *Sip) MaterializeDigest() (map[string]any, error) {
 // Source describes a content publisher tracked in the database.
 // Optional metadata is represented with pointers; missing optional metadata is not an error.
 type Source struct {
-	ID          uuid.UUID `db:"id" json:"id" swaggertype:"string" format:"uuid" example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
-	BaseURL     string    `db:"base_url" json:"base_url" example:"https://example.com"`
-	DomainName  *string   `db:"domain_name" json:"domain,omitempty" example:"example.com"`
-	SiteName    *string   `db:"site_name" json:"name,omitempty" example:"Example News"`
-	Description *string   `db:"description" json:"description,omitempty" example:"Independent business and policy coverage."`
-	Favicon     *string   `db:"favicon" json:"favicon_url,omitempty" example:"https://example.com/favicon.ico"`
-	RSSFeed     *string   `db:"rss_feed" json:"rss_feed_url,omitempty" example:"https://example.com/rss"`
+	ID          uuid.UUID      `db:"id" json:"id,omitzero" swaggertype:"string" format:"uuid" example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
+	BaseURL     string         `db:"base_url" json:"base_url,omitempty" example:"https://example.com"`
+	DomainName  sql.NullString `db:"domain_name" json:"domain,omitempty" example:"example.com"`
+	SiteName    sql.NullString `db:"site_name" json:"name,omitempty" example:"Example News"`
+	Description sql.NullString `db:"description" json:"description,omitempty" example:"Independent business and policy coverage."`
+	Favicon     sql.NullString `db:"favicon" json:"favicon_url,omitempty" example:"https://example.com/favicon.ico"`
+	RSSFeed     sql.NullString `db:"rss_feed" json:"rss_feed_url,omitempty" example:"https://example.com/rss"`
 }
 
 func (source *Source) IsZero() bool {
 	return source.ID == uuid.Nil && source.BaseURL == ""
+}
+
+type ExtendedSip struct {
+	Sip
+	DomainName  sql.NullString `db:"domain_name" json:"domain,omitempty" example:"example.com"`
+	SiteName    sql.NullString `db:"site_name" json:"name,omitempty" example:"Example News"`
+	Description sql.NullString `db:"description" json:"description,omitempty" example:"Independent business and policy coverage."`
+	Favicon     sql.NullString `db:"favicon" json:"favicon_url,omitempty" example:"https://example.com/favicon.ico"`
+	RSSFeed     sql.NullString `db:"rss_feed" json:"rss_feed_url,omitempty" example:"https://example.com/rss"`
+}
+
+func (sip *ExtendedSip) GetSource() *Source {
+	return &Source{
+		ID:          sip.SourceID,
+		BaseURL:     sip.BaseURL.String,
+		DomainName:  sip.DomainName,
+		SiteName:    sip.SiteName,
+		Description: sip.Description,
+		Favicon:     sip.Favicon,
+		RSSFeed:     sip.RSSFeed,
+	}
 }
 
 // Relation links two sips by a named relationship (for example SAME_AS or DERIVED_FROM).
@@ -72,15 +100,6 @@ type Relation struct {
 	ToID         uuid.UUID `db:"to_id" json:"to_id" swaggertype:"string" format:"uuid" example:"9c3cc0a2-6eea-5290-9e9b-b5c462aeaa3a"`
 	Relationship string    `db:"relationship" json:"relationship" example:"SAME_AS" enums:"SAME_AS,DERIVED_FROM"`
 }
-
-// EventEvidence is the narrow storage projection used by the bare evidence route.
-// type EventEvidence struct {
-// 	ID       uuid.UUID  `db:"id" json:"id"`
-// 	Created  time.Time  `db:"created" json:"created"`
-// 	SourceID *uuid.UUID `db:"source" json:"source_id,omitempty"`
-// 	URL      *string    `db:"url" json:"url,omitempty"`
-// 	BaseURL  *string    `db:"base_url" json:"base_url,omitempty"`
-// }
 
 type RelationCounts struct {
 	SameAs      int64 `db:"same_as_count"`
@@ -94,26 +113,11 @@ type Page[T any] struct {
 	NextCursor *Cursor
 }
 
-// const (
-// 	SortRecent    string = "recent"
-// 	SortRelevance string = "relevance"
-// )
-
-// const (
-// 	SummaryCreatedDay string = "created_day"
-// 	SummaryEventType  string = "event_type"
-// 	SummaryImpact     string = "impact_level"
-// 	SummarySource     string = "source"
-// 	SummaryTag        string = "tag"
-// 	SummaryRegion     string = "region"
-// )
-
-// // EventSummaryRow is one aggregate bucket returned by SummarizeEvents.
-// type EventSummaryRow struct {
-// 	Key           string `db:"key" json:"key"`
-// 	EventCount    int64  `db:"event_count" json:"event_count"`
-// 	CoverageCount int64  `db:"coverage_count" json:"coverage_count"`
-// }
+// TagValue is one exact value exposed by a discovery route.
+type TagValue struct {
+	Value string `db:"value" json:"value"`
+	Type  string `db:"type" json:"type,omitempty" example:"region"`
+}
 
 type Filters struct {
 	IDs             []uuid.UUID
@@ -143,6 +147,7 @@ type Cursor struct {
 	Created  *time.Time `json:"c,omitempty"`
 	Distance *float64   `json:"d,omitempty"`
 	TextKey  *string    `json:"k,omitempty"`
+	EventTag *TagValue  `json:"et,omitempty"`
 }
 
 // PageRequest is the cursor-based page request. Callers (router) own limit defaults and caps.
@@ -183,7 +188,7 @@ func DecodeCursor(raw string) (*Cursor, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, ErrInvalidCursor
 	}
-	if c.Version != _CURSOR_VERSION || (c.ID == nil && c.TextKey == nil) {
+	if c.Version != _CURSOR_VERSION || (c.ID == nil && c.TextKey == nil && c.EventTag == nil) {
 		return nil, ErrInvalidCursor
 	}
 	return &c, nil

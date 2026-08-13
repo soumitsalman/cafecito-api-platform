@@ -20,14 +20,14 @@ type ResponseMeta struct {
 	AsOf time.Time `json:"as_of"`
 }
 
-// CollectionResponse is the canonical envelope for list endpoints.
+// PageResponse is the canonical envelope for list endpoints.
 type PageResponse[T any] struct {
 	Data       []T          `json:"data"`
 	Pagination Pagination   `json:"pagination"`
 	Meta       ResponseMeta `json:"meta"`
 }
 
-// DetailResponse is the canonical envelope for single-resource endpoints.
+// ItemResponse is the canonical envelope for single-resource endpoints.
 type ItemResponse[T any] struct {
 	Data T `json:"data"`
 }
@@ -42,10 +42,15 @@ func (e APIError) Error() string {
 	return fmt.Sprintf("Error Code=%s, Message=%s", e.Code, e.Message)
 }
 
+// ErrorResponse is the canonical envelope for error responses.
+type ErrorResponse struct {
+	Error APIError `json:"error"`
+}
+
 // DigestDocument preserves arbitrary upstream digest members without imposing a closed Event or Signal response schema.
 type DigestDocument map[string]any
 
-func NewDigestDocument(sip *db.Sip) DigestDocument {
+func NewDigestDocumentForSip(sip *db.Sip) DigestDocument {
 	fields, err := sip.MaterializeDigest()
 	if err != nil {
 		return nil
@@ -60,9 +65,15 @@ func NewDigestDocument(sip *db.Sip) DigestDocument {
 	return doc
 }
 
+func NewDigestDocumentForExtendedSip(sip *db.ExtendedSip) DigestDocument {
+	doc := NewDigestDocumentForSip(&sip.Sip)
+	doc["source"] = NewSourceDocument(sip.GetSource())
+	return doc
+}
+
 func NewDigestDocuments(sips []db.Sip) []DigestDocument {
 	return datautils.Transform(sips, func(sip *db.Sip) DigestDocument {
-		return NewDigestDocument(sip)
+		return NewDigestDocumentForSip(sip)
 	})
 }
 
@@ -106,9 +117,46 @@ func encodeNextCursor(c *db.Cursor) *string {
 THESE TYPES ARE USED PRIMARILY TO GENERATE THE OPENAPI SPEC
 ***********************************************************/
 
-// SourceDocument preserves arbitrary upstream source members without imposing
-// a closed Source response schema.
-type SourceDocument map[string]any
+// SourceDocument is the stable public Source response shape. Optional source
+// metadata is represented explicitly as null when it is unavailable.
+type SourceDocument struct {
+	ID          uuid.UUID `json:"id,omitzero" swaggertype:"string" format:"uuid"`
+	Domain      string    `json:"domain,omitempty"`
+	Name        string    `json:"name,omitempty"`
+	URL         string    `json:"url,omitempty"`
+	Description string    `json:"description,omitempty"`
+	FaviconURL  string    `json:"favicon_url,omitempty"`
+	RSSFeedURL  string    `json:"rss_feed_url,omitempty"`
+}
+
+func NewSourceDocument(source *db.Source) *SourceDocument {
+	doc := &SourceDocument{
+		ID:  source.ID,
+		URL: source.BaseURL,
+	}
+	if source.DomainName.Valid {
+		doc.Domain = source.DomainName.String
+	}
+	if source.SiteName.Valid {
+		doc.Name = source.SiteName.String
+	}
+	if source.Description.Valid {
+		doc.Description = source.Description.String
+	}
+	if source.Favicon.Valid {
+		doc.FaviconURL = source.Favicon.String
+	}
+	if source.RSSFeed.Valid {
+		doc.RSSFeedURL = source.RSSFeed.String
+	}
+	return doc
+}
+
+func NewSourceDocuments(sources []db.Source) []SourceDocument {
+	return datautils.Transform(sources, func(source *db.Source) SourceDocument {
+		return *NewSourceDocument(source)
+	})
+}
 
 type Links struct {
 	Evidence string `json:"evidence,omitempty"`
@@ -148,12 +196,14 @@ func NewEventEvidence(sip *db.Sip) EventEvidence {
 // and detail response needs a concrete wrapper. The runtime still uses the generic
 // CollectionResponse[T] and DetailResponse[T] helpers; these are schema-only.
 type SipCollectionResponse struct {
+	Success    bool             `json:"success"`
 	Data       []DigestDocument `json:"data"`
 	Pagination Pagination       `json:"pagination"`
 	Meta       ResponseMeta     `json:"meta"`
 }
 
 type SourceCollectionResponse struct {
+	Success    bool             `json:"success"`
 	Data       []SourceDocument `json:"data"`
 	Pagination Pagination       `json:"pagination"`
 	Meta       ResponseMeta     `json:"meta"`
@@ -163,4 +213,16 @@ type StringCollectionResponse struct {
 	Data       []string     `json:"data"`
 	Pagination Pagination   `json:"pagination"`
 	Meta       ResponseMeta `json:"meta"`
+}
+
+type TagValueCollectionResponse struct {
+	Data       []db.TagValue `json:"data"`
+	Pagination Pagination    `json:"pagination"`
+	Meta       ResponseMeta  `json:"meta"`
+}
+
+type EventEvidenceCollectionResponse struct {
+	Data       []EventEvidence `json:"data"`
+	Pagination Pagination      `json:"pagination"`
+	Meta       ResponseMeta    `json:"meta"`
 }

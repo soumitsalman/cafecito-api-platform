@@ -34,7 +34,7 @@ const (
 	MIN_WINDOW       = 1
 	DEFAULT_WINDOW   = 7 // DAYS
 	DEFAULT_ACCURACY = 0.5
-	DEFAULT_LIMIT    = 16
+	DEFAULT_LIMIT    = 20
 	MAX_LIMIT        = 128
 )
 
@@ -156,7 +156,6 @@ func (params *SignalEventsParams) createFilters(c *gin.Context, config *Configur
 	return filters, nil
 }
 
-// createSipKinds maps the `resource` CSV to stored SipKinds. action is intentionally ignored (action-gated).
 func createSipKinds(resources []string) []string {
 	var kinds []string
 	for _, res := range resources {
@@ -165,8 +164,6 @@ func createSipKinds(resources []string) []string {
 			kinds = append(kinds, db.SIP_KIND_EVENT)
 		case "signal":
 			kinds = append(kinds, db.SIP_KIND_SIGNAL)
-		case "action":
-			kinds = append(kinds, db.SIP_KIND_ACTION)
 		}
 	}
 	return kinds
@@ -216,7 +213,6 @@ func writeItem[T any](c *gin.Context, item T, response_type string) {
 // writeError writes an APIError to the response.
 // Uses InternalServerError for DB, Embedding, Encoding errors and default cases
 func writeError(c *gin.Context, err error) {
-	// NOTE:
 	status := http.StatusInternalServerError
 	if api_err, ok := err.(APIError); ok {
 		switch api_err.Code {
@@ -225,8 +221,10 @@ func writeError(c *gin.Context, err error) {
 		case API_ERROR_NOT_FOUND:
 			status = http.StatusNotFound
 		}
+		c.AbortWithStatusJSON(status, ErrorResponse{Error: api_err})
+	} else {
+		c.AbortWithStatusJSON(status, ErrorResponse{Error: APIError{Message: API_ERROR_MSG_OUR_BAD}})
 	}
-	c.AbortWithStatusJSON(status, err)
 }
 
 // health godoc
@@ -267,10 +265,10 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param regions query []string false "Match digest.regions array (CSV)." collectionFormat(csv)
 // @Param source_ids query []string false "Match the persisted source UUID, including direct SAME_AS evidence coverage (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
+// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
-// @Success 200 {object} EventCollectionResponse "Event-family records when response_type=json; plain-text event blocks when response_type=text"
+// @Success 200 {object} SipCollectionResponse "Event-family records when response_type=json; plain-text event blocks when response_type=text"
 // @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
 // @Failure 401 {object} APIError "Missing or invalid API key"
 // @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
@@ -294,8 +292,9 @@ func (r *Configuration) getEvents(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	filters.Kind = db.SIP_KIND_EVENT
 
-	page_out, err := r.DB.QueryEvents(c.Request.Context(), *filters, *page_req)
+	page_out, err := r.DB.QuerySips(c.Request.Context(), *filters, *page_req)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -311,7 +310,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 // @Produce plain
 // @Param event_id path string true "Event-family record UUID (RFC 4122)." format(uuid)
 // @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
-// @Success 200 {object} EventDetailResponse "The Event-family record"
+// @Success 200 {object} SipItemResponse "The Event-family record"
 // @Failure 400 {object} APIError "Malformed UUID"
 // @Failure 404 {object} APIError "No Event-family record with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -326,7 +325,7 @@ func (r *Configuration) getEvent(c *gin.Context) {
 		return
 	}
 
-	event, err := r.DB.GetEvent(c.Request.Context(), params.ID)
+	event, err := r.DB.GetSip(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -340,7 +339,7 @@ func (r *Configuration) getEvent(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writeItem(c, NewDigestDocument(&event).addEventDetails(counts), params.ResponseType)
+	writeItem(c, NewDigestDocumentForExtendedSip(&event).addEventDetails(counts), params.ResponseType)
 }
 
 // getEventEvidence godoc
@@ -354,7 +353,7 @@ func (r *Configuration) getEvent(c *gin.Context) {
 // @Param from query string false "Inclusive evidence created_at lower bound (RFC3339 timestamp)." format(date-time)
 // @Param to query string false "Inclusive evidence created_at upper bound (RFC3339 timestamp)." format(date-time)
 // @Param response_type query string false "Output format. json returns the bare evidence list; text returns the same records as compact plain text." Enums(json, text) default(json)
-// @Success 200 {array} EventEvidenceItem "Bare Event evidence list"
+// @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection"
 // @Failure 400 {object} APIError "Malformed UUID or invalid parameters"
 // @Failure 404 {object} APIError "No Event-family record with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -379,8 +378,9 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	filters.Kind = db.SIP_KIND_EVENT
 
-	exists, err := r.DB.EventExists(c.Request.Context(), params.ID)
+	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -389,7 +389,7 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
 		return
 	}
-	page_out, err := r.DB.QueryEventEvidence(c.Request.Context(), params.ID, *filters, *page_req)
+	page_out, err := r.DB.QuerySameSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -415,7 +415,7 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 // @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} PageResponse[SignalDocument] "Signals derived from this Event"
+// @Success 200 {object} SipCollectionResponse "Signals derived from this Event"
 // @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
 // @Failure 404 {object} APIError "No Event-family record with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -440,8 +440,9 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	filters.Kind = db.SIP_KIND_SIGNAL
 
-	exists, err := r.DB.EventExists(c.Request.Context(), params.ID)
+	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -450,7 +451,7 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
 		return
 	}
-	page_out, err := r.DB.QueryDerivedSignals(c.Request.Context(), params.ID, *filters, *page_req)
+	page_out, err := r.DB.QueryDerivedSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -480,7 +481,7 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} PageResponse[SignalDocument] "Signal records"
+// @Success 200 {object} SipCollectionResponse "Signal records"
 // @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
 // @Failure 401 {object} APIError "Missing or invalid API key"
 // @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
@@ -504,8 +505,9 @@ func (r *Configuration) getSignals(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	filters.Kind = db.SIP_KIND_SIGNAL
 
-	page_out, err := r.DB.QuerySignals(c.Request.Context(), *filters, *page_req)
+	page_out, err := r.DB.QuerySips(c.Request.Context(), *filters, *page_req)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -520,7 +522,7 @@ func (r *Configuration) getSignals(c *gin.Context) {
 // @Produce plain
 // @Param signal_id path string true "Signal record UUID (RFC 4122)." format(uuid)
 // @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
-// @Success 200 {object} ItemResponse[SignalDocument] "The Signal record"
+// @Success 200 {object} SipItemResponse "The Signal record"
 // @Failure 400 {object} APIError "Malformed UUID"
 // @Failure 404 {object} APIError "No Signal with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -535,7 +537,7 @@ func (r *Configuration) getSignal(c *gin.Context) {
 		return
 	}
 
-	signal, err := r.DB.GetSignal(c.Request.Context(), params.ID)
+	signal, err := r.DB.GetSip(c.Request.Context(), params.ID, db.SIP_KIND_SIGNAL)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -549,7 +551,7 @@ func (r *Configuration) getSignal(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writeItem(c, NewDigestDocument(&signal).addSignalDetails(counts), params.ResponseType)
+	writeItem(c, NewDigestDocumentForExtendedSip(&signal).addSignalDetails(counts), params.ResponseType)
 }
 
 // getSignalEvents godoc
@@ -567,7 +569,7 @@ func (r *Configuration) getSignal(c *gin.Context) {
 // @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} PageResponse[EventDocument] "Event-family records supporting this Signal"
+// @Success 200 {object} SipCollectionResponse "Event-family records supporting this Signal"
 // @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
 // @Failure 404 {object} APIError "No Signal with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -592,8 +594,9 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	filters.Kind = db.SIP_KIND_EVENT
 
-	exists, err := r.DB.SignalExists(c.Request.Context(), params.ID)
+	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_SIGNAL)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -602,7 +605,7 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SIGNAL_NOT_FOUND})
 		return
 	}
-	page_out, err := r.DB.QuerySupportingEvents(c.Request.Context(), params.ID, *filters, *page_req)
+	page_out, err := r.DB.QuerySupportingSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
@@ -611,14 +614,15 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 }
 
 // @Summary List intelligence sources
-// @Description Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs. JSON only initially.
+// @Description Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs.
 // @Tags Sources
 // @Produce json
-// @Param q query string false "Case-insensitive match against site name, domain, or base URL."
+// @Param q query string false "Case-insensitive match against domain, site name, or base URL."
 // @Param domains query []string false "Exact domain-name filter (CSV)." collectionFormat(csv)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} PageResponse[SourceDocument] "Source records"
+// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} SourceCollectionResponse "Source records"
 // @Failure 400 {object} APIError "Invalid limit, cursor, or parameters"
 // @Failure 401 {object} APIError "Missing or invalid API key"
 // @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
@@ -642,7 +646,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
-	writePage(c, page_out.Items, page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getSource godoc
@@ -651,7 +655,8 @@ func (r *Configuration) getSources(c *gin.Context) {
 // @Tags Sources
 // @Produce json
 // @Param source_id path string true "Source record UUID (RFC 4122)." format(uuid)
-// @Success 200 {object} ItemResponse[SourceDocument] "The source record"
+// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} SourceItemResponse "The source record"
 // @Failure 400 {object} APIError "Malformed UUID"
 // @Failure 404 {object} APIError "No source with this UUID"
 // @Failure 401 {object} APIError "Missing or invalid API key"
@@ -675,25 +680,25 @@ func (r *Configuration) getSource(c *gin.Context) {
 		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SOURCE_NOT_FOUND})
 		return
 	}
-	writeItem(c, source, item.ResponseType)
+	writeItem(c, NewSourceDocument(&source), item.ResponseType)
 }
 
 // getTags godoc
 // @Summary Discover tag filters for Espresso intelligence
-// @Description Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag strings extracted from event and signal records.
+// @Description Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag value objects extracted from Event and Signal records.
 // @Description **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
 // @Description **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).
-// @Description **Response formats**: `response_type=json` returns the collection envelope with a `data` string array. `response_type=text` returns one comma-separated plain-text string for lower-token MCP context.
+// @Description **Response formats**: `response_type` accepts json, yaml, or toon. JSON returns a collection of `{ "value": "tag" }` objects.
 // @Description **Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.
 // @Tags Tags
 // @Produce json
 // @Produce plain
 // @Param q query string false "Case-insensitive substring or prefix match."
-// @Param resource query []string false "Optional kind scope (CSV): event, signal, evidence. action remains gated." collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns comma-separated tags." Enums(json, text) default(json)
+// @Param resource query []string false "Optional kind scope (CSV): event, signal." collectionFormat(csv)
+// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, text) default(json)
 // @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
 // @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
-// @Success 200 {object} CollectionResponse[string] "Tag strings when response_type=json; comma-separated tags when response_type=text"
+// @Success 200 {object} DiscoveryValueCollectionResponse "Tag value objects"
 // @Failure 400 {object} APIError "Invalid limit, cursor, or response_type"
 // @Failure 401 {object} APIError "Missing or invalid API key"
 // @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
@@ -712,13 +717,124 @@ func (r *Configuration) getTags(c *gin.Context) {
 		return
 	}
 
-	page_out, err := r.DB.QueryTags(c.Request.Context(), params.Q, createSipKinds(params.Resource), *page)
+	kinds := createSipKinds(params.Resource)
+	if len(kinds) == 0 {
+		kinds = []string{db.SIP_KIND_EVENT, db.SIP_KIND_SIGNAL}
+	}
+	page_out, err := r.DB.QueryTags(c.Request.Context(), params.Q, kinds, *page)
 	if err != nil {
 		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
 		return
 	}
 	next := encodeNextCursor(page_out.NextCursor)
-	writePage(c, page_out.Items, page.Limit, next, params.ResponseType)
+	items := datautils.Transform(page_out.Items, func(tag *string) db.TagValue {
+		return db.TagValue{Value: *tag}
+	})
+	writePage(c, items, page.Limit, next, params.ResponseType)
+}
+
+// getEntities godoc
+// @Summary Discover Event entities
+// @Description Returns distinct exact company and person strings stored in Event digests.
+// @Tags Discovery
+// @Produce json
+// @Param q query string false "Case-insensitive substring filter."
+// @Param types query []string false "Entity types: company, person." collectionFormat(csv)
+// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor."
+// @Success 200 {object} DiscoveryValueCollectionResponse
+// @Failure 400 {object} APIError
+// @Failure 500 {object} APIError
+// @ID listIntelligenceEntities
+// @Router /entities [get]
+func (r *Configuration) getEntities(c *gin.Context) {
+	var params EntitiesParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	types := params.Types
+	if len(types) == 0 {
+		types = []string{db.EVENT_TAG_TYPE_COMPANY, db.EVENT_TAG_TYPE_PEOPLE}
+	}
+	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, types, *page)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getRegions godoc
+// @Summary Discover Event regions
+// @Description Returns distinct exact region strings stored in Event digests.
+// @Tags Discovery
+// @Produce json
+// @Param q query string false "Case-insensitive substring filter."
+// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor."
+// @Success 200 {object} DiscoveryValueCollectionResponse
+// @Failure 400 {object} APIError
+// @Failure 500 {object} APIError
+// @ID listIntelligenceRegions
+// @Router /regions [get]
+func (r *Configuration) getRegions(c *gin.Context) {
+	var params DiscoveryParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, []string{db.EVENT_TAG_TYPE_REGION}, *page)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+}
+
+// getEventTypes godoc
+// @Summary Discover Event types
+// @Description Returns distinct exact event_type values stored in Event digests.
+// @Tags Discovery
+// @Produce json
+// @Param q query string false "Case-insensitive substring filter."
+// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
+// @Param cursor query string false "Opaque pagination cursor."
+// @Success 200 {object} DiscoveryValueCollectionResponse
+// @Failure 400 {object} APIError
+// @Failure 500 {object} APIError
+// @ID listIntelligenceEventTypes
+// @Router /event-types [get]
+func (r *Configuration) getEventTypes(c *gin.Context) {
+	var params DiscoveryParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, []string{db.EVENT_TAG_TYPE_EVENT_TYPE}, *page)
+	if err != nil {
+		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		return
+	}
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
@@ -751,7 +867,11 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 	protected := router.Group("/")
 	protected.Use(config.apiKeyMiddleware)
 	protected.GET("/tags", config.getTags)
+	protected.GET("/entities", config.getEntities)
+	protected.GET("/regions", config.getRegions)
+	protected.GET("/event-types", config.getEventTypes)
 	protected.GET("/events", config.getEvents)
+	protected.GET("/events/search", config.getEvents)
 	protected.GET("/events/:id", config.getEvent)
 	protected.GET("/events/:id/signals", config.getEventSignals)
 	protected.GET("/events/:id/evidence", config.getEventEvidence)
