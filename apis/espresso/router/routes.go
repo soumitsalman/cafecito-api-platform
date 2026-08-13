@@ -80,13 +80,17 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = p.To
-	filters.ImpactedDomains = p.ImpactedDomains
 	filters.Tags = p.Tags
-	filters.ImpactLevels = p.ImpactLevels
+	if len(filters.Tags) == 0 && len(p.Entities) > 0 {
+		filters.Tags = p.Entities
+	}
+	filters.Categories = p.Categories
 	filters.Companies = p.Companies
 	filters.People = p.People
 	filters.Products = p.Products
 	filters.Regions = p.Regions
+	filters.ImpactedDomains = p.ImpactedDomains
+	filters.ImpactLevels = p.ImpactLevels
 	return nil
 }
 
@@ -290,19 +294,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	r.shared_queryEvents(c, params)
-}
 
-func (r *Configuration) searchEvents(c *gin.Context) {
-	var params EventSearchParams
-	if err := c.ShouldBindJSON(&params); err != nil {
-		writeError(c, err)
-		return
-	}
-	r.shared_queryEvents(c, params)
-}
-
-func (r *Configuration) shared_queryEvents(c *gin.Context, params EventSearchParams) {
 	page_req, err := params.createPageRequest(c, r)
 	if err != nil {
 		writeError(c, err)
@@ -875,7 +867,7 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 		gin.Recovery(),
 		cors.New(cors.Config{
 			AllowAllOrigins:  true,
-			AllowMethods:     []string{"GET", "OPTIONS", "POST"},
+			AllowMethods:     []string{"GET", "OPTIONS"},
 			AllowHeaders:     []string{"*"},
 			AllowCredentials: false,
 			MaxAge:           24 * time.Hour,
@@ -892,7 +884,6 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 	protected.GET("/regions", config.getRegions)
 	protected.GET("/event-types", config.getEventTypes)
 	protected.GET("/events", config.getEvents)
-	protected.POST("/events/search", config.searchEvents)
 	protected.GET("/events/:id", config.getEvent)
 	protected.GET("/events/:id/signals", config.getEventSignals)
 	protected.GET("/events/:id/evidence", config.getEventEvidence)

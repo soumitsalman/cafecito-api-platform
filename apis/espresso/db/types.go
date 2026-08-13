@@ -62,7 +62,7 @@ func (sip *Sip) MaterializeDigest() (map[string]any, error) {
 type Source struct {
 	ID          uuid.UUID      `db:"id" json:"id,omitzero" swaggertype:"string" format:"uuid" example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
 	BaseURL     string         `db:"base_url" json:"base_url,omitempty" example:"https://example.com"`
-	DomainName  sql.NullString `db:"domain_name" json:"domain,omitempty" example:"example.com"`
+	DomainName  string         `db:"domain_name" json:"domain,omitempty" example:"example.com"`
 	SiteName    sql.NullString `db:"site_name" json:"name,omitempty" example:"Example News"`
 	Description sql.NullString `db:"description" json:"description,omitempty" example:"Independent business and policy coverage."`
 	Favicon     sql.NullString `db:"favicon" json:"favicon_url,omitempty" example:"https://example.com/favicon.ico"`
@@ -86,7 +86,7 @@ func (sip *ExtendedSip) GetSource() *Source {
 	return &Source{
 		ID:          sip.SourceID,
 		BaseURL:     sip.BaseURL.String,
-		DomainName:  sip.DomainName,
+		DomainName:  sip.DomainName.String,
 		SiteName:    sip.SiteName,
 		Description: sip.Description,
 		Favicon:     sip.Favicon,
@@ -126,6 +126,7 @@ type Filters struct {
 	CreatedFrom     time.Time
 	CreatedTo       time.Time
 	Tags            []string
+	Categories      []string
 	Companies       []string
 	People          []string
 	Products        []string

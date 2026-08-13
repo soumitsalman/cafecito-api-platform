@@ -229,7 +229,7 @@ Gateway paths add /espresso. Backend routes omit that prefix.
 | R08 | GET /sources | Searches Source records. | Industry route/pattern: Perigon Sources. | Current-data + Query-change |
 | R09 | GET /sources/{source_id} | Retrieves one Source. | Espresso extension over industry Source discovery. | Current-data + Query-change |
 | R11 | GET /tags | Discovers stored tag values. | Espresso extension; comparable APIs expose filter values differently. | Current-data + Query-change |
-| R12 | GET /entities | Discovers company and person strings in Event digests. | Industry pattern adapted from GDELT Entities and PredictHQ entity filtering. | Current-data + Query-change |
+| R12 | GET /entities | Discovers company and people strings in Event digests. | Industry pattern adapted from GDELT Entities and PredictHQ entity filtering. | Current-data + Query-change |
 | R13 | GET /regions | Discovers region strings in Event digests. | Industry pattern adapted from GDELT geography discovery and PredictHQ Places. | Current-data + Query-change |
 | R14 | GET /event-types | Discovers Event event_type values. | Industry pattern adapted from category/filter discovery. | Current-data + Query-change |
 | R16 | GET /events/count | Returns Event count distributions. | Industry route: PredictHQ Event Counts. | Current-data + Query-change |
@@ -383,7 +383,7 @@ All discovery routes accept q, limit, cursor, and response_type.
 | Route | Extra parameter | Item payload |
 |---|---|---|
 | GET /tags | resource=event,signal | {"value":"tag"} |
-| GET /entities | types=company,person | {"value":"name","type":"company"} |
+| GET /entities | types=company,people | {"value":"name","type":"company"} |
 | GET /regions | none | {"value":"region", "type": "region"} |
 | GET /event-types | none | {"value":"stock_decline", "type": "event_type"} |
 
@@ -497,6 +497,16 @@ Those comparisons must use ->> followed by = ANY(...).
 | Serialization docs | Older docs advertise text | Document json/yaml/toon only. |
 | Auth config | Runtime reads API_KEY; platform docs use API_KEYS | Correct runtime configuration. |
 | Additional routes | Discovery, count/summary, and Event JSON vector search are absent. | Implement the published additional routes after query-plan and response tests. |
+
+## V1 Scope
+
+- sort and RFC 3339 date-time values for query from/to are expected and acceptable V1 deferrals. Both will be added later.
+- Relation-collection q is an accepted V1 deferral.
+- Event and Signal collections omit url, base_url, source_id, and source. This is an accepted V1 payload gap; details expose them when usable.
+- Routes `/actions/*` , `/events/search`, `/events/summary`, `/events/count` are out of scope for V1
+- The scalar JSONB ?| predicates for event_type and impact_level are valid. They are not a gap and must not be replaced with ->> = ANY.
+
+These will be addressed in future extensions
 
 ## 7. Future gaps
 

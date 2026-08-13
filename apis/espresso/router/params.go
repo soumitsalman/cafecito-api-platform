@@ -43,13 +43,15 @@ type vectorSearchParams struct {
 type sipQueryParams struct {
 	From            time.Time `form:"from" time_format:"2006-01-02"`
 	To              time.Time `form:"to" time_format:"2006-01-02"`
-	ImpactedDomains []string  `form:"impacted_domains" collection_format:"csv" binding:"max=128"`
-	ImpactLevels    []string  `form:"impact_levels" collection_format:"csv" binding:"max=128"`
 	Tags            []string  `form:"tags" collection_format:"csv" binding:"max=128"`
+	Entities        []string  `form:"entities" collection_format:"csv" binding:"max=128,dive,oneof=company people product"`
+	Categories      []string  `form:"categories" collection_format:"csv" binding:"max=128"`
 	Companies       []string  `form:"companies" collection_format:"csv" binding:"max=128"`
 	People          []string  `form:"people" collection_format:"csv" binding:"max=128"`
 	Products        []string  `form:"products" collection_format:"csv" binding:"max=128"`
 	Regions         []string  `form:"regions" collection_format:"csv" binding:"max=128"`
+	ImpactedDomains []string  `form:"impacted_domains" collection_format:"csv" binding:"max=128"`
+	ImpactLevels    []string  `form:"impact_levels" collection_format:"csv" binding:"max=128"`
 }
 
 // eventSearchParams holds filter and search parameters for GET /events.

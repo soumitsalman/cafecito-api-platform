@@ -80,6 +80,10 @@ func whereTagsFts(where *[]string, params pgx.NamedArgs, tags []string, prefix s
 }
 
 func whereDigest(where *[]string, params pgx.NamedArgs, filters *Filters, prefix string) {
+	if len(filters.Categories) > 0 {
+		*where = append(*where, prefix+"digest->'categories' ?| @categories")
+		params["categories"] = filters.Categories
+	}
 	if len(filters.Companies) > 0 {
 		*where = append(*where, prefix+"digest->'companies' ?| @companies")
 		params["companies"] = filters.Companies
@@ -261,6 +265,9 @@ func (p *Cupboard) QuerySameSips(ctx context.Context, id uuid.UUID, filters Filt
 	LIMIT @limit`
 
 	where, params := buildWhere(&filters, "")
+	if len(where) > 0 {
+		where = []string{"(id = @id OR (" + strings.Join(where, " AND ") + "))"}
+	}
 	if page.Cursor != nil {
 		where = append(where, "((created, id) < (@cursor_created, @cursor_id))")
 		params["cursor_created"] = page.Cursor.Created

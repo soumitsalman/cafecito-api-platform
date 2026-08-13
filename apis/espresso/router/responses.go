@@ -72,16 +72,23 @@ func NewDigestDocumentForSip(sip *db.Sip) DigestDocument {
 
 func NewDigestDocumentForExtendedSip(sip *db.ExtendedSip) DigestDocument {
 	doc := NewDigestDocumentForSip(&sip.Sip)
-	if sip.URL.Valid {
-		doc["url"] = sip.URL.String
+	doc["url"] = nil
+	doc["base_url"] = nil
+	doc["source_id"] = nil
+
+	// override default values for non-signals
+	if sip.Kind != db.SIP_KIND_SIGNAL {
+		if sip.URL.Valid {
+			doc["url"] = sip.URL.String
+		}
+		if sip.BaseURL.Valid {
+			doc["base_url"] = sip.BaseURL.String
+		}
+		if sip.SourceID != uuid.Nil {
+			doc["source_id"] = sip.SourceID
+			doc["source"] = NewSourceDocument(sip.GetSource())
+		}
 	}
-	if sip.BaseURL.Valid {
-		doc["base_url"] = sip.BaseURL.String
-	}
-	if sip.SourceID != uuid.Nil {
-		doc["source_id"] = sip.SourceID
-	}
-	doc["source"] = NewSourceDocument(sip.GetSource())
 	return doc
 }
 
@@ -98,9 +105,9 @@ func (digest DigestDocument) addEventDetails(counts db.RelationCounts) DigestDoc
 		// Action:   fmt.Sprintf("/events/%s/actions", digest["id"]), // TODO: add actions link
 	}
 	digest["counts"] = Counts{
-		Evidence: counts.SameAs,
-		Signals:  counts.DerivedTo,
-		Actions:  counts.DerivedFrom,
+		Evidence: &counts.SameAs,
+		Signals:  &counts.DerivedTo,
+		Actions:  &counts.DerivedFrom,
 	}
 	return digest
 }
@@ -110,7 +117,7 @@ func (digest DigestDocument) addSignalDetails(counts db.RelationCounts) DigestDo
 		Events: fmt.Sprintf("/signals/%s/events", digest["id"]),
 	}
 	digest["counts"] = Counts{
-		Events: counts.DerivedFrom,
+		Events: &counts.DerivedFrom,
 	}
 	return digest
 }
@@ -134,34 +141,32 @@ THESE TYPES ARE USED PRIMARILY TO GENERATE THE OPENAPI SPEC
 // SourceDocument is the stable public Source response shape. Optional source
 // metadata is represented explicitly as null when it is unavailable.
 type SourceDocument struct {
-	ID          uuid.UUID `json:"id,omitzero" swaggertype:"string" format:"uuid"`
-	Domain      string    `json:"domain"`
-	Name        string    `json:"name"`
-	URL         string    `json:"url"`
-	Description string    `json:"description,omitempty"`
-	FaviconURL  string    `json:"favicon_url,omitempty"`
-	RSSFeedURL  string    `json:"rss_feed_url,omitempty"`
+	ID          uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
+	BaseURL     string    `json:"url"`
+	DomainName  string    `json:"domain"`
+	SiteName    *string   `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	Favicon     *string   `json:"favicon_url,omitempty"`
+	RSSFeed     *string   `json:"rss_feed_url,omitempty"`
 }
 
 func NewSourceDocument(source *db.Source) *SourceDocument {
 	doc := &SourceDocument{
-		ID:  source.ID,
-		URL: source.BaseURL,
-	}
-	if source.DomainName.Valid {
-		doc.Domain = source.DomainName.String
+		ID:         source.ID,
+		BaseURL:    source.BaseURL,
+		DomainName: source.DomainName,
 	}
 	if source.SiteName.Valid {
-		doc.Name = source.SiteName.String
+		doc.SiteName = &source.SiteName.String
 	}
 	if source.Description.Valid {
-		doc.Description = source.Description.String
+		doc.Description = &source.Description.String
 	}
 	if source.Favicon.Valid {
-		doc.FaviconURL = source.Favicon.String
+		doc.Favicon = &source.Favicon.String
 	}
 	if source.RSSFeed.Valid {
-		doc.RSSFeedURL = source.RSSFeed.String
+		doc.RSSFeed = &source.RSSFeed.String
 	}
 	return doc
 }
@@ -180,33 +185,38 @@ type Links struct {
 }
 
 type Counts struct {
-	Evidence int64 `json:"evidence,omitzero"`
-	Actions  int64 `json:"actions,omitzero"`
-	Events   int64 `json:"events,omitzero"`
-	Signals  int64 `json:"signals,omitzero"`
+	Evidence *int64 `json:"evidence,omitempty"`
+	Actions  *int64 `json:"actions,omitempty"`
+	Events   *int64 `json:"events,omitempty"`
+	Signals  *int64 `json:"signals,omitempty"`
 }
 
 // SipEvidenceItem is the explicit bare-list response item for R03.
 type EventEvidence struct {
-	ID       uuid.UUID `json:"id"`
-	Kind     string    `json:"kind"`
-	Created  time.Time `json:"created_at"`
-	Tags     []string  `json:"tags"`
-	SourceID uuid.UUID `json:"source_id"`
-	URL      string    `json:"url"`
-	BaseURL  string    `json:"base_url"`
+	ID       uuid.UUID  `json:"id"`
+	Kind     string     `json:"kind"`
+	Created  time.Time  `json:"created_at"`
+	Tags     []string   `json:"tags"`
+	SourceID *uuid.UUID `json:"source_id"`
+	URL      string     `json:"url"`
+	BaseURL  string     `json:"base_url"`
 }
 
 func NewEventEvidence(sip *db.Sip) EventEvidence {
-	return EventEvidence{
-		ID:       sip.ID,
-		Kind:     sip.Kind,
-		Created:  sip.Created,
-		Tags:     sip.Tags,
-		SourceID: sip.SourceID,
-		URL:      sip.URL.String,
-		BaseURL:  sip.BaseURL.String,
+	doc := EventEvidence{
+		ID:      sip.ID,
+		Kind:    sip.Kind,
+		Created: sip.Created,
+		Tags:    sip.Tags,
+		URL:     sip.URL.String,
+		BaseURL: sip.BaseURL.String,
 	}
+	if sip.SourceID != uuid.Nil {
+		doc.SourceID = &sip.SourceID
+	} else {
+		doc.SourceID = nil
+	}
+	return doc
 }
 
 // The concrete envelope types below exist so swag can generate named schemas for the
