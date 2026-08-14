@@ -69,7 +69,6 @@ require (
 )
 
 require (
-	github.com/alpkeskin/gotoon v0.1.1
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
@@ -80,9 +79,11 @@ require (
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/rs/zerolog v1.34.0
 	github.com/soumitsalman/data-utils v0.0.0-20240411181743-1067a6fce2ca
+	github.com/stoewer/go-strcase v1.3.1
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.4
+	github.com/toon-format/toon-go v0.0.0-20251202084852-7ca0e27c4e8c
 	google.golang.org/grpc v1.79.2
 )

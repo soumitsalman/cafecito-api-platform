@@ -11,26 +11,27 @@ import (
 
 // Pagination is the pagination block returned by every collection response.
 type Pagination struct {
-	Limit      int     `json:"limit"`
-	Cursor     *string `json:"cursor"`
-	NextCursor *string `json:"next_cursor"`
+	Limit      int     `json:"limit" toon:"limit" binding:"required"`
+	NumResults int     `json:"num_results" toon:"num_results" binding:"required"`
+	Cursor     *string `json:"page" toon:"page" binding:"required"`
+	NextCursor *string `json:"next_page" toon:"next_page" binding:"required"`
 }
 
 // ResponseMeta carries freshness metadata for a collection response.
 type ResponseMeta struct {
-	AsOf time.Time `json:"as_of"`
+	AsOf time.Time `json:"as_of" toon:"as_of" binding:"required"`
 }
 
 // PageResponse is the canonical envelope for list endpoints.
 type PageResponse[T any] struct {
-	Data       []T          `json:"data"`
-	Pagination Pagination   `json:"pagination"`
-	Meta       ResponseMeta `json:"meta"`
+	Data       []T          `json:"data" toon:"data"`
+	Pagination Pagination   `json:"pagination" toon:"pagination"`
+	Meta       ResponseMeta `json:"meta" toon:"meta"`
 }
 
 // ItemResponse is the canonical envelope for single-resource endpoints.
 type ItemResponse[T any] struct {
-	Data T `json:"data"`
+	Data T `json:"data" toon:"data"`
 }
 
 // APIError is the stable public error shape.
@@ -102,12 +103,10 @@ func (digest DigestDocument) addEventDetails(counts db.RelationCounts) DigestDoc
 	digest["links"] = Links{
 		Evidence: fmt.Sprintf("/events/%s/evidence", digest["id"]),
 		Signals:  fmt.Sprintf("/events/%s/signals", digest["id"]),
-		// Action:   fmt.Sprintf("/events/%s/actions", digest["id"]), // TODO: add actions link
 	}
 	digest["counts"] = Counts{
 		Evidence: &counts.SameAs,
 		Signals:  &counts.DerivedTo,
-		Actions:  &counts.DerivedFrom,
 	}
 	return digest
 }
@@ -141,13 +140,13 @@ THESE TYPES ARE USED PRIMARILY TO GENERATE THE OPENAPI SPEC
 // SourceDocument is the stable public Source response shape. Optional source
 // metadata is represented explicitly as null when it is unavailable.
 type SourceDocument struct {
-	ID          uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
-	BaseURL     string    `json:"url"`
-	DomainName  string    `json:"domain"`
-	SiteName    *string   `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	Favicon     *string   `json:"favicon_url,omitempty"`
-	RSSFeed     *string   `json:"rss_feed_url,omitempty"`
+	ID          uuid.UUID `json:"id" toon:"id" swaggertype:"string" format:"uuid"`
+	BaseURL     string    `json:"url" toon:"url"`
+	DomainName  string    `json:"domain" toon:"domain"`
+	SiteName    *string   `json:"name" toon:"name"`
+	Description *string   `json:"description,omitempty" toon:"description,omitempty"`
+	Favicon     *string   `json:"favicon_url,omitempty" toon:"favicon_url,omitempty"`
+	RSSFeed     *string   `json:"rss_feed_url,omitempty" toon:"rss_feed_url,omitempty"`
 }
 
 func NewSourceDocument(source *db.Source) *SourceDocument {
@@ -178,28 +177,28 @@ func NewSourceDocuments(sources []db.Source) []SourceDocument {
 }
 
 type Links struct {
-	Evidence string `json:"evidence,omitempty"`
-	Actions  string `json:"actions,omitempty"`
-	Events   string `json:"events,omitempty"`
-	Signals  string `json:"signals,omitempty"`
+	Evidence string `json:"evidence,omitempty" toon:"evidence,omitempty"`
+	Actions  string `json:"actions,omitempty" toon:"actions,omitempty"`
+	Events   string `json:"events,omitempty" toon:"events,omitempty"`
+	Signals  string `json:"signals,omitempty" toon:"signals,omitempty"`
 }
 
 type Counts struct {
-	Evidence *int64 `json:"evidence,omitempty"`
-	Actions  *int64 `json:"actions,omitempty"`
-	Events   *int64 `json:"events,omitempty"`
-	Signals  *int64 `json:"signals,omitempty"`
+	Evidence *int64 `json:"evidence,omitempty" toon:"evidence,omitempty"`
+	Actions  *int64 `json:"actions,omitempty" toon:"actions,omitempty"`
+	Events   *int64 `json:"events,omitempty" toon:"events,omitempty"`
+	Signals  *int64 `json:"signals,omitempty" toon:"signals,omitempty"`
 }
 
 // SipEvidenceItem is the explicit bare-list response item for R03.
 type EventEvidence struct {
-	ID       uuid.UUID  `json:"id"`
-	Kind     string     `json:"kind"`
-	Created  time.Time  `json:"created_at"`
-	Tags     []string   `json:"tags"`
-	SourceID *uuid.UUID `json:"source_id"`
-	URL      string     `json:"url"`
-	BaseURL  string     `json:"base_url"`
+	ID       uuid.UUID  `json:"id" toon:"id"`
+	Kind     string     `json:"kind" toon:"kind"`
+	Created  time.Time  `json:"created_at" toon:"created_at"`
+	Tags     []string   `json:"tags" toon:"tags"`
+	SourceID *uuid.UUID `json:"source_id" toon:"source_id"`
+	URL      string     `json:"url" toon:"url"`
+	BaseURL  string     `json:"base_url" toon:"base_url"`
 }
 
 func NewEventEvidence(sip *db.Sip) EventEvidence {
@@ -224,17 +223,15 @@ func NewEventEvidence(sip *db.Sip) EventEvidence {
 // and detail response needs a concrete wrapper. The runtime still uses the generic
 // CollectionResponse[T] and DetailResponse[T] helpers; these are schema-only.
 type SipCollectionResponse struct {
-	Success    bool             `json:"success"`
 	Data       []DigestDocument `json:"data"`
-	Pagination Pagination       `json:"pagination"`
-	Meta       ResponseMeta     `json:"meta"`
+	Pagination Pagination       `json:"pagination" binding:"required"`
+	Meta       ResponseMeta     `json:"meta" binding:"required"`
 }
 
 type SourceCollectionResponse struct {
-	Success    bool             `json:"success"`
-	Data       []SourceDocument `json:"data"`
-	Pagination Pagination       `json:"pagination"`
-	Meta       ResponseMeta     `json:"meta"`
+	Data       []SourceDocument `json:"data" binding:"required"`
+	Pagination Pagination       `json:"pagination" binding:"required"`
+	Meta       ResponseMeta     `json:"meta" binding:"required"`
 }
 
 type StringCollectionResponse struct {
@@ -244,13 +241,53 @@ type StringCollectionResponse struct {
 }
 
 type TagValueCollectionResponse struct {
-	Data       []db.TagValue `json:"data"`
-	Pagination Pagination    `json:"pagination"`
+	Data       []db.TagValue `json:"data" binding:"required"`
+	Pagination Pagination    `json:"pagination" binding:"required"`
 	Meta       ResponseMeta  `json:"meta"`
 }
 
 type EventEvidenceCollectionResponse struct {
-	Data       []EventEvidence `json:"data"`
-	Pagination Pagination      `json:"pagination"`
-	Meta       ResponseMeta    `json:"meta"`
+	Data       []EventEvidence `json:"data" binding:"required"`
+	Pagination Pagination      `json:"pagination" binding:"required"`
+	Meta       ResponseMeta    `json:"meta" binding:"required"`
+}
+
+// EventDocument is the flattened, extensible public Event collection/detail payload.
+type EventDocument map[string]any
+
+// SignalDocument is the flattened, extensible public Signal collection/detail payload.
+type SignalDocument map[string]any
+
+type EventCollectionResponse struct {
+	Data       []EventDocument `json:"data" binding:"required"`
+	Pagination Pagination      `json:"pagination" binding:"required"`
+	Meta       ResponseMeta    `json:"meta" binding:"required"`
+}
+
+type EventDetailResponse struct {
+	Data EventDocument `json:"data" binding:"required"`
+}
+
+type SignalCollectionResponse struct {
+	Data       []SignalDocument `json:"data" binding:"required"`
+	Pagination Pagination       `json:"pagination" binding:"required"`
+	Meta       ResponseMeta     `json:"meta" binding:"required"`
+}
+
+type SignalDetailResponse struct {
+	Data SignalDocument `json:"data" binding:"required"`
+}
+
+type SipItemResponse struct {
+	Data DigestDocument `json:"data" binding:"required"`
+}
+
+type SourceItemResponse struct {
+	Data SourceDocument `json:"data" binding:"required"`
+}
+
+type DiscoveryValueCollectionResponse struct {
+	Data       []db.TagValue `json:"data" binding:"required"`
+	Pagination Pagination    `json:"pagination" binding:"required"`
+	Meta       ResponseMeta  `json:"meta" binding:"required"`
 }

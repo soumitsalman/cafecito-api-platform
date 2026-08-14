@@ -30,7 +30,7 @@ type itemParams struct {
 // base cursor-pagination params for all list queries.
 type paginationParams struct {
 	Limit  int    `form:"limit,default=20" binding:"min=1,max=100"`
-	Cursor string `form:"cursor"`
+	Cursor string `form:"page"`
 	responseTypeParams
 }
 
@@ -44,7 +44,7 @@ type sipQueryParams struct {
 	From            time.Time `form:"from" time_format:"2006-01-02"`
 	To              time.Time `form:"to" time_format:"2006-01-02"`
 	Tags            []string  `form:"tags" collection_format:"csv" binding:"max=128"`
-	Entities        []string  `form:"entities" collection_format:"csv" binding:"max=128,dive,oneof=company people product"`
+	Entities        []string  `form:"entities" collection_format:"csv" binding:"max=128"`
 	Categories      []string  `form:"categories" collection_format:"csv" binding:"max=128"`
 	Companies       []string  `form:"companies" collection_format:"csv" binding:"max=128"`
 	People          []string  `form:"people" collection_format:"csv" binding:"max=128"`
@@ -74,6 +74,7 @@ type SignalSearchParams struct {
 
 // eventEvidenceParams holds parameters for GET /events/{id}/evidence.
 type EventEvidenceParams struct {
+	IDs       []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	SourceIDs []uuid.UUID `form:"source_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	pathIDParams
 	sipQueryParams
@@ -82,6 +83,7 @@ type EventEvidenceParams struct {
 
 // eventSignalsParams holds parameters for GET /events/{id}/signals.
 type EventSignalsParams struct {
+	IDs []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	pathIDParams
 	sipQueryParams
 	paginationParams
@@ -89,6 +91,7 @@ type EventSignalsParams struct {
 
 // signalEventsParams holds parameters for GET /signals/{id}/events.
 type SignalEventsParams struct {
+	IDs        []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	SourceIDs  []uuid.UUID `form:"source_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	EventTypes []string    `form:"event_types" collection_format:"csv" binding:"max=128"`
 	pathIDParams

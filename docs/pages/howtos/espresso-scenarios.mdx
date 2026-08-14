@@ -1,0 +1,251 @@
+---
+description: Composite Espresso workflows that combine discovery, Event, Signal, evidence, Source, pagination, and MCP calls.
+navigation_label: Espresso scenarios
+category: "Getting Started"
+---
+
+# Espresso API scenarios
+
+Espresso is most useful as a sequence of related calls. Start with a broad collection or discovery route, pass IDs and filter values into the next route, and only fetch detail or provenance when the user needs it.
+
+Every workflow below uses two or more API calls. For authentication, language-specific examples, response envelopes, and individual route parameters, see the [Espresso how-to](/howtos/espresso-howto).
+
+## How to compose Espresso calls
+
+| Step | What to carry forward |
+| --- | --- |
+| Discover | Public filter values from `/tags`, `/event-types`, `/entities`, or `/regions`. Tags are fuzzy; structured values are exact normalized names. |
+| Search | Event or Signal IDs, `source_id` values, and `pagination.next_page`. |
+| Inspect | Detail-only provenance, summaries, links, counts, and optional intelligence fields. |
+| Traverse | Evidence, derived Signals, or supporting Events using the ID from the previous call. |
+| Continue | Send `pagination.next_page` back as the next request’s `page`; never construct the token. |
+
+`categories` is a separate exact Event field from `event_types`. `tags` use fuzzy text matching. `created_at` is record creation time, not occurrence, publication, or lifecycle time.
+
+## Scenario 1: Discover vocabulary, search Events, then inspect evidence
+
+**Use when:** an analyst starts with human terms such as “Microsoft regulation” and needs both matching developments and source coverage.
+
+**Call sequence: 5 calls**
+
+1. `GET /espresso/tags?resource=event` — discover fuzzy tag labels.
+2. `GET /espresso/entities?types=company` — discover exact company names.
+3. `GET /espresso/regions` — discover exact region names when geography matters.
+4. `GET /espresso/events` — search with the discovered values plus date bounds.
+5. `GET /espresso/events/{event_id}/evidence` — inspect directly related source records for a selected Event.
+
+```bash
+# 1. Discover fuzzy tag vocabulary
+curl -s "${BASE_URL}/espresso/tags?resource=event&limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 2. Discover exact company names
+curl -s "${BASE_URL}/espresso/entities?types=company&limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 3. Discover exact region names
+curl -s "${BASE_URL}/espresso/regions?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 4. Search Events using discovered values
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "from=2026-05-01" \
+  --data-urlencode "to=2026-05-31" \
+  --data-urlencode "companies=microsoft,nvidia" \
+  --data-urlencode "regions=north_america" \
+  --data-urlencode "tags=policy,supply_chain" \
+  --data-urlencode "limit=20"
+
+# 5. Inspect source coverage for the selected Event
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Use `ids` or `source_ids` on the evidence call when the analyst wants a narrower evidence set. The evidence route is a compact direct-related-record view; it is not article content or an unbounded equivalence graph.
+
+## Scenario 2: Find an Event, inspect its detail, then find other Events from the same Source
+
+**Use when:** a user finds one relevant development and wants to see what else the same publisher or source contributed.
+
+**Call sequence: 3 calls, or 4 when Source metadata needs a separate lookup**
+
+1. `GET /espresso/events` — find a candidate Event.
+2. `GET /espresso/events/{event_id}` — retrieve detail-only `source_id`, `source`, `url`, and relation links.
+3. `GET /espresso/events?source_ids={source_id}` — search other Events from that Source.
+4. Optional: `GET /espresso/sources/{source_id}` — retrieve the normalized Source object and nullable metadata.
+
+```bash
+# 1. Find a candidate Event
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=semiconductor supply pressure" \
+  --data-urlencode "limit=20"
+
+# 2. Get detail and read source_id
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 3. Reuse source_id to find other Events from that Source
+curl -s "${BASE_URL}/espresso/events?source_ids=SOURCE_UUID&limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 4. Optional Source metadata lookup
+curl -s "${BASE_URL}/espresso/sources/SOURCE_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Do not assume every Event has a usable Source. A missing or orphaned reference remains omitted or null; the API does not invent publisher metadata.
+
+## Scenario 3: Start from a Source, then narrow Events and evidence
+
+**Use when:** a monitoring workflow begins with a known domain or publisher and wants a traceable set of developments.
+
+**Call sequence: 4 calls**
+
+1. `GET /espresso/sources?q=...&domains=...` — find the Source UUID.
+2. `GET /espresso/sources/{source_id}` — confirm Source identity and available metadata.
+3. `GET /espresso/events?source_ids=...` — retrieve Events from that Source with exact or fuzzy filters.
+4. `GET /espresso/events/{event_id}/evidence?source_ids=...` — inspect direct evidence for a selected Event.
+
+```bash
+# 1. Find the Source
+curl -s --get "${BASE_URL}/espresso/sources" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=example.com" \
+  --data-urlencode "domains=example.com" \
+  --data-urlencode "limit=20"
+
+# 2. Confirm Source metadata
+curl -s "${BASE_URL}/espresso/sources/SOURCE_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 3. Search that Source's Events
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "source_ids=SOURCE_UUID" \
+  --data-urlencode "categories=regulation" \
+  --data-urlencode "tags=policy" \
+  --data-urlencode "limit=20"
+
+# 4. Trace evidence for one selected Event
+curl -s --get "${BASE_URL}/espresso/events/EVENT_UUID/evidence" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "source_ids=SOURCE_UUID" \
+  --data-urlencode "limit=20"
+```
+
+Source `q` is case-insensitive metadata matching, not semantic search. Event `q` is semantic search where supported.
+
+## Scenario 4: Search Signals, inspect one, then walk back to supporting Events
+
+**Use when:** a user asks for a conclusion first, then wants the concrete Events that support it.
+
+**Call sequence: 3 calls, or 4 when an Event detail is needed**
+
+1. `GET /espresso/signals` — search Signal conclusions with `q`, date bounds, impact levels, or impacted domains.
+2. `GET /espresso/signals/{signal_id}` — inspect the Signal summary, usable provenance, links, and counts.
+3. `GET /espresso/signals/{signal_id}/events` — retrieve supporting Events and apply Event filters.
+4. Optional: `GET /espresso/events/{event_id}` — inspect one supporting Event’s detail and provenance.
+
+```bash
+# 1. Search Signals
+curl -s --get "${BASE_URL}/espresso/signals" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=regional supply pressure" \
+  --data-urlencode "impact_levels=high" \
+  --data-urlencode "limit=20"
+
+# 2. Inspect the selected Signal
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 3. Retrieve the supporting Events
+curl -s --get "${BASE_URL}/espresso/signals/SIGNAL_UUID/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "categories=regulation" \
+  --data-urlencode "entities=microsoft" \
+  --data-urlencode "limit=20"
+
+# 4. Optional Event detail
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+The route names express the user’s question and hide `DERIVED_FROM` storage orientation: Signal → supporting Events is `/signals/{signal_id}/events`; Event → derived Signals is `/events/{event_id}/signals`.
+
+## Scenario 5: Inspect an Event, then follow its derived Signals and each Signal’s support
+
+**Use when:** a development is the starting point and the user wants to understand its higher-level implications.
+
+**Call sequence: 4 calls**
+
+1. `GET /espresso/events/{event_id}` — read the Event summary and links.
+2. `GET /espresso/events/{event_id}/signals` — retrieve Signals derived from the Event’s evidence trail.
+3. `GET /espresso/signals/{signal_id}` — inspect one Signal’s conclusion and counts.
+4. `GET /espresso/signals/{signal_id}/events` — retrieve the Events supporting that Signal.
+
+```bash
+# 1. Event detail
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 2. Signals derived from the Event
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/signals?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 3. Signal detail
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# 4. Supporting Events
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID/events?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+This is useful for an analyst narrative: concrete development → synthesized conclusion → supporting records. It does not imply that every Event has a Signal or that every Signal has complete provenance.
+
+## Scenario 6: Paginate a bounded search and enrich only selected records
+
+**Use when:** an ingestion job or agent must process many results without fetching expensive detail for every row.
+
+**Call sequence: repeated search calls plus selected detail calls**
+
+1. `GET /espresso/events?limit=20` — fetch the first page.
+2. Read `pagination.next_page` and send it back as `page` for the next page.
+3. Stop when `next_page` is null.
+4. For only the records that meet the application’s threshold, call Event detail and then evidence or Signal routes.
+
+```bash
+# Page 1
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "from=2026-05-01" \
+  --data-urlencode "to=2026-05-31" \
+  --data-urlencode "limit=20"
+
+# Page 2: substitute the exact opaque value returned as pagination.next_page
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "page=OPAQUE_NEXT_PAGE" \
+  --data-urlencode "limit=20"
+
+# Enrich only a selected Event
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+`num_results` is the number of records in the current page. It is not a total-match count. Keep pagination state separate from Event IDs and do not construct or decode page tokens.
+
+## Scenario 7: Agent workflow with compact output
+
+**Use when:** an MCP or AI-agent client should discover vocabulary, search, and drill down while minimizing token overhead.
+
+**Call sequence: 4 stages**
+
+1. Discover with `listTags`, `listEventTypes`, `listEntities`, or `listRegions`.
+2. Search Events or Signals using the same REST parameters and bounded dates.
+3. Request `response_type=yaml` or `response_type=toon` for token-optimized output; keep JSON for canonical parsing when needed.
+4. Follow detail and relationship links only when the user asks for provenance or explanation.
+
+The hosted endpoint is `https://api.cafecito.tech/espresso/mcp`. YAML and TOON preserve the same filtering and pagination contract; they are alternate serializations, not different data products.

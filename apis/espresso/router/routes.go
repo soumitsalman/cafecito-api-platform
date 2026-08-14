@@ -1,10 +1,10 @@
 // @title 			Espresso API & MCP
 // @version 		0.2
 // @description 	MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.
-// @description 	An **Event** is any record whose kind starts with `event` (canonical `event`, plus `event:news`, `event:blog`, `event:post`, `event:site`, `event:social`). A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
+// @description  An **Event** is a concrete intelligence record with kind `event`. A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
 // @description 	Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.
-// @description 	Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use cursor pagination: `limit` default 20 max 128, and an opaque `cursor` returned as `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
-// @description Response formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same non-empty digest members as compact field-per-line plain text with `---` record delimiters. Public Event and Signal payloads do not synthesize storage id, created, kind, representation, or object fields.
+// @description  Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use page pagination: `limit` default 20 max 100, and an opaque `page` returned as `next_page`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
+// @description Response formats: use `response_type=json` for canonical structured application data. Use `response_type=yaml` or `response_type=toon` for token-optimized output to MCP and AI-agent clients. Public Event and Signal payloads expose flattened intelligence fields without embeddings, relation direction, or a nested internal object.
 // @schemes 		https
 // @license.name 	MIT
 // @contact.name 	Project Cafecito
@@ -17,11 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alpkeskin/gotoon"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/stoewer/go-strcase"
+	"github.com/toon-format/toon-go"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
@@ -35,7 +37,7 @@ const (
 	DEFAULT_WINDOW   = 7 // DAYS
 	DEFAULT_ACCURACY = 0.5
 	DEFAULT_LIMIT    = 20
-	MAX_LIMIT        = 128
+	MAX_LIMIT        = 100
 )
 
 const (
@@ -77,20 +79,25 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
 }
 
+func normalizeTags(items []string) []string {
+	for i, item := range items {
+		items[i] = strcase.SnakeCase(item)
+	}
+	return items
+}
+
 func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = p.To
-	filters.Tags = p.Tags
-	if len(filters.Tags) == 0 && len(p.Entities) > 0 {
-		filters.Tags = p.Entities
-	}
-	filters.Categories = p.Categories
-	filters.Companies = p.Companies
-	filters.People = p.People
-	filters.Products = p.Products
-	filters.Regions = p.Regions
-	filters.ImpactedDomains = p.ImpactedDomains
-	filters.ImpactLevels = p.ImpactLevels
+	filters.Tags = normalizeTags(p.Tags)
+	filters.Entities = normalizeTags(p.Entities)
+	filters.Categories = normalizeTags(p.Categories)
+	filters.Companies = normalizeTags(p.Companies)
+	filters.People = normalizeTags(p.People)
+	filters.Products = normalizeTags(p.Products)
+	filters.Regions = normalizeTags(p.Regions)
+	filters.ImpactedDomains = normalizeTags(p.ImpactedDomains)
+	filters.ImpactLevels = normalizeTags(p.ImpactLevels)
 	return nil
 }
 
@@ -111,7 +118,7 @@ func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration)
 	filters := &db.Filters{
 		IDs:        p.IDs,
 		SourceIDs:  p.SourceIDs,
-		EventTypes: p.EventTypes,
+		EventTypes: normalizeTags(p.EventTypes),
 	}
 	if err := p.sipQueryParams.bindFilters(c, config, filters); err != nil {
 		return nil, err
@@ -138,6 +145,7 @@ func (p *SignalSearchParams) createFilters(c *gin.Context, config *Configuration
 
 func (params *EventEvidenceParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
 	filters := &db.Filters{
+		IDs:       params.IDs,
 		SourceIDs: params.SourceIDs,
 	}
 	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
@@ -147,7 +155,9 @@ func (params *EventEvidenceParams) createFilters(c *gin.Context, config *Configu
 }
 
 func (params *EventSignalsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
-	filters := &db.Filters{}
+	filters := &db.Filters{
+		IDs: params.IDs,
+	}
 	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
 		return nil, err
 	}
@@ -156,8 +166,9 @@ func (params *EventSignalsParams) createFilters(c *gin.Context, config *Configur
 
 func (params *SignalEventsParams) createFilters(c *gin.Context, config *Configuration) (*db.Filters, error) {
 	filters := &db.Filters{
+		IDs:        params.IDs,
 		SourceIDs:  params.SourceIDs,
-		EventTypes: params.EventTypes,
+		EventTypes: normalizeTags(params.EventTypes),
 	}
 	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
 		return nil, err
@@ -189,14 +200,14 @@ func writePage[T any](c *gin.Context, items []T, limit int, cursor string, next_
 	}
 	response := PageResponse[T]{
 		Data:       items,
-		Pagination: Pagination{Limit: limit, Cursor: cursor_val, NextCursor: next_cursor},
+		Pagination: Pagination{Limit: limit, NumResults: len(items), Cursor: cursor_val, NextCursor: next_cursor},
 		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
 	}
 	switch response_type {
 	case "yaml":
 		c.YAML(http.StatusOK, response)
 	case "toon":
-		if encoded, err := gotoon.Encode(response); err != nil {
+		if encoded, err := toon.MarshalString(response); err != nil {
 			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
 		} else {
 			c.String(http.StatusOK, encoded)
@@ -213,7 +224,7 @@ func writeItem[T any](c *gin.Context, item T, response_type string) {
 	case "yaml":
 		c.YAML(http.StatusOK, response)
 	case "toon":
-		if encoded, err := gotoon.Encode(response); err != nil {
+		if encoded, err := toon.MarshalString(response); err != nil {
 			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
 		} else {
 			c.String(http.StatusOK, encoded)
@@ -254,38 +265,35 @@ func (r *Configuration) health(c *gin.Context) {
 }
 
 // getEvents godoc
-// @Summary Search Event-family records
-// @Description Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.
-// @Description **When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.
-// @Description **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
-// @Description **Time**: `from`/`to` are inclusive bounds on record `created_at` until an occurrence-time field exists. They do not claim Event occurrence time.
-// @Description **Tags**: match on persisted tags uses overlap (any supplied tag).
-// @Description **Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.
-// @Description **Agent format**: use `response_type=text` for compact field-per-line records with `---` delimiters when feeding an LLM or MCP client.
+// @Summary Search Events
+// @Description Find Event records that match optional filters and an optional semantic query. Use this route to find concrete developments before following an Event's detail, evidence, or Signal links.
+// @Description **Time**: `from` and `to` are inclusive ISO date-only bounds on record `created_at`; they are not occurrence or publication timestamps.
+// @Description **Filters**: tags use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after normalizing names to snake_case. `categories` is a separate category filter from `event_types`.
+// @Description **Output**: Event collections contain flattened intelligence fields plus `id`, `created_at`, and `kind`; provenance fields are available on the detail route when usable. YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
 // @Tags Events
 // @Produce json
-// @Produce plain
-// @Param q query string false "Natural-language semantic search query. Max 1024 characters; requires the embedder. When present, default sort is relevance." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param from query string false "Only include records created on or after this date (RFC3339 timestamp)." format(date-time)
-// @Param to query string false "Only include records created on or before this date (RFC3339 timestamp)." format(date-time)
-// @Param ids query []string false "Restrict to known Event-family IDs (CSV). Prefer the detail route for one ID." collectionFormat(csv)
-// @Param event_types query []string false "Allowlisted match against digest.event_type (CSV)." collectionFormat(csv)
-// @Param impact_levels query []string false "Match digest.impact_level (CSV): low, medium, high." collectionFormat(csv)
-// @Param companies query []string false "Match digest.companies array (CSV)." collectionFormat(csv)
-// @Param people query []string false "Match digest.people array (CSV)." collectionFormat(csv)
-// @Param products query []string false "Match digest.products array (CSV)." collectionFormat(csv)
-// @Param regions query []string false "Match digest.regions array (CSV)." collectionFormat(csv)
-// @Param source_ids query []string false "Match the persisted source UUID, including direct SAME_AS evidence coverage (CSV)." collectionFormat(csv)
-// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, yaml, toon) default(json)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
-// @Success 200 {object} SipCollectionResponse "Event-family records when response_type=json; plain-text event blocks when response_type=text"
-// @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
+// @Param from query string false "Inclusive created_at lower bound (YYYY-MM-DD)." format(date)
+// @Param to query string false "Inclusive created_at upper bound (YYYY-MM-DD)." format(date)
+// @Param ids query []string false "Restrict to Event UUIDs (CSV)." collectionFormat(csv)
+// @Param event_types query []string false "Exact Event type names in snake_case (CSV), for example policy_change,market_entry." collectionFormat(csv)
+// @Param categories query []string false "Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types." collectionFormat(csv)
+// @Param entities query []string false "Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia." collectionFormat(csv)
+// @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
+// @Param companies query []string false "Exact company names in snake_case (CSV), for example microsoft,nvidia." collectionFormat(csv)
+// @Param people query []string false "Exact person names in snake_case (CSV), for example sam_altman,elon_musk." collectionFormat(csv)
+// @Param products query []string false "Exact product names in snake_case (CSV), for example windows,geforce." collectionFormat(csv)
+// @Param regions query []string false "Exact region names in snake_case (CSV), for example north_america,europe." collectionFormat(csv)
+// @Param source_ids query []string false "Restrict to direct Event source UUIDs (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Fuzzy text match against persisted tag labels (CSV)." collectionFormat(csv)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} EventCollectionResponse "Event collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID searchEvents
 // @Router /events [get]
 func (r *Configuration) getEvents(c *gin.Context) {
@@ -316,19 +324,18 @@ func (r *Configuration) getEvents(c *gin.Context) {
 }
 
 // getEvent godoc
-// @Summary Retrieve one Event-family record
-// @Description What Event-family record has this UUID? Retrieves any record whose kind starts with `event` by UUID and returns its raw non-empty flattened digest members plus detail metadata links and relation counts. Returns 404 when no such record exists.
+// @Summary Retrieve one Event
+// @Description Retrieve an Event by UUID. The detail payload contains flattened intelligence fields and detail-only provenance, optional Source metadata, relation links, and relation counts. `created_at` is the record creation time, not an Event occurrence date.
 // @Tags Events
 // @Produce json
-// @Produce plain
-// @Param event_id path string true "Event-family record UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
-// @Success 200 {object} SipItemResponse "The Event-family record"
-// @Failure 400 {object} APIError "Malformed UUID"
-// @Failure 404 {object} APIError "No Event-family record with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} EventDetailResponse "Event detail envelope"
+// @Failure 400 {object} ErrorResponse "Malformed UUID"
+// @Failure 404 {object} ErrorResponse "No Event with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID getEvent
 // @Router /events/{event_id} [get]
 func (r *Configuration) getEvent(c *gin.Context) {
@@ -356,24 +363,26 @@ func (r *Configuration) getEvent(c *gin.Context) {
 }
 
 // getEventEvidence godoc
-// @Summary Retrieve Event evidence
-// @Description Which source-specific records support this Event? Returns a bare JSON list containing the requested Event and every direct SAME_AS Event-family neighbour in both relation orientations. Each item contains only event_id, created, source_id, url, and base_url. The default scope is direct_same_as: a bounded claim about current data, not a complete transitive equivalence closure.
+// @Summary Retrieve an Event evidence trail
+// @Description Show the directly related records that make up an Event's evidence trail, helping clients assess source coverage. It is not article content or story membership. The item projection exposes record identity, creation time, tags, source ID, and available URLs.
 // @Tags Events
 // @Produce json
-// @Produce plain
-// @Param id path string true "Event-family record UUID (RFC 4122)." format(uuid)
-// @Param source_ids query []string false "Restrict evidence to selected sources (CSV)." collectionFormat(csv)
-// @Param from query string false "Inclusive evidence created_at lower bound (RFC3339 timestamp)." format(date-time)
-// @Param to query string false "Inclusive evidence created_at upper bound (RFC3339 timestamp)." format(date-time)
-// @Param response_type query string false "Output format. json returns the bare evidence list; text returns the same records as compact plain text." Enums(json, text) default(json)
-// @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection"
-// @Failure 400 {object} APIError "Malformed UUID or invalid parameters"
-// @Failure 404 {object} APIError "No Event-family record with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
+// @Param ids query []string false "Restrict returned evidence records to Event UUIDs (CSV)." collectionFormat(csv)
+// @Param source_ids query []string false "Restrict direct evidence records to Source UUIDs (CSV)." collectionFormat(csv)
+// @Param from query string false "Inclusive evidence created_at lower bound (YYYY-MM-DD)." format(date)
+// @Param to query string false "Inclusive evidence created_at upper bound (YYYY-MM-DD)." format(date)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection envelope"
+// @Failure 400 {object} ErrorResponse "Malformed UUID or invalid parameters"
+// @Failure 404 {object} ErrorResponse "No Event with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID getEventEvidence
-// @Router /events/{id}/evidence [get]
+// @Router /events/{event_id}/evidence [get]
 func (r *Configuration) getEventEvidence(c *gin.Context) {
 	var params EventEvidenceParams
 	if err := params.shouldBind(c); err != nil {
@@ -415,27 +424,27 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 
 // getEventSignals godoc
 // @Summary Retrieve Signals derived from an Event
-// @Description Which broader conclusions use this Event as evidence? Returns Signals whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS equivalents. The caller does not need to know which Event-family record was used as the relation target. Returns 404 when the Event does not exist; 200 with an empty collection when it exists but has no Signals.
+// @Description Return the higher-level Signals that were derived from the Event's evidence trail. Use this relation route after retrieving an Event to inspect synthesized conclusions; an existing Event with no matching Signals returns an empty collection.
 // @Tags Events
 // @Produce json
-// @Produce plain
-// @Param id path string true "Event-family record UUID (RFC 4122)." format(uuid)
-// @Param from query string false "Inclusive Signal created_at lower bound (RFC3339 timestamp)." format(date-time)
-// @Param to query string false "Inclusive Signal created_at upper bound (RFC3339 timestamp)." format(date-time)
-// @Param impact_levels query []string false "Match Signal digest.impact_level (CSV)." collectionFormat(csv)
-// @Param impacted_domains query []string false "Match Signal digest.impacted_domains array (CSV)." collectionFormat(csv)
-// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} SipCollectionResponse "Signals derived from this Event"
-// @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
-// @Failure 404 {object} APIError "No Event-family record with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
+// @Param ids query []string false "Restrict returned Signals to Signal UUIDs (CSV)." collectionFormat(csv)
+// @Param from query string false "Inclusive Signal created_at lower bound (YYYY-MM-DD)." format(date)
+// @Param to query string false "Inclusive Signal created_at upper bound (YYYY-MM-DD)." format(date)
+// @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
+// @Param impacted_domains query []string false "Exact impacted-domain names in snake_case (CSV), for example public_health,climate." collectionFormat(csv)
+// @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} SignalCollectionResponse "Signals derived from this Event"
+// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
+// @Failure 404 {object} ErrorResponse "No Event with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID getEventSignals
-// @Router /events/{id}/signals [get]
+// @Router /events/{event_id}/signals [get]
 func (r *Configuration) getEventSignals(c *gin.Context) {
 	var params EventSignalsParams
 	if err := params.shouldBind(c); err != nil {
@@ -473,32 +482,27 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 }
 
 // getSignals godoc
-// @Summary Search synthesized Signals
-// @Description Which synthesized conclusions or forecasts match my question? Returns signal-kind records. A Signal is returned intelligence, not a saved monitoring definition.
-// @Description **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
-// @Description **Time**: `from`/`to` are inclusive bounds on Signal `created_at`.
-// @Description **Tags**: match on persisted tags uses overlap (any supplied tag).
+// @Summary Search Signals
+// @Description Find synthesized Signal records with optional filters and an optional semantic query. Use this route for higher-level conclusions, then follow a Signal detail or supporting-Events link to inspect its basis.
+// @Description **Time**: `from` and `to` are inclusive ISO date-only bounds on Signal `created_at`.
+// @Description **Filters**: tags use fuzzy text matching. Impact levels and impacted domains use exact snake_case matching. Collection items omit provenance fields; use Signal detail when Source metadata is usable.
 // @Tags Signals
 // @Produce json
-// @Produce plain
-// @Param q query string false "Natural-language semantic search query. Max 1024 characters." maxlength(1024)
-// @Param acc query number false "Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param from query string false "Inclusive Signal created_at lower bound (RFC3339 timestamp)." format(date-time)
-// @Param to query string false "Inclusive Signal created_at upper bound (RFC3339 timestamp)." format(date-time)
-// @Param ids query []string false "Restrict to known Signal IDs (CSV)." collectionFormat(csv)
-// @Param impact_levels query []string false "Match Signal digest.impact_level (CSV)." collectionFormat(csv)
-// @Param impacted_domains query []string false "Match Signal digest.impacted_domains array (CSV)." collectionFormat(csv)
-// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
-// @Param tag_mode query string false "Tag matching mode." Enums(any, all) default(any)
-// @Param sort query string false "Sort order. recent=created_at desc (default), relevance=semantic distance asc (requires q)." Enums(recent, relevance) default(recent)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} SipCollectionResponse "Signal records"
-// @Failure 400 {object} APIError "Invalid query parameters, malformed UUID, or malformed cursor"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
+// @Param from query string false "Inclusive Signal created_at lower bound (YYYY-MM-DD)." format(date)
+// @Param to query string false "Inclusive Signal created_at upper bound (YYYY-MM-DD)." format(date)
+// @Param ids query []string false "Restrict to Signal UUIDs (CSV)." collectionFormat(csv)
+// @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
+// @Param impacted_domains query []string false "Exact impacted-domain names in snake_case (CSV), for example public_health,climate." collectionFormat(csv)
+// @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} SignalCollectionResponse "Signal collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID searchSignals
 // @Router /signals [get]
 func (r *Configuration) getSignals(c *gin.Context) {
@@ -529,20 +533,19 @@ func (r *Configuration) getSignals(c *gin.Context) {
 }
 
 // @Summary Retrieve one Signal
-// @Description What is the complete Signal with this UUID? Retrieves one signal-kind record by UUID. The detail payload links to supporting Events instead of inventing inline event references from unstructured digest strings. Returns 404 when no such Signal exists.
+// @Description Retrieve a Signal by UUID. The detail payload contains flattened intelligence fields, optional provenance when a usable Source exists, and links/counts for supporting Events. `created_at` is the Signal record creation time.
 // @Tags Signals
 // @Produce json
-// @Produce plain
-// @Param signal_id path string true "Signal record UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output format. json returns the detail envelope; text returns a compact plain-text record." Enums(json, text) default(json)
-// @Success 200 {object} SipItemResponse "The Signal record"
-// @Failure 400 {object} APIError "Malformed UUID"
-// @Failure 404 {object} APIError "No Signal with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param signal_id path string true "Signal UUID (RFC 4122)." format(uuid)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} SignalDetailResponse "Signal detail envelope"
+// @Failure 400 {object} ErrorResponse "Malformed UUID"
+// @Failure 404 {object} ErrorResponse "No Signal with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID getSignal
-// @Router /signals/{id} [get]
+// @Router /signals/{signal_id} [get]
 func (r *Configuration) getSignal(c *gin.Context) {
 	var params itemParams
 	if err := params.shouldBind(c); err != nil {
@@ -568,26 +571,33 @@ func (r *Configuration) getSignal(c *gin.Context) {
 }
 
 // getSignalEvents godoc
-// @Summary Retrieve Event-family records supporting a Signal
-// @Description Which Event-family records support this Signal? Follows DERIVED_FROM edges in the stored signal-to-event direction and returns raw non-empty flattened digest members from direct Event-family targets. Returns 404 when the Signal does not exist; 200 with an empty collection when it exists but has no supporting Events.
+// @Summary Retrieve Events supporting a Signal
+// @Description Return the Events that were used to derive the Signal, so clients can inspect the basis of its conclusion. An existing Signal with no matching Events returns an empty collection.
 // @Tags Signals
 // @Produce json
-// @Produce plain
-// @Param id path string true "Signal record UUID (RFC 4122)." format(uuid)
-// @Param from query string false "Inclusive Event created_at lower bound (RFC3339 timestamp)." format(date-time)
-// @Param to query string false "Inclusive Event created_at upper bound (RFC3339 timestamp)." format(date-time)
-// @Param event_types query []string false "Match digest.event_type (CSV)." collectionFormat(csv)
-// @Param impact_levels query []string false "Match digest.impact_level (CSV)." collectionFormat(csv)
-// @Param tags query []string false "Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all requires every supplied tag." collectionFormat(csv)
-// @Param response_type query string false "Output format. json returns the collection envelope; text returns compact plain-text records." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Success 200 {object} SipCollectionResponse "Event-family records supporting this Signal"
-// @Failure 400 {object} APIError "Malformed UUID, invalid cursor, or invalid parameters"
-// @Failure 404 {object} APIError "No Signal with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database or embedder unavailable; retry"
+// @Param signal_id path string true "Signal UUID (RFC 4122)." format(uuid)
+// @Param ids query []string false "Restrict returned Events to Event UUIDs (CSV)." collectionFormat(csv)
+// @Param event_types query []string false "Exact Event type names in snake_case (CSV), for example policy_change,market_entry." collectionFormat(csv)
+// @Param categories query []string false "Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types." collectionFormat(csv)
+// @Param entities query []string false "Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia." collectionFormat(csv)
+// @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
+// @Param companies query []string false "Exact company names in snake_case (CSV), for example microsoft,nvidia." collectionFormat(csv)
+// @Param people query []string false "Exact person names in snake_case (CSV), for example sam_altman,elon_musk." collectionFormat(csv)
+// @Param products query []string false "Exact product names in snake_case (CSV), for example windows,geforce." collectionFormat(csv)
+// @Param regions query []string false "Exact region names in snake_case (CSV), for example north_america,europe." collectionFormat(csv)
+// @Param source_ids query []string false "Restrict returned Events to Source UUIDs (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Fuzzy text match against persisted Event tag labels (CSV)." collectionFormat(csv)
+// @Param from query string false "Inclusive Event created_at lower bound (YYYY-MM-DD)." format(date)
+// @Param to query string false "Inclusive Event created_at upper bound (YYYY-MM-DD)." format(date)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} EventCollectionResponse "Events supporting this Signal"
+// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
+// @Failure 404 {object} ErrorResponse "No Signal with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
 // @ID getSignalEvents
 // @Router /signals/{signal_id}/events [get]
 func (r *Configuration) getSignalEvents(c *gin.Context) {
@@ -627,19 +637,19 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 }
 
 // @Summary List intelligence sources
-// @Description Which source records can I filter by or cite? Returns provenance records keyed by UUID. Optional source metadata may be null; missing optional metadata is not an error and the API does not fabricate names, domains, or URLs.
+// @Description Find provenance Source records for filtering and citation. `q` is case-insensitive metadata matching across domain, name, and URL; it is not semantic search. Optional metadata may be omitted when unavailable.
 // @Tags Sources
 // @Produce json
-// @Param q query string false "Case-insensitive match against domain, site name, or base URL."
-// @Param domains query []string false "Exact domain-name filter (CSV)." collectionFormat(csv)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor."
-// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, yaml, toon) default(json)
-// @Success 200 {object} SourceCollectionResponse "Source records"
-// @Failure 400 {object} APIError "Invalid limit, cursor, or parameters"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param q query string false "Case-insensitive Source metadata search." maxlength(1024)
+// @Param domains query []string false "Exact Source domain-name filter (CSV)." collectionFormat(csv)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} SourceCollectionResponse "Source collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceSources
 // @Router /sources [get]
 func (r *Configuration) getSources(c *gin.Context) {
@@ -663,18 +673,18 @@ func (r *Configuration) getSources(c *gin.Context) {
 }
 
 // getSource godoc
-// @Summary Retrieve one intelligence source
-// @Description What metadata is known about this source? This is provenance metadata. It does not return Events published by the source; use GET /events?source_ids={source_id} for that question. Returns 404 when no such source exists.
+// @Summary Retrieve one intelligence Source
+// @Description Retrieve Source provenance metadata by UUID. It does not return Events published by the Source; use `GET /events?source_ids={source_id}` for that use case. Description, favicon, and RSS feed metadata may be omitted when unavailable.
 // @Tags Sources
 // @Produce json
-// @Param source_id path string true "Source record UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, yaml, toon) default(json)
-// @Success 200 {object} SourceItemResponse "The source record"
-// @Failure 400 {object} APIError "Malformed UUID"
-// @Failure 404 {object} APIError "No source with this UUID"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param source_id path string true "Source UUID (RFC 4122)." format(uuid)
+// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Success 200 {object} SourceItemResponse "Source detail envelope"
+// @Failure 400 {object} ErrorResponse "Malformed UUID"
+// @Failure 404 {object} ErrorResponse "No Source with this UUID"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID getIntelligenceSource
 // @Router /sources/{source_id} [get]
 func (r *Configuration) getSource(c *gin.Context) {
@@ -698,24 +708,21 @@ func (r *Configuration) getSource(c *gin.Context) {
 
 // getTags godoc
 // @Summary Discover tag filters for Espresso intelligence
-// @Description Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag value objects extracted from Event and Signal records.
-// @Description **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
-// @Description **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).
-// @Description **Response formats**: `response_type` accepts json, yaml, or toon. JSON returns a collection of `{ "value": "tag" }` objects.
-// @Description **Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.
+// @Description List persisted tag labels available for Event and Signal filtering. Tag filters use fuzzy text matching, so clients can discover useful label vocabulary here without requiring a canonical taxonomy.
+// @Description **Pagination**: follow `pagination.next_page`; `limit` defaults to 20 and is capped at 100.
+// @Description **Formats**: JSON is canonical; YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
 // @Tags Tags
 // @Produce json
-// @Produce plain
-// @Param q query string false "Case-insensitive substring or prefix match."
-// @Param resource query []string false "Optional kind scope (CSV): event, signal." collectionFormat(csv)
-// @Param response_type query string false "Output format: json, yaml, or toon." Enums(json, text) default(json)
-// @Param limit query int false "Page size. Default 20, max 128." default(20) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor returned as next_cursor. Clients must not construct or inspect it."
-// @Success 200 {object} DiscoveryValueCollectionResponse "Tag value objects"
-// @Failure 400 {object} APIError "Invalid limit, cursor, or response_type"
-// @Failure 401 {object} APIError "Missing or invalid API key"
-// @Failure 429 {object} APIError "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} APIError "Database unavailable; retry"
+// @Param q query string false "Case-insensitive substring or prefix match." maxlength(1024)
+// @Param resource query []string false "Optional resource scope (CSV): event, signal." collectionFormat(csv)
+// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} DiscoveryValueCollectionResponse "Tag value collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or response_type"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceTags
 // @Router /tags [get]
 func (r *Configuration) getTags(c *gin.Context) {
@@ -748,17 +755,17 @@ func (r *Configuration) getTags(c *gin.Context) {
 
 // getEntities godoc
 // @Summary Discover Event entities
-// @Description Returns distinct exact company and people strings stored in Event digests.
+// @Description List exact company and people names available for Event filtering. Values are normalized snake_case filter names, not canonical entity IDs or profiles.
 // @Tags Discovery
 // @Produce json
-// @Param q query string false "Case-insensitive substring filter."
-// @Param types query []string false "Entity types: company, people." collectionFormat(csv)
-// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor."
-// @Success 200 {object} DiscoveryValueCollectionResponse
-// @Failure 400 {object} APIError
-// @Failure 500 {object} APIError
+// @Param q query string false "Case-insensitive substring filter." maxlength(1024)
+// @Param types query []string false "Entity types (CSV): company, people." collectionFormat(csv)
+// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} DiscoveryValueCollectionResponse "Entity value collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceEntities
 // @Router /entities [get]
 func (r *Configuration) getEntities(c *gin.Context) {
@@ -786,16 +793,16 @@ func (r *Configuration) getEntities(c *gin.Context) {
 
 // getRegions godoc
 // @Summary Discover Event regions
-// @Description Returns distinct exact region strings stored in Event digests.
+// @Description List exact region names available for Event filtering. Values are normalized snake_case names, not structured geography or canonical place records.
 // @Tags Discovery
 // @Produce json
-// @Param q query string false "Case-insensitive substring filter."
-// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor."
-// @Success 200 {object} DiscoveryValueCollectionResponse
-// @Failure 400 {object} APIError
-// @Failure 500 {object} APIError
+// @Param q query string false "Case-insensitive substring filter." maxlength(1024)
+// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} DiscoveryValueCollectionResponse "Region value collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceRegions
 // @Router /regions [get]
 func (r *Configuration) getRegions(c *gin.Context) {
@@ -819,16 +826,16 @@ func (r *Configuration) getRegions(c *gin.Context) {
 
 // getEventTypes godoc
 // @Summary Discover Event types
-// @Description Returns distinct exact event_type values stored in Event digests.
+// @Description List exact Event type names available for Event filtering. These values can be supplied to `event_types`; `categories` is a separate exact category filter.
 // @Tags Discovery
 // @Produce json
-// @Param q query string false "Case-insensitive substring filter."
-// @Param response_type query string false "Output format." Enums(json, yaml, toon) default(json)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param cursor query string false "Opaque pagination cursor."
-// @Success 200 {object} DiscoveryValueCollectionResponse
-// @Failure 400 {object} APIError
-// @Failure 500 {object} APIError
+// @Param q query string false "Case-insensitive substring filter." maxlength(1024)
+// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Success 200 {object} DiscoveryValueCollectionResponse "Event type value collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceEventTypes
 // @Router /event-types [get]
 func (r *Configuration) getEventTypes(c *gin.Context) {

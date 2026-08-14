@@ -1,7 +1,8 @@
 definitions:
-  db.DiscoveryValue:
+  db.TagValue:
     properties:
       type:
+        example: region
         type: string
       value:
         type: string
@@ -13,30 +14,67 @@ definitions:
       message:
         type: string
     type: object
-  router.DigestDocument:
-    additionalProperties: {}
-    type: object
   router.DiscoveryValueCollectionResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/db.DiscoveryValue'
+          $ref: '#/definitions/db.TagValue'
         type: array
       meta:
         $ref: '#/definitions/router.ResponseMeta'
       pagination:
         $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
+    type: object
+  router.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/router.APIError'
+    type: object
+  router.EventCollectionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/router.EventDocument'
+        type: array
+      meta:
+        $ref: '#/definitions/router.ResponseMeta'
+      pagination:
+        $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
+    type: object
+  router.EventDetailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/router.EventDocument'
+    required:
+    - data
+    type: object
+  router.EventDocument:
+    additionalProperties: {}
     type: object
   router.EventEvidence:
     properties:
       base_url:
         type: string
-      created:
+      created_at:
         type: string
-      event_id:
+      id:
+        type: string
+      kind:
         type: string
       source_id:
         type: string
+      tags:
+        items:
+          type: string
+        type: array
       url:
         type: string
     type: object
@@ -50,34 +88,58 @@ definitions:
         $ref: '#/definitions/router.ResponseMeta'
       pagination:
         $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
     type: object
   router.Pagination:
     properties:
       limit:
         type: integer
-      next_cursor:
+      next_page:
         type: string
+      num_results:
+        type: integer
+      page:
+        type: string
+    required:
+    - limit
+    - next_page
+    - num_results
+    - page
     type: object
   router.ResponseMeta:
     properties:
       as_of:
         type: string
+    required:
+    - as_of
     type: object
-  router.SipCollectionResponse:
+  router.SignalCollectionResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/router.DigestDocument'
+          $ref: '#/definitions/router.SignalDocument'
         type: array
       meta:
         $ref: '#/definitions/router.ResponseMeta'
       pagination:
         $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
     type: object
-  router.SipItemResponse:
+  router.SignalDetailResponse:
     properties:
       data:
-        $ref: '#/definitions/router.DigestDocument'
+        $ref: '#/definitions/router.SignalDocument'
+    required:
+    - data
+    type: object
+  router.SignalDocument:
+    additionalProperties: {}
     type: object
   router.SourceCollectionResponse:
     properties:
@@ -89,8 +151,10 @@ definitions:
         $ref: '#/definitions/router.ResponseMeta'
       pagination:
         $ref: '#/definitions/router.Pagination'
-      success:
-        type: boolean
+    required:
+    - data
+    - meta
+    - pagination
     type: object
   router.SourceDocument:
     properties:
@@ -114,8 +178,8 @@ definitions:
     properties:
       data:
         $ref: '#/definitions/router.SourceDocument'
-      success:
-        type: boolean
+    required:
+    - data
     type: object
 info:
   contact:
@@ -124,10 +188,10 @@ info:
     url: http://cafecito.tech
   description: |-
     MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.
-    An **Event** is any record whose kind starts with `event` (canonical `event`, plus `event:news`, `event:blog`, `event:post`, `event:site`, `event:social`). A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
+    An **Event** is a concrete intelligence record with kind `event`. A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
     Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.
-    Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use cursor pagination: `limit` default 20 max 128, and an opaque `cursor` returned as `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
-    Response formats: use `response_type=json` for structured application data. Use `response_type=text` for MCP/LLM context; it returns the same non-empty digest members as compact field-per-line plain text with `---` record delimiters. Public Event and Signal payloads do not synthesize storage id, created, kind, representation, or object fields.
+    Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use page pagination: `limit` default 20 max 100, and an opaque `page` returned as `next_page`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
+    Response formats: use `response_type=json` for canonical structured application data. Use `response_type=yaml` or `response_type=toon` for token-optimized output to MCP and AI-agent clients. Public Event and Signal payloads expose flattened intelligence fields without embeddings, relation direction, or a nested internal object.
   license:
     name: MIT
   title: Espresso API & MCP
@@ -135,23 +199,25 @@ info:
 paths:
   /entities:
     get:
-      description: Returns distinct exact company and person strings stored in Event
-        digests.
+      description: List exact company and people names available for Event filtering.
+        Values are normalized snake_case filter names, not canonical entity IDs or
+        profiles.
       operationId: listIntelligenceEntities
       parameters:
       - description: Case-insensitive substring filter.
         in: query
+        maxLength: 1024
         name: q
         type: string
       - collectionFormat: csv
-        description: 'Entity types: company, person.'
+        description: 'Entity types (CSV): company, people.'
         in: query
         items:
           type: string
         name: types
         type: array
       - default: json
-        description: Output format.
+        description: Output serialization.
         enum:
         - json
         - yaml
@@ -159,46 +225,49 @@ paths:
         in: query
         name: response_type
         type: string
-      - default: 16
-        description: Page size. Default 16, max 128.
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Entity value collection envelope
           schema:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid limit, page token, or parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Discover Event entities
       tags:
       - Discovery
   /event-types:
     get:
-      description: Returns distinct exact event_type values stored in Event digests.
+      description: List exact Event type names available for Event filtering. These
+        values can be supplied to `event_types`; `categories` is a separate exact
+        category filter.
       operationId: listIntelligenceEventTypes
       parameters:
       - description: Case-insensitive substring filter.
         in: query
+        maxLength: 1024
         name: q
         type: string
       - default: json
-        description: Output format.
+        description: Output serialization.
         enum:
         - json
         - yaml
@@ -206,140 +275,141 @@ paths:
         in: query
         name: response_type
         type: string
-      - default: 16
-        description: Page size. Default 16, max 128.
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Event type value collection envelope
           schema:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid limit, page token, or parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Discover Event types
       tags:
       - Discovery
   /events:
     get:
       description: |-
-        Which Event-family records match my question and filters? Returns every record where kind LIKE event% (canonical event plus event:news, event:blog, event:post, event:site, event:social). Each public item is the raw non-empty flattened digest object; storage fields such as id, created, kind, representation, and object are not synthesized.
-        **When to use**: retrieve concrete developments, incidents, company actions, policy changes, or market moves before moving to higher-level signals.
-        **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
-        **Time**: `from`/`to` are inclusive bounds on record `created_at` until an occurrence-time field exists. They do not claim Event occurrence time.
-        **Tags**: match on persisted tags uses overlap (any supplied tag).
-        **Response shape**: raw non-empty flattened digest members. Use the detail route for follow-up links and relation counts.
-        **Agent format**: use `response_type=text` for compact field-per-line records with `---` delimiters when feeding an LLM or MCP client.
+        Find Event records that match optional filters and an optional semantic query. Use this route to find concrete developments before following an Event's detail, evidence, or Signal links.
+        **Time**: `from` and `to` are inclusive ISO date-only bounds on record `created_at`; they are not occurrence or publication timestamps.
+        **Filters**: tags use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after normalizing names to snake_case. `categories` is a separate category filter from `event_types`.
+        **Output**: Event collections contain flattened intelligence fields plus `id`, `created_at`, and `kind`; provenance fields are available on the detail route when usable. YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
       operationId: searchEvents
       parameters:
-      - description: Natural-language semantic search query. Max 1024 characters;
-          requires the embedder. When present, default sort is relevance.
+      - description: Optional natural-language semantic query. Max 1024 characters.
         in: query
         maxLength: 1024
         name: q
         type: string
-      - default: 0.5
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
-        in: query
-        maximum: 1
-        minimum: 0
-        name: acc
-        type: number
-      - description: Only include records created on or after this date (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive created_at lower bound (YYYY-MM-DD).
+        format: date
         in: query
         name: from
         type: string
-      - description: Only include records created on or before this date (RFC3339
-          timestamp).
-        format: date-time
+      - description: Inclusive created_at upper bound (YYYY-MM-DD).
+        format: date
         in: query
         name: to
         type: string
       - collectionFormat: csv
-        description: Restrict to known Event-family IDs (CSV). Prefer the detail route
-          for one ID.
+        description: Restrict to Event UUIDs (CSV).
         in: query
         items:
           type: string
         name: ids
         type: array
       - collectionFormat: csv
-        description: Allowlisted match against digest.event_type (CSV).
+        description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
         in: query
         items:
           type: string
         name: event_types
         type: array
       - collectionFormat: csv
-        description: 'Match digest.impact_level (CSV): low, medium, high.'
+        description: Exact category names in snake_case (CSV), for example regulation,technology.
+          This is separate from event_types.
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Exact entity names in snake_case, matched against company or
+          people names (CSV), for example microsoft,nvidia.
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Exact impact-level names (CSV), for example high,medium.
         in: query
         items:
           type: string
         name: impact_levels
         type: array
       - collectionFormat: csv
-        description: Match digest.companies array (CSV).
+        description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
         in: query
         items:
           type: string
         name: companies
         type: array
       - collectionFormat: csv
-        description: Match digest.people array (CSV).
+        description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
         in: query
         items:
           type: string
         name: people
         type: array
       - collectionFormat: csv
-        description: Match digest.products array (CSV).
+        description: Exact product names in snake_case (CSV), for example windows,geforce.
         in: query
         items:
           type: string
         name: products
         type: array
       - collectionFormat: csv
-        description: Match digest.regions array (CSV).
+        description: Exact region names in snake_case (CSV), for example north_america,europe.
         in: query
         items:
           type: string
         name: regions
         type: array
       - collectionFormat: csv
-        description: Match the persisted source UUID, including direct SAME_AS evidence
-          coverage (CSV).
+        description: Restrict to direct Event source UUIDs (CSV).
         in: query
         items:
           type: string
         name: source_ids
         type: array
       - collectionFormat: csv
-        description: Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all
-          requires every supplied tag.
+        description: Fuzzy text match against persisted tag labels (CSV).
         in: query
         items:
           type: string
         name: tags
         type: array
       - default: json
-        description: Output format. json returns the collection envelope; text returns
-          compact plain-text records.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
         - yaml
@@ -348,267 +418,287 @@ paths:
         name: response_type
         type: string
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor. Clients must
-          not construct or inspect it.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: Event-family records when response_type=json; plain-text event
-            blocks when response_type=text
+          description: Event collection envelope
           schema:
-            $ref: '#/definitions/router.SipCollectionResponse'
+            $ref: '#/definitions/router.EventCollectionResponse'
         "400":
-          description: Invalid query parameters, malformed UUID, or malformed cursor
+          description: Invalid query parameters, malformed UUID, or malformed page
+            token
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Search Event-family records
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Search Events
       tags:
       - Events
   /events/{event_id}:
     get:
-      description: What Event-family record has this UUID? Retrieves any record whose
-        kind starts with `event` by UUID and returns its raw non-empty flattened digest
-        members plus detail metadata links and relation counts. Returns 404 when no
-        such record exists.
+      description: Retrieve an Event by UUID. The detail payload contains flattened
+        intelligence fields and detail-only provenance, optional Source metadata,
+        relation links, and relation counts. `created_at` is the record creation time,
+        not an Event occurrence date.
       operationId: getEvent
       parameters:
-      - description: Event-family record UUID (RFC 4122).
+      - description: Event UUID (RFC 4122).
         format: uuid
         in: path
         name: event_id
         required: true
         type: string
       - default: json
-        description: Output format. json returns the detail envelope; text returns
-          a compact plain-text record.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: The Event-family record
+          description: Event detail envelope
           schema:
-            $ref: '#/definitions/router.SipItemResponse'
+            $ref: '#/definitions/router.EventDetailResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: No Event-family record with this UUID
+          description: No Event with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Retrieve one Event-family record
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Retrieve one Event
       tags:
       - Events
-  /events/{id}/evidence:
+  /events/{event_id}/evidence:
     get:
-      description: 'Which source-specific records support this Event? Returns a bare
-        JSON list containing the requested Event and every direct SAME_AS Event-family
-        neighbour in both relation orientations. Each item contains only event_id,
-        created, source_id, url, and base_url. The default scope is direct_same_as:
-        a bounded claim about current data, not a complete transitive equivalence
-        closure.'
+      description: Show the directly related records that make up an Event's evidence
+        trail, helping clients assess source coverage. It is not article content or
+        story membership. The item projection exposes record identity, creation time,
+        tags, source ID, and available URLs.
       operationId: getEventEvidence
       parameters:
-      - description: Event-family record UUID (RFC 4122).
+      - description: Event UUID (RFC 4122).
         format: uuid
         in: path
-        name: id
+        name: event_id
         required: true
         type: string
       - collectionFormat: csv
-        description: Restrict evidence to selected sources (CSV).
+        description: Restrict returned evidence records to Event UUIDs (CSV).
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
+      - collectionFormat: csv
+        description: Restrict direct evidence records to Source UUIDs (CSV).
         in: query
         items:
           type: string
         name: source_ids
         type: array
-      - description: Inclusive evidence created_at lower bound (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive evidence created_at lower bound (YYYY-MM-DD).
+        format: date
         in: query
         name: from
         type: string
-      - description: Inclusive evidence created_at upper bound (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive evidence created_at upper bound (YYYY-MM-DD).
+        format: date
         in: query
         name: to
         type: string
       - default: json
-        description: Output format. json returns the bare evidence list; text returns
-          the same records as compact plain text.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque page token. Follow pagination.next_page for the next page.
+        in: query
+        name: page
+        type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: Event evidence collection
+          description: Event evidence collection envelope
           schema:
             $ref: '#/definitions/router.EventEvidenceCollectionResponse'
         "400":
           description: Malformed UUID or invalid parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: No Event-family record with this UUID
+          description: No Event with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Retrieve Event evidence
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Retrieve an Event evidence trail
       tags:
       - Events
-  /events/{id}/signals:
+  /events/{event_id}/signals:
     get:
-      description: Which broader conclusions use this Event as evidence? Returns Signals
-        whose DERIVED_FROM edges target the requested Event or any of its direct SAME_AS
-        equivalents. The caller does not need to know which Event-family record was
-        used as the relation target. Returns 404 when the Event does not exist; 200
-        with an empty collection when it exists but has no Signals.
+      description: Return the higher-level Signals that were derived from the Event's
+        evidence trail. Use this relation route after retrieving an Event to inspect
+        synthesized conclusions; an existing Event with no matching Signals returns
+        an empty collection.
       operationId: getEventSignals
       parameters:
-      - description: Event-family record UUID (RFC 4122).
+      - description: Event UUID (RFC 4122).
         format: uuid
         in: path
-        name: id
+        name: event_id
         required: true
         type: string
-      - description: Inclusive Signal created_at lower bound (RFC3339 timestamp).
-        format: date-time
+      - collectionFormat: csv
+        description: Restrict returned Signals to Signal UUIDs (CSV).
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
+      - description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+        format: date
         in: query
         name: from
         type: string
-      - description: Inclusive Signal created_at upper bound (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+        format: date
         in: query
         name: to
         type: string
       - collectionFormat: csv
-        description: Match Signal digest.impact_level (CSV).
+        description: Exact impact-level names (CSV), for example high,medium.
         in: query
         items:
           type: string
         name: impact_levels
         type: array
       - collectionFormat: csv
-        description: Match Signal digest.impacted_domains array (CSV).
+        description: Exact impacted-domain names in snake_case (CSV), for example
+          public_health,climate.
         in: query
         items:
           type: string
         name: impacted_domains
         type: array
       - collectionFormat: csv
-        description: Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all
-          requires every supplied tag.
+        description: Fuzzy text match against persisted Signal tag labels (CSV).
         in: query
         items:
           type: string
         name: tags
         type: array
       - default: json
-        description: Output format. json returns the collection envelope; text returns
-          compact plain-text records.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
           description: Signals derived from this Event
           schema:
-            $ref: '#/definitions/router.SipCollectionResponse'
+            $ref: '#/definitions/router.SignalCollectionResponse'
         "400":
-          description: Malformed UUID, invalid cursor, or invalid parameters
+          description: Malformed UUID, invalid page token, or invalid parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: No Event-family record with this UUID
+          description: No Event with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Retrieve Signals derived from an Event
       tags:
       - Events
@@ -632,15 +722,17 @@ paths:
       - Health
   /regions:
     get:
-      description: Returns distinct exact region strings stored in Event digests.
+      description: List exact region names available for Event filtering. Values are
+        normalized snake_case names, not structured geography or canonical place records.
       operationId: listIntelligenceRegions
       parameters:
       - description: Case-insensitive substring filter.
         in: query
+        maxLength: 1024
         name: q
         type: string
       - default: json
-        description: Output format.
+        description: Output serialization.
         enum:
         - json
         - yaml
@@ -648,343 +740,375 @@ paths:
         in: query
         name: response_type
         type: string
-      - default: 16
-        description: Page size. Default 16, max 128.
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Region value collection envelope
           schema:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid limit, page token, or parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Discover Event regions
       tags:
       - Discovery
   /signals:
     get:
       description: |-
-        Which synthesized conclusions or forecasts match my question? Returns signal-kind records. A Signal is returned intelligence, not a saved monitoring definition.
-        **Search modes**: `q` + `acc` for semantic search (default sort becomes `relevance`); without `q` records are sorted by `created_at` descending (`recent`).
-        **Time**: `from`/`to` are inclusive bounds on Signal `created_at`.
-        **Tags**: match on persisted tags uses overlap (any supplied tag).
+        Find synthesized Signal records with optional filters and an optional semantic query. Use this route for higher-level conclusions, then follow a Signal detail or supporting-Events link to inspect its basis.
+        **Time**: `from` and `to` are inclusive ISO date-only bounds on Signal `created_at`.
+        **Filters**: tags use fuzzy text matching. Impact levels and impacted domains use exact snake_case matching. Collection items omit provenance fields; use Signal detail when Source metadata is usable.
       operationId: searchSignals
       parameters:
-      - description: Natural-language semantic search query. Max 1024 characters.
+      - description: Optional natural-language semantic query. Max 1024 characters.
         in: query
         maxLength: 1024
         name: q
         type: string
-      - default: 0.5
-        description: Match strictness for q. 0.0=broad, 1.0=strict. Default 0.5.
-        in: query
-        maximum: 1
-        minimum: 0
-        name: acc
-        type: number
-      - description: Inclusive Signal created_at lower bound (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+        format: date
         in: query
         name: from
         type: string
-      - description: Inclusive Signal created_at upper bound (RFC3339 timestamp).
-        format: date-time
+      - description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+        format: date
         in: query
         name: to
         type: string
       - collectionFormat: csv
-        description: Restrict to known Signal IDs (CSV).
+        description: Restrict to Signal UUIDs (CSV).
         in: query
         items:
           type: string
         name: ids
         type: array
       - collectionFormat: csv
-        description: Match Signal digest.impact_level (CSV).
+        description: Exact impact-level names (CSV), for example high,medium.
         in: query
         items:
           type: string
         name: impact_levels
         type: array
       - collectionFormat: csv
-        description: Match Signal digest.impacted_domains array (CSV).
+        description: Exact impacted-domain names in snake_case (CSV), for example
+          public_health,climate.
         in: query
         items:
           type: string
         name: impacted_domains
         type: array
       - collectionFormat: csv
-        description: Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all
-          requires every supplied tag.
+        description: Fuzzy text match against persisted Signal tag labels (CSV).
         in: query
         items:
           type: string
         name: tags
         type: array
-      - default: any
-        description: Tag matching mode.
-        enum:
-        - any
-        - all
-        in: query
-        name: tag_mode
-        type: string
-      - default: recent
-        description: Sort order. recent=created_at desc (default), relevance=semantic
-          distance asc (requires q).
-        enum:
-        - recent
-        - relevance
-        in: query
-        name: sort
-        type: string
       - default: json
-        description: Output format. json returns the collection envelope; text returns
-          compact plain-text records.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: Signal records
+          description: Signal collection envelope
           schema:
-            $ref: '#/definitions/router.SipCollectionResponse'
+            $ref: '#/definitions/router.SignalCollectionResponse'
         "400":
-          description: Invalid query parameters, malformed UUID, or malformed cursor
+          description: Invalid query parameters, malformed UUID, or malformed page
+            token
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Search synthesized Signals
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Search Signals
       tags:
       - Signals
-  /signals/{id}:
+  /signals/{signal_id}:
     get:
-      description: What is the complete Signal with this UUID? Retrieves one signal-kind
-        record by UUID. The detail payload links to supporting Events instead of inventing
-        inline event references from unstructured digest strings. Returns 404 when
-        no such Signal exists.
+      description: Retrieve a Signal by UUID. The detail payload contains flattened
+        intelligence fields, optional provenance when a usable Source exists, and
+        links/counts for supporting Events. `created_at` is the Signal record creation
+        time.
       operationId: getSignal
       parameters:
-      - description: Signal record UUID (RFC 4122).
+      - description: Signal UUID (RFC 4122).
         format: uuid
         in: path
         name: signal_id
         required: true
         type: string
       - default: json
-        description: Output format. json returns the detail envelope; text returns
-          a compact plain-text record.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: The Signal record
+          description: Signal detail envelope
           schema:
-            $ref: '#/definitions/router.SipItemResponse'
+            $ref: '#/definitions/router.SignalDetailResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Signal with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Retrieve one Signal
       tags:
       - Signals
   /signals/{signal_id}/events:
     get:
-      description: Which Event-family records support this Signal? Follows DERIVED_FROM
-        edges in the stored signal-to-event direction and returns raw non-empty flattened
-        digest members from direct Event-family targets. Returns 404 when the Signal
-        does not exist; 200 with an empty collection when it exists but has no supporting
-        Events.
+      description: Return the Events that were used to derive the Signal, so clients
+        can inspect the basis of its conclusion. An existing Signal with no matching
+        Events returns an empty collection.
       operationId: getSignalEvents
       parameters:
-      - description: Signal record UUID (RFC 4122).
+      - description: Signal UUID (RFC 4122).
         format: uuid
         in: path
-        name: id
+        name: signal_id
         required: true
         type: string
-      - description: Inclusive Event created_at lower bound (RFC3339 timestamp).
-        format: date-time
-        in: query
-        name: from
-        type: string
-      - description: Inclusive Event created_at upper bound (RFC3339 timestamp).
-        format: date-time
-        in: query
-        name: to
-        type: string
       - collectionFormat: csv
-        description: Match digest.event_type (CSV).
+        description: Restrict returned Events to Event UUIDs (CSV).
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
+      - collectionFormat: csv
+        description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
         in: query
         items:
           type: string
         name: event_types
         type: array
       - collectionFormat: csv
-        description: Match digest.impact_level (CSV).
+        description: Exact category names in snake_case (CSV), for example regulation,technology.
+          This is separate from event_types.
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Exact entity names in snake_case, matched against company or
+          people names (CSV), for example microsoft,nvidia.
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Exact impact-level names (CSV), for example high,medium.
         in: query
         items:
           type: string
         name: impact_levels
         type: array
       - collectionFormat: csv
-        description: Match persisted tags (CSV). tag_mode=any uses overlap; tag_mode=all
-          requires every supplied tag.
+        description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+        in: query
+        items:
+          type: string
+        name: companies
+        type: array
+      - collectionFormat: csv
+        description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+        in: query
+        items:
+          type: string
+        name: people
+        type: array
+      - collectionFormat: csv
+        description: Exact product names in snake_case (CSV), for example windows,geforce.
+        in: query
+        items:
+          type: string
+        name: products
+        type: array
+      - collectionFormat: csv
+        description: Exact region names in snake_case (CSV), for example north_america,europe.
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Restrict returned Events to Source UUIDs (CSV).
+        in: query
+        items:
+          type: string
+        name: source_ids
+        type: array
+      - collectionFormat: csv
+        description: Fuzzy text match against persisted Event tag labels (CSV).
         in: query
         items:
           type: string
         name: tags
         type: array
+      - description: Inclusive Event created_at lower bound (YYYY-MM-DD).
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: Inclusive Event created_at upper bound (YYYY-MM-DD).
+        format: date
+        in: query
+        name: to
+        type: string
       - default: json
-        description: Output format. json returns the collection envelope; text returns
-          compact plain-text records.
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: Event-family records supporting this Signal
+          description: Events supporting this Signal
           schema:
-            $ref: '#/definitions/router.SipCollectionResponse'
+            $ref: '#/definitions/router.EventCollectionResponse'
         "400":
-          description: Malformed UUID, invalid cursor, or invalid parameters
+          description: Malformed UUID, invalid page token, or invalid parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Signal with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database or embedder unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Retrieve Event-family records supporting a Signal
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Retrieve Events supporting a Signal
       tags:
       - Signals
   /sources:
     get:
-      description: Which source records can I filter by or cite? Returns provenance
-        records keyed by UUID. Optional source metadata may be null; missing optional
-        metadata is not an error and the API does not fabricate names, domains, or
-        URLs.
+      description: Find provenance Source records for filtering and citation. `q`
+        is case-insensitive metadata matching across domain, name, and URL; it is
+        not semantic search. Optional metadata may be omitted when unavailable.
       operationId: listIntelligenceSources
       parameters:
-      - description: Case-insensitive match against domain, site name, or base URL.
+      - description: Case-insensitive Source metadata search.
         in: query
+        maxLength: 1024
         name: q
         type: string
       - collectionFormat: csv
-        description: Exact domain-name filter (CSV).
+        description: Exact Source domain-name filter (CSV).
         in: query
         items:
           type: string
         name: domains
         type: array
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       - default: json
-        description: 'Output format: json, yaml, or toon.'
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
         - yaml
@@ -996,43 +1120,45 @@ paths:
       - application/json
       responses:
         "200":
-          description: Source records
+          description: Source collection envelope
           schema:
             $ref: '#/definitions/router.SourceCollectionResponse'
         "400":
-          description: Invalid limit, cursor, or parameters
+          description: Invalid limit, page token, or parameters
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: List intelligence sources
       tags:
       - Sources
   /sources/{source_id}:
     get:
-      description: What metadata is known about this source? This is provenance metadata.
-        It does not return Events published by the source; use GET /events?source_ids={source_id}
-        for that question. Returns 404 when no such source exists.
+      description: Retrieve Source provenance metadata by UUID. It does not return
+        Events published by the Source; use `GET /events?source_ids={source_id}` for
+        that use case. Description, favicon, and RSS feed metadata may be omitted
+        when unavailable.
       operationId: getIntelligenceSource
       parameters:
-      - description: Source record UUID (RFC 4122).
+      - description: Source UUID (RFC 4122).
         format: uuid
         in: path
         name: source_id
         required: true
         type: string
       - default: json
-        description: 'Output format: json, yaml, or toon.'
+        description: Output serialization. JSON is canonical; YAML and TOON are token-optimized
+          for MCP and AI-agent clients.
         enum:
         - json
         - yaml
@@ -1044,97 +1170,95 @@ paths:
       - application/json
       responses:
         "200":
-          description: The source record
+          description: Source detail envelope
           schema:
             $ref: '#/definitions/router.SourceItemResponse'
         "400":
           description: Malformed UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: No source with this UUID
+          description: No Source with this UUID
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
-      summary: Retrieve one intelligence source
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Retrieve one intelligence Source
       tags:
       - Sources
   /tags:
     get:
       description: |-
-        Which exact tag strings are valid filters? Returns a paginated, alphabetically sorted list of unique tag value objects extracted from Event and Signal records.
-        **When to use**: call this before searchEvents or searchSignals when an agent needs valid tag vocabulary instead of guessing filter values.
-        **Filter behavior**: tags returned here can be passed to `tags` on `/events` and `/signals`; matching uses overlap (any supplied tag).
-        **Response formats**: `response_type` accepts json, yaml, or toon. JSON returns a collection of `{ "value": "tag" }` objects.
-        **Pagination**: cursor-based. Use `next_cursor` to continue; `limit` default 20, max 128.
+        List persisted tag labels available for Event and Signal filtering. Tag filters use fuzzy text matching, so clients can discover useful label vocabulary here without requiring a canonical taxonomy.
+        **Pagination**: follow `pagination.next_page`; `limit` defaults to 20 and is capped at 100.
+        **Formats**: JSON is canonical; YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
       operationId: listIntelligenceTags
       parameters:
       - description: Case-insensitive substring or prefix match.
         in: query
+        maxLength: 1024
         name: q
         type: string
       - collectionFormat: csv
-        description: 'Optional kind scope (CSV): event, signal.'
+        description: 'Optional resource scope (CSV): event, signal.'
         in: query
         items:
           type: string
         name: resource
         type: array
       - default: json
-        description: 'Output format: json, yaml, or toon.'
+        description: Output serialization.
         enum:
         - json
-        - text
+        - yaml
+        - toon
         in: query
         name: response_type
         type: string
       - default: 20
-        description: Page size. Default 20, max 128.
+        description: Maximum records per page. Default 20, max 100.
         in: query
-        maximum: 128
+        maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - description: Opaque pagination cursor returned as next_cursor. Clients must
-          not construct or inspect it.
+      - description: Opaque page token. Follow pagination.next_page for the next page.
         in: query
-        name: cursor
+        name: page
         type: string
       produces:
       - application/json
-      - text/plain
       responses:
         "200":
-          description: Tag value objects
+          description: Tag value collection envelope
           schema:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
-          description: Invalid limit, cursor, or response_type
+          description: Invalid limit, page token, or response_type
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "401":
           description: Missing or invalid API key
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "429":
           description: Concurrency limit exceeded; retry shortly
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Database unavailable; retry
           schema:
-            $ref: '#/definitions/router.APIError'
+            $ref: '#/definitions/router.ErrorResponse'
       summary: Discover tag filters for Espresso intelligence
       tags:
       - Tags

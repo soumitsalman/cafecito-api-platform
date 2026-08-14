@@ -63,7 +63,7 @@ func whereCreated(where *[]string, params pgx.NamedArgs, from, to time.Time, pre
 	}
 }
 
-// whereTags appends the allowlisted any tag predicate.
+// whereTags appends the exact tag-overlap predicate used by legacy/internal callers.
 func whereTags(where *[]string, params pgx.NamedArgs, tags []string, prefix string) {
 	if len(tags) > 0 {
 		*where = append(*where, prefix+"tags && @tags")
@@ -71,7 +71,7 @@ func whereTags(where *[]string, params pgx.NamedArgs, tags []string, prefix stri
 	}
 }
 
-// appendTagsFtsWhere appends the allowlisted any tag FTS predicate.
+// whereTagsFts appends fuzzy text matching for public tag filters.
 func whereTagsFts(where *[]string, params pgx.NamedArgs, tags []string, prefix string) {
 	if len(tags) > 0 {
 		*where = append(*where, prefix+"tags_fts @@ plainto_tsquery('simple', @tags)")
@@ -80,6 +80,10 @@ func whereTagsFts(where *[]string, params pgx.NamedArgs, tags []string, prefix s
 }
 
 func whereDigest(where *[]string, params pgx.NamedArgs, filters *Filters, prefix string) {
+	if len(filters.Entities) > 0 {
+		*where = append(*where, "("+prefix+"digest->'companies' ?| @entities OR "+prefix+"digest->'people' ?| @entities)")
+		params["entities"] = filters.Entities
+	}
 	if len(filters.Categories) > 0 {
 		*where = append(*where, prefix+"digest->'categories' ?| @categories")
 		params["categories"] = filters.Categories
@@ -126,7 +130,7 @@ func buildWhere(filters *Filters, alias string) ([]string, pgx.NamedArgs) {
 	whereSourceIDs(&where, params, filters.SourceIDs, alias)
 	whereKind(&where, params, filters.Kind, alias)
 	whereCreated(&where, params, filters.CreatedFrom, filters.CreatedTo, alias)
-	whereTags(&where, params, filters.Tags, alias)
+	whereTagsFts(&where, params, filters.Tags, alias)
 	whereDigest(&where, params, filters, alias)
 
 	return where, params

@@ -115,8 +115,8 @@ type Page[T any] struct {
 
 // TagValue is one exact value exposed by a discovery route.
 type TagValue struct {
-	Value string `db:"value" json:"value"`
-	Type  string `db:"type" json:"type,omitempty" example:"region"`
+	Value string `db:"value" json:"value" toon:"value"`
+	Type  string `db:"type" json:"type,omitempty" toon:"type,omitempty" example:"region"`
 }
 
 type Filters struct {
@@ -126,6 +126,7 @@ type Filters struct {
 	CreatedFrom     time.Time
 	CreatedTo       time.Time
 	Tags            []string
+	Entities        []string
 	Categories      []string
 	Companies       []string
 	People          []string

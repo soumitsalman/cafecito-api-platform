@@ -30,17 +30,20 @@ cd apis/beans && go test ./tests/...
 cd apis/espresso && go test ./tests/...
 ```
 
-For testing vector search run llama-server locally and set `EMBEDDER_BASE_URL=http://localhost:10000`
+For testing vector search, run llama-server from the repo root and set `EMBEDDER_BASE_URL=http://localhost:10000`. It stays in the foreground; success looks like `listening on http://127.0.0.1:10000` (about 1s). This local binary is CPU-only.
 ```bash
 apis/.tools/llama-server/llama-server \
   --model apis/.models/F2LLM-v2-80M.Q8_0.gguf \
   --embedding \
   --pooling last \
   --embd-normalize 2 \
-  --verbosity 1 \
-  --ctx-size 2048 \
+  --verbosity 3 \
+  --ctx-size 16384 \
   --parallel 32 \
-  -ngl 99  \
+  --batch-size 512 \
+  --ubatch-size 512 \
+  --host 127.0.0.1 \
+  --n-gpu-layers all \
   --port 10000
 ```
 

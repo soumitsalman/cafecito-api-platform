@@ -144,6 +144,14 @@ const config: ZudokuConfig = {
             },
             {
               type: "doc",
+              file: "howtos/espresso-scenarios",
+            },
+            {
+              type: "doc",
+              file: "howtos/espresso-migration",
+            },
+            {
+              type: "doc",
               file: "howtos/cortado-howto",
             },
           ],
