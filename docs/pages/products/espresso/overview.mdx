@@ -230,17 +230,123 @@ Source `q` is case-insensitive metadata matching across source domain, name, and
 
 ## JSON, YAML, TOON, and MCP
 
-`response_type=json` is the canonical contract. Add `response_type=yaml` or `response_type=toon` to any supported Espresso route when an MCP client or AI agent benefits from a token-optimized response.
+Set `response_type` to choose the representation returned by any Espresso route. JSON is the canonical format. YAML and TOON carry the same response fields in formats optimized for MCP and AI-agent context.
 
-```bash
-curl -s --get "${BASE_URL}/espresso/signals" \
-  -H "Authorization: Bearer ${API_KEY}" \
-  --data-urlencode "q=regional supply pressure" \
-  --data-urlencode "response_type=toon" \
-  --data-urlencode "limit=5"
+The following excerpts use real values from a one-Event response returned by `GET /events?limit=1` from the running Espresso service. Selected fields are shown so the three serializations remain easy to compare; `meta.as_of` changes on every request.
+
+<CodeTabs syncKey="espresso-response-types">
+```json title="JSON"
+{
+  "data": [
+    {
+      "activities": [
+        "2026-08-13 NDC president Peter Obi declares Nigerian youths great assets",
+        "2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors"
+      ],
+      "created_at": "2026-08-13T02:30:04-04:00",
+      "event_type": "youth_empowerment_declaration",
+      "forecast": "Increased public funding directed at youth programs within six months",
+      "id": "9cefc4ae-cad9-548e-9f5f-28ef22327a13",
+      "impact_level": "high",
+      "impacted_domains": ["education", "employment", "technology"],
+      "impacts": [
+        "Nigeria's government commits resources toward youth development initiatives",
+        "Private sector encouraged to engage young professionals across multiple domains"
+      ],
+      "kind": "event",
+      "macro_context": "african_demographic_dividend_strategy",
+      "people": ["peter_obi"],
+      "regions": ["bauchi"],
+      "summary": "Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.",
+      "tags": [
+        "african_demographic_dividend_strategy",
+        "entrepreneurship_and_startups",
+        "peter_obi",
+        "news",
+        "bauchi",
+        "digital_communities_and_online_platforms"
+      ]
+    }
+  ],
+  "pagination": {
+    "limit": 1,
+    "num_results": 1,
+    "page": null,
+    "next_page": null
+  },
+  "meta": {
+    "as_of": "2026-08-14T17:44:34.874458971Z"
+  }
+}
 ```
 
-YAML and TOON preserve the same records, filters, and pagination as JSON. Use JSON for schema-sensitive parsing, and use YAML or TOON when compact agent context is more useful.
+```yaml title="YAML"
+data:
+- activities:
+  - 2026-08-13 NDC president Peter Obi declares Nigerian youths great assets
+  - 2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors
+  created_at: 2026-08-13T02:30:04-04:00
+  event_type: youth_empowerment_declaration
+  forecast: Increased public funding directed at youth programs within six months
+  id: 9cefc4ae-cad9-548e-9f5f-28ef22327a13
+  impact_level: high
+  impacted_domains:
+  - education
+  - employment
+  - technology
+  impacts:
+  - Nigeria's government commits resources toward youth development initiatives
+  - Private sector encouraged to engage young professionals across multiple domains
+  kind: event
+  macro_context: african_demographic_dividend_strategy
+  people:
+  - peter_obi
+  regions:
+  - bauchi
+  summary: Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.
+  tags:
+  - african_demographic_dividend_strategy
+  - entrepreneurship_and_startups
+  - peter_obi
+  - news
+  - bauchi
+  - digital_communities_and_online_platforms
+pagination:
+  limit: 1
+  num_results: 1
+  page: null
+  next_page: null
+meta:
+  as_of: 2026-08-14T17:44:34.897815116Z
+```
+
+```text title="TOON"
+data[1]:
+  - activities[2]: 2026-08-13 NDC president Peter Obi declares Nigerian youths great assets,2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors
+    created_at: "2026-08-13T06:30:04Z"
+    event_type: youth_empowerment_declaration
+    forecast: Increased public funding directed at youth programs within six months
+    id: 9cefc4ae-cad9-548e-9f5f-28ef22327a13
+    impact_level: high
+    impacted_domains[3]: education,employment,technology
+    impacts[2]: Nigeria's government commits resources toward youth development initiatives,Private sector encouraged to engage young professionals across multiple domains
+    kind: event
+    macro_context: african_demographic_dividend_strategy
+    people[1]: peter_obi
+    regions[1]: bauchi
+    summary: Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.
+    tags[6]: african_demographic_dividend_strategy,entrepreneurship_and_startups,peter_obi,news,bauchi,digital_communities_and_online_platforms
+pagination:
+  limit: 1
+  num_results: 1
+  page: null
+  next_page: null
+meta:
+  as_of: "2026-08-14T17:44:34.912410727Z"
+```
+</CodeTabs>
+
+Use JSON when a client needs strict JSON parsing. Use YAML when readable indentation is more useful. Use TOON when an agent needs the same fields in the most compact representation. `pagination.next_page` remains opaque in every format: send it unchanged as the next request `page`.
 
 MCP clients can connect to `https://api.cafecito.tech/espresso/mcp` with the same API key. See [MCP & AI agents](/guides/mcp-ai-agents) for the tool list and agent operating guidance.
 
