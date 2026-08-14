@@ -1,0 +1,663 @@
+---
+title: Workflows
+description: Compose Espresso Events, Signals, evidence, Sources, discovery, and pagination into multi-call agent workflows.
+---
+
+# Espresso for Your Workflows
+
+Espresso answers richer questions through a small sequence of focused calls. Start with the route that matches the user question, carry forward only returned IDs or filter values, and stop once the answer has enough support.
+
+Every REST scenario includes a complete JavaScript and Python implementation alongside cURL. JavaScript examples use the built-in `fetch` available in Node.js 18 and later. Python examples require `requests`.
+
+## Operating rules for agents
+
+| Rule | Why it matters |
+| --- | --- |
+| Search **Events** for concrete developments and **Signals** for conclusions or outlook. | This avoids treating a conclusion as raw evidence or a development as an interpretation. |
+| Read IDs from `data[].id` and preserve them exactly. | Event, Signal, and Source UUIDs are the handoff between calls. |
+| Use discovery only when an exact value is unknown. | Known normalized values can go directly into a search. |
+| Keep fuzzy `tags` separate from exact structured filters. | `categories`, `event_types`, `companies`, `people`, `products`, and `regions` use exact snake_case values. |
+| Treat `pagination.next_page` as opaque. | Send it back unchanged as `page`; `num_results` is only the count for the current page. |
+| Request detail, evidence, or support only for selected records. | This keeps agent context small and the answer traceable. |
+
+## Scenario 1: Discover vocabulary, find Events, then inspect evidence
+
+**Use when:** The request contains human terms and the agent needs accepted filter vocabulary before searching.
+
+**Call sequence:** 5 calls
+
+1. `GET /espresso/tags?resource=event` to find fuzzy Event tag labels.
+2. `GET /espresso/entities?types=company` to find exact company values.
+3. `GET /espresso/regions` when the request has a geographic constraint.
+4. `GET /espresso/events` using selected filter values.
+5. `GET /espresso/events/{event_id}/evidence` for a selected Event.
+
+<CodeTabs syncKey="espresso-scenario-1">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function get(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+const [tagPage, companyPage, regionPage] = await Promise.all([
+  get("/espresso/tags", { resource: "event", limit: 20 }),
+  get("/espresso/entities", { types: "company", limit: 20 }),
+  get("/espresso/regions", { limit: 20 }),
+]);
+
+const eventPage = await get("/espresso/events", {
+  companies: "microsoft,nvidia",
+  regions: "north_america",
+  tags: "policy,supply_chain",
+  limit: 20,
+});
+const event = eventPage.data.at(0);
+const evidencePage = event
+  ? await get(`/espresso/events/${event.id}/evidence`, { limit: 20 })
+  : { data: [] };
+
+console.log({
+  filterVocabulary: {
+    tags: tagPage.data,
+    companies: companyPage.data,
+    regions: regionPage.data,
+  },
+  event: event ?? null,
+  evidence: evidencePage.data,
+});
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+base_url = "https://api.cafecito.tech"
+session = requests.Session()
+session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+def get(path, params=None):
+    response = session.get(f"{base_url}{path}", params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+tag_page = get("/espresso/tags", {"resource": "event", "limit": 20})
+company_page = get("/espresso/entities", {"types": "company", "limit": 20})
+region_page = get("/espresso/regions", {"limit": 20})
+event_page = get(
+    "/espresso/events",
+    {
+        "companies": "microsoft,nvidia",
+        "regions": "north_america",
+        "tags": "policy,supply_chain",
+        "limit": 20,
+    },
+)
+
+event = event_page["data"][0] if event_page["data"] else None
+event_id = event["id"] if event else None
+evidence_page = (
+    get(f"/espresso/events/{event_id}/evidence", {"limit": 20})
+    if event_id
+    else {"data": []}
+)
+
+print(
+    {
+        "filter_vocabulary": {
+            "tags": tag_page["data"],
+            "companies": company_page["data"],
+            "regions": region_page["data"],
+        },
+        "event": event,
+        "evidence": evidence_page["data"],
+    }
+)
+```
+
+```bash title="cURL"
+# Discover values only when they are not already known.
+curl -s "${BASE_URL}/espresso/tags?resource=event&limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/entities?types=company&limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/regions?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# Search using fuzzy tags and exact structured values.
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "companies=microsoft,nvidia" \
+  --data-urlencode "regions=north_america" \
+  --data-urlencode "tags=policy,supply_chain" \
+  --data-urlencode "limit=20"
+
+# Inspect context for one selected Event.
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+**Agent stop condition:** Return the selected Event with evidence context. Do not request evidence for every Event in the collection.
+
+## Scenario 2: Find a development, then understand its implications
+
+**Use when:** The starting point is a concrete development and the user asks what it may mean.
+
+**Call sequence:** 4 calls
+
+1. `GET /espresso/events` to find the development.
+2. `GET /espresso/events/{event_id}` to inspect the selected record.
+3. `GET /espresso/events/{event_id}/signals` to find associated conclusions.
+4. `GET /espresso/signals/{signal_id}/events` to check the concrete support for one conclusion.
+
+<CodeTabs syncKey="espresso-scenario-2">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function get(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+const eventPage = await get("/espresso/events", {
+  q: "semiconductor supply pressure",
+  limit: 10,
+});
+const event = eventPage.data.at(0);
+
+if (!event) {
+  console.log("No matching Event found.");
+} else {
+  const eventDetail = await get(`/espresso/events/${event.id}`);
+  const signalPage = await get(`/espresso/events/${event.id}/signals`, {
+    limit: 10,
+  });
+  const signal = signalPage.data.at(0);
+  const supportingEvents = signal
+    ? await get(`/espresso/signals/${signal.id}/events`, { limit: 20 })
+    : { data: [] };
+
+  console.log({
+    event: eventDetail.data,
+    associatedSignals: signalPage.data,
+    supportingEvents: supportingEvents.data,
+  });
+}
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+base_url = "https://api.cafecito.tech"
+session = requests.Session()
+session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+def get(path, params=None):
+    response = session.get(f"{base_url}{path}", params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+event_page = get("/espresso/events", {"q": "semiconductor supply pressure", "limit": 10})
+event = event_page["data"][0] if event_page["data"] else None
+
+if not event:
+    print("No matching Event found.")
+else:
+    event_id = event["id"]
+    event_detail = get(f"/espresso/events/{event_id}")
+    signal_page = get(f"/espresso/events/{event_id}/signals", {"limit": 10})
+    signal = signal_page["data"][0] if signal_page["data"] else None
+    signal_id = signal["id"] if signal else None
+    supporting_events = (
+        get(f"/espresso/signals/{signal_id}/events", {"limit": 20})
+        if signal_id
+        else {"data": []}
+    )
+
+    print(
+        {
+            "event": event_detail["data"],
+            "associated_signals": signal_page["data"],
+            "supporting_events": supporting_events["data"],
+        }
+    )
+```
+
+```bash title="cURL"
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=semiconductor supply pressure" \
+  --data-urlencode "limit=10"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/signals?limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID/events?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+**Agent stop condition:** If the Event has no associated Signals, answer from the Event and state that no related conclusion is available.
+
+## Scenario 3: Start from a conclusion and verify it with Events
+
+**Use when:** The user asks about a trend, impact, or outlook and needs the supporting developments.
+
+**Call sequence:** 4 calls
+
+1. `GET /espresso/signals` to search synthesized conclusions.
+2. `GET /espresso/signals/{signal_id}` to inspect the selected Signal.
+3. `GET /espresso/signals/{signal_id}/events` to retrieve Events that support it.
+4. `GET /espresso/events/{event_id}/evidence` for additional context on the most relevant supporting Event.
+
+<CodeTabs syncKey="espresso-scenario-3">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function get(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+const signalPage = await get("/espresso/signals", {
+  q: "regional supply pressure",
+  impact_levels: "high",
+  limit: 10,
+});
+const signal = signalPage.data.at(0);
+
+if (!signal) {
+  console.log("No matching Signal found.");
+} else {
+  const signalDetail = await get(`/espresso/signals/${signal.id}`);
+  const eventsPage = await get(`/espresso/signals/${signal.id}/events`, {
+    limit: 20,
+  });
+  const event = eventsPage.data.at(0);
+  const evidencePage = event
+    ? await get(`/espresso/events/${event.id}/evidence`, { limit: 20 })
+    : { data: [] };
+
+  console.log({
+    signal: signalDetail.data,
+    supportingEvents: eventsPage.data,
+    selectedEventEvidence: evidencePage.data,
+  });
+}
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+base_url = "https://api.cafecito.tech"
+session = requests.Session()
+session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+def get(path, params=None):
+    response = session.get(f"{base_url}{path}", params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+signal_page = get(
+    "/espresso/signals",
+    {
+        "q": "regional supply pressure",
+        "impact_levels": "high",
+        "limit": 10,
+    },
+)
+signal = signal_page["data"][0] if signal_page["data"] else None
+
+if not signal:
+    print("No matching Signal found.")
+else:
+    signal_id = signal["id"]
+    signal_detail = get(f"/espresso/signals/{signal_id}")
+    events_page = get(f"/espresso/signals/{signal_id}/events", {"limit": 20})
+    event = events_page["data"][0] if events_page["data"] else None
+    event_id = event["id"] if event else None
+    evidence_page = (
+        get(f"/espresso/events/{event_id}/evidence", {"limit": 20})
+        if event_id
+        else {"data": []}
+    )
+
+    print(
+        {
+            "signal": signal_detail["data"],
+            "supporting_events": events_page["data"],
+            "selected_event_evidence": evidence_page["data"],
+        }
+    )
+```
+
+```bash title="cURL"
+curl -s --get "${BASE_URL}/espresso/signals" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=regional supply pressure" \
+  --data-urlencode "impact_levels=high" \
+  --data-urlencode "response_type=yaml" \
+  --data-urlencode "limit=10"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID/events?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+**Agent stop condition:** Cite the Signal and the selected supporting Events. Evidence is optional when the Event summary already provides enough context.
+
+## Scenario 4: Resolve a source, then monitor its Events
+
+**Use when:** The workflow begins with a publisher, domain, or known source and needs a bounded Event set.
+
+**Call sequence:** 4 calls
+
+1. `GET /espresso/sources` to find the Source UUID.
+2. `GET /espresso/sources/{source_id}` to inspect source metadata.
+3. `GET /espresso/events?source_ids={source_id}` to retrieve Events from the Source.
+4. `GET /espresso/events/{event_id}` to inspect one selected Event.
+
+<CodeTabs syncKey="espresso-scenario-4">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function get(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+const sourcePage = await get("/espresso/sources", {
+  q: "example.com",
+  domains: "example.com",
+  limit: 10,
+});
+const source = sourcePage.data.at(0);
+
+if (!source) {
+  console.log("No matching Source found.");
+} else {
+  const sourceDetail = await get(`/espresso/sources/${source.id}`);
+  const eventPage = await get("/espresso/events", {
+    source_ids: source.id,
+    categories: "regulation",
+    limit: 20,
+  });
+  const event = eventPage.data.at(0);
+  const eventDetail = event
+    ? await get(`/espresso/events/${event.id}`)
+    : { data: null };
+
+  console.log({
+    source: sourceDetail.data,
+    events: eventPage.data,
+    selectedEvent: eventDetail.data,
+  });
+}
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+base_url = "https://api.cafecito.tech"
+session = requests.Session()
+session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+def get(path, params=None):
+    response = session.get(f"{base_url}{path}", params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+source_page = get(
+    "/espresso/sources",
+    {"q": "example.com", "domains": "example.com", "limit": 10},
+)
+source = source_page["data"][0] if source_page["data"] else None
+
+if not source:
+    print("No matching Source found.")
+else:
+    source_id = source["id"]
+    source_detail = get(f"/espresso/sources/{source_id}")
+    event_page = get(
+        "/espresso/events",
+        {"source_ids": source_id, "categories": "regulation", "limit": 20},
+    )
+    event = event_page["data"][0] if event_page["data"] else None
+    event_id = event["id"] if event else None
+    event_detail = get(f"/espresso/events/{event_id}") if event_id else {"data": None}
+
+    print(
+        {
+            "source": source_detail["data"],
+            "events": event_page["data"],
+            "selected_event": event_detail["data"],
+        }
+    )
+```
+
+```bash title="cURL"
+curl -s --get "${BASE_URL}/espresso/sources" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=example.com" \
+  --data-urlencode "domains=example.com" \
+  --data-urlencode "limit=10"
+
+curl -s "${BASE_URL}/espresso/sources/SOURCE_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "source_ids=SOURCE_UUID" \
+  --data-urlencode "categories=regulation" \
+  --data-urlencode "limit=20"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+Source `q` matches source metadata such as domain, name, and URL. It is not semantic search.
+
+## Scenario 5: Process multiple pages, then enrich selected results
+
+**Use when:** An agent or ingestion job needs more than one page but must control token and request cost.
+
+**Call sequence:** 4 or more calls
+
+1. Search the first Event page with a bounded query.
+2. Reissue the same search with `page=pagination.next_page`.
+3. Continue only while `next_page` is non-null.
+4. Retrieve Event detail and evidence only for records that meet the selection criteria.
+
+<CodeTabs syncKey="espresso-scenario-5">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function get(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+const selectedEvents = [];
+let page;
+let nextPage;
+do {
+  page = await get("/espresso/events", {
+    q: "supply disruption",
+    from: "2026-05-01",
+    to: "2026-05-31",
+    limit: 20,
+    ...(nextPage ? { page: nextPage } : {}),
+  });
+  selectedEvents.push(...page.data.slice(0, 3 - selectedEvents.length));
+  nextPage = page.pagination.next_page;
+} while (nextPage && selectedEvents.length < 3);
+
+const enrichedEvents = await Promise.all(
+  selectedEvents.map(async (event) => {
+    const [detail, evidence] = await Promise.all([
+      get(`/espresso/events/${event.id}`),
+      get(`/espresso/events/${event.id}/evidence`, { limit: 20 }),
+    ]);
+    return { event: detail.data, evidence: evidence.data };
+  }),
+);
+
+console.log({ enrichedEvents, nextPage });
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+base_url = "https://api.cafecito.tech"
+session = requests.Session()
+session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+def get(path, params=None):
+    response = session.get(f"{base_url}{path}", params=params, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+selected_events = []
+next_page = None
+while len(selected_events) < 3:
+    params = {
+        "q": "supply disruption",
+        "from": "2026-05-01",
+        "to": "2026-05-31",
+        "limit": 20,
+    }
+    if next_page:
+        params["page"] = next_page
+
+    page = get("/espresso/events", params)
+    selected_events.extend(page["data"][: 3 - len(selected_events)])
+    next_page = page["pagination"]["next_page"]
+    if not next_page:
+        break
+
+enriched_events = []
+for event in selected_events:
+    event_id = event["id"]
+    enriched_events.append(
+        {
+            "event": get(f"/espresso/events/{event_id}")["data"],
+            "evidence": get(
+                f"/espresso/events/{event_id}/evidence", {"limit": 20}
+            )["data"],
+        }
+    )
+
+print({"enriched_events": enriched_events, "next_page": next_page})
+```
+
+```bash title="cURL"
+# First page
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=supply disruption" \
+  --data-urlencode "from=2026-05-01" \
+  --data-urlencode "to=2026-05-31" \
+  --data-urlencode "limit=20"
+
+# Next page: send the returned token unchanged and keep the original filters.
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=supply disruption" \
+  --data-urlencode "from=2026-05-01" \
+  --data-urlencode "to=2026-05-31" \
+  --data-urlencode "page=OPAQUE_NEXT_PAGE" \
+  --data-urlencode "limit=20"
+
+# Enrich only a selected record.
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+</CodeTabs>
+
+`pagination.num_results` is not a total-match count. Do not infer a global total from it or attempt to manufacture the next token.
+
+## Scenario 6: Use MCP with token-optimized results
+
+**Use when:** An AI agent uses the hosted MCP server and must keep intermediate context compact.
+
+**Call sequence:** 3 or 4 tool calls
+
+1. Use a discovery tool only if an exact filter value is unknown.
+2. Call `searchEvents` or `searchSignals` with a small `limit` and `response_type=yaml` or `response_type=toon`.
+3. Use `getEvent`, `getSignal`, `getEventEvidence`, `getEventSignals`, or `getSignalEvents` only for a selected ID.
+4. Summarize from the selected records and preserve IDs if a later user turn needs deeper inspection.
+
+The hosted endpoint is `https://api.cafecito.tech/espresso/mcp`. YAML and TOON preserve the same data, filters, and pagination as JSON; they are alternate serializations optimized for token-sensitive MCP and AI-agent workflows. See [MCP & AI agents](/guides/mcp-ai-agents) for MCP client setup.
+
+## Related documentation
+
+- [Espresso overview and quickstart](/products/espresso)
+- [Migrate to Espresso](/products/espresso/migration)
+- [Espresso API reference](/api/espresso)
+- [MCP & AI agents](/guides/mcp-ai-agents)

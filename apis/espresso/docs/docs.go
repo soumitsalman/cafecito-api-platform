@@ -24,14 +24,14 @@ const docTemplate = `{
     "paths": {
         "/entities": {
             "get": {
-                "description": "List exact company and people names available for Event filtering. Values are normalized snake_case filter names, not canonical entity IDs or profiles.",
+                "description": "Use only when an agent needs available company or people names before applying an exact Event filter. Returned values are normalized snake_case filter strings, not canonical entity IDs or profiles.\nIf a known normalized value is already available, query Events directly. Use ` + "`" + `types=company` + "`" + ` or ` + "`" + `types=people` + "`" + ` to reduce the returned vocabulary.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "Discover Event entities",
+                "summary": "Discover exact Event entity filters",
                 "operationId": "listIntelligenceEntities",
                 "parameters": [
                     {
@@ -59,7 +59,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -74,7 +74,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -103,14 +103,14 @@ const docTemplate = `{
         },
         "/event-types": {
             "get": {
-                "description": "List exact Event type names available for Event filtering. These values can be supplied to ` + "`" + `event_types` + "`" + `; ` + "`" + `categories` + "`" + ` is a separate exact category filter.",
+                "description": "Use only when an agent needs available values before applying the exact ` + "`" + `event_types` + "`" + ` Event filter. Returned values are normalized snake_case filter strings.\n` + "`" + `event_types` + "`" + ` and ` + "`" + `categories` + "`" + ` filter different Event fields. If a known normalized value is already available, query Events directly.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "Discover Event types",
+                "summary": "Discover exact Event type filters",
                 "operationId": "listIntelligenceEventTypes",
                 "parameters": [
                     {
@@ -128,7 +128,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -143,7 +143,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -172,14 +172,14 @@ const docTemplate = `{
         },
         "/events": {
             "get": {
-                "description": "Find Event records that match optional filters and an optional semantic query. Use this route to find concrete developments before following an Event's detail, evidence, or Signal links.\n**Time**: ` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` are inclusive ISO date-only bounds on record ` + "`" + `created_at` + "`" + `; they are not occurrence or publication timestamps.\n**Filters**: tags use fuzzy text matching. ` + "`" + `event_types` + "`" + `, ` + "`" + `categories` + "`" + `, ` + "`" + `entities` + "`" + `, ` + "`" + `impact_levels` + "`" + `, ` + "`" + `companies` + "`" + `, ` + "`" + `people` + "`" + `, ` + "`" + `products` + "`" + `, and ` + "`" + `regions` + "`" + ` use exact matching after normalizing names to snake_case. ` + "`" + `categories` + "`" + ` is a separate category filter from ` + "`" + `event_types` + "`" + `.\n**Output**: Event collections contain flattened intelligence fields plus ` + "`" + `id` + "`" + `, ` + "`" + `created_at` + "`" + `, and ` + "`" + `kind` + "`" + `; provenance fields are available on the detail route when usable. YAML and TOON are token-optimized serializations for MCP and AI-agent clients.",
+                "description": "Use when the user asks what happened to a company, person, product, region, or topic. Returns concrete Event records, not article bodies and not synthesized conclusions.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Event detail, evidence, or related-Signals routes. Use ` + "`" + `tags` + "`" + ` for fuzzy concepts; use structured filters for exact normalized values. ` + "`" + `categories` + "`" + ` is not an alias for ` + "`" + `event_types` + "`" + `.\nSearch Signals instead when the user asks for meaning, implication, or outlook. ` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` bound record ` + "`" + `created_at` + "`" + `, not occurrence or publication time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Search Events",
+                "summary": "Find concrete Events",
                 "operationId": "searchEvents",
                 "parameters": [
                     {
@@ -321,7 +321,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -336,7 +336,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -377,14 +377,14 @@ const docTemplate = `{
         },
         "/events/{event_id}": {
             "get": {
-                "description": "Retrieve an Event by UUID. The detail payload contains flattened intelligence fields and detail-only provenance, optional Source metadata, relation links, and relation counts. ` + "`" + `created_at` + "`" + ` is the record creation time, not an Event occurrence date.",
+                "description": "Use after selecting an Event from a collection. Returns its complete public view, optional Source provenance, and links/counts for available evidence and related Signals.\nCarry the Event ID to ` + "`" + `/events/{event_id}/evidence` + "`" + ` for supporting context or source coverage, or to ` + "`" + `/events/{event_id}/signals` + "`" + ` for associated higher-level conclusions. ` + "`" + `created_at` + "`" + ` is record creation time, not Event occurrence time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Retrieve one Event",
+                "summary": "Inspect one Event",
                 "operationId": "getEvent",
                 "parameters": [
                     {
@@ -403,7 +403,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     }
@@ -450,14 +450,14 @@ const docTemplate = `{
         },
         "/events/{event_id}/evidence": {
             "get": {
-                "description": "Show the directly related records that make up an Event's evidence trail, helping clients assess source coverage. It is not article content or story membership. The item projection exposes record identity, creation time, tags, source ID, and available URLs.",
+                "description": "Use after selecting an Event when the user needs supporting context, available source coverage, or traceability. Returns directly related evidence records with identity, creation time, tags, Source IDs, and available URLs.\nThis is not an article-body endpoint, a story-clustering endpoint, or a complete record-history export. An empty collection means no evidence records are available for this Event under the supplied filters.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Retrieve an Event evidence trail",
+                "summary": "Inspect evidence for an Event",
                 "operationId": "getEventEvidence",
                 "parameters": [
                     {
@@ -510,7 +510,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -525,7 +525,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -572,14 +572,14 @@ const docTemplate = `{
         },
         "/events/{event_id}/signals": {
             "get": {
-                "description": "Return the higher-level Signals that were derived from the Event's evidence trail. Use this relation route after retrieving an Event to inspect synthesized conclusions; an existing Event with no matching Signals returns an empty collection.",
+                "description": "Use after selecting an Event to find higher-level conclusions associated with that development. Returns Signal records that can be inspected individually or followed to their supporting Events.\nAn empty collection means Espresso has no available Signal connected to this Event; it does not invalidate the Event. This route narrows associated Signals; use ` + "`" + `/signals` + "`" + ` for a new Signal search.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Retrieve Signals derived from an Event",
+                "summary": "Find Signals connected to an Event",
                 "operationId": "getEventSignals",
                 "parameters": [
                     {
@@ -652,7 +652,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -667,7 +667,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -714,14 +714,14 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable. This endpoint does not require query parameters and returns only service status.",
+                "description": "Use this lightweight endpoint to confirm that the Espresso service is reachable before making intelligence requests. It returns service status only; it does not validate an API key, search data, or report dependency health.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Health"
                 ],
-                "summary": "Check API health",
+                "summary": "Check Espresso service availability",
                 "operationId": "healthCheck",
                 "responses": {
                     "200": {
@@ -738,14 +738,14 @@ const docTemplate = `{
         },
         "/regions": {
             "get": {
-                "description": "List exact region names available for Event filtering. Values are normalized snake_case names, not structured geography or canonical place records.",
+                "description": "Use only when an agent needs available region values before applying the exact ` + "`" + `regions` + "`" + ` Event filter. Returned values are normalized snake_case filter strings, not canonical places, coordinates, or structured geography.\nIf a known normalized value is already available, query Events directly.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "Discover Event regions",
+                "summary": "Discover exact Event region filters",
                 "operationId": "listIntelligenceRegions",
                 "parameters": [
                     {
@@ -763,7 +763,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -778,7 +778,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -807,14 +807,14 @@ const docTemplate = `{
         },
         "/signals": {
             "get": {
-                "description": "Find synthesized Signal records with optional filters and an optional semantic query. Use this route for higher-level conclusions, then follow a Signal detail or supporting-Events link to inspect its basis.\n**Time**: ` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` are inclusive ISO date-only bounds on Signal ` + "`" + `created_at` + "`" + `.\n**Filters**: tags use fuzzy text matching. Impact levels and impacted domains use exact snake_case matching. Collection items omit provenance fields; use Signal detail when Source metadata is usable.",
+                "description": "Use when the user asks what a set of developments means, what impact is expected, or what broader conclusion Espresso has produced. Returns synthesized Signals, not raw observations or article content.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Signal detail, then list supporting Events when the conclusion needs substantiation. Search Events instead when the user needs a concrete development rather than an interpretation.\n` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` bound Signal ` + "`" + `created_at` + "`" + `; tags are fuzzy text matches, while impact levels and impacted domains are exact normalized values.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Signals"
                 ],
-                "summary": "Search Signals",
+                "summary": "Find synthesized Signals",
                 "operationId": "searchSignals",
                 "parameters": [
                     {
@@ -886,7 +886,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -901,7 +901,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -942,14 +942,14 @@ const docTemplate = `{
         },
         "/signals/{signal_id}": {
             "get": {
-                "description": "Retrieve a Signal by UUID. The detail payload contains flattened intelligence fields, optional provenance when a usable Source exists, and links/counts for supporting Events. ` + "`" + `created_at` + "`" + ` is the Signal record creation time.",
+                "description": "Use after selecting a Signal from a collection. Returns its complete public fields, optional Source provenance, and a link/count for Events that support the conclusion.\nCarry the Signal ID to ` + "`" + `/signals/{signal_id}/events` + "`" + ` when an answer needs concrete supporting developments. ` + "`" + `created_at` + "`" + ` is record creation time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Signals"
                 ],
-                "summary": "Retrieve one Signal",
+                "summary": "Inspect one Signal",
                 "operationId": "getSignal",
                 "parameters": [
                     {
@@ -968,7 +968,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     }
@@ -1015,14 +1015,14 @@ const docTemplate = `{
         },
         "/signals/{signal_id}/events": {
             "get": {
-                "description": "Return the Events that were used to derive the Signal, so clients can inspect the basis of its conclusion. An existing Signal with no matching Events returns an empty collection.",
+                "description": "Use after selecting a Signal when an agent must explain, verify, or cite the concrete developments behind its conclusion. Returns Events that support the Signal.\nApply Event filters only to narrow this existing support set. This route does not perform a new semantic search and does not return unrelated Events. An empty collection means no supporting Events match the supplied filters.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Signals"
                 ],
-                "summary": "Retrieve Events supporting a Signal",
+                "summary": "Inspect Events supporting a Signal",
                 "operationId": "getSignalEvents",
                 "parameters": [
                     {
@@ -1165,7 +1165,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -1180,7 +1180,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -1227,14 +1227,14 @@ const docTemplate = `{
         },
         "/sources": {
             "get": {
-                "description": "Find provenance Source records for filtering and citation. ` + "`" + `q` + "`" + ` is case-insensitive metadata matching across domain, name, and URL; it is not semantic search. Optional metadata may be omitted when unavailable.",
+                "description": "Use to discover or resolve provenance Sources before filtering Events by ` + "`" + `source_ids` + "`" + `, or when an answer needs source metadata for citation. ` + "`" + `q` + "`" + ` performs case-insensitive metadata matching across source domain, name, and URL; it is not semantic search.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Source detail or ` + "`" + `GET /events?source_ids={source_id}` + "`" + `. Source results describe publishers and provenance; they do not contain Events.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Sources"
                 ],
-                "summary": "List intelligence sources",
+                "summary": "Find intelligence Sources",
                 "operationId": "listIntelligenceSources",
                 "parameters": [
                     {
@@ -1265,7 +1265,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     },
@@ -1277,7 +1277,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     }
@@ -1318,14 +1318,14 @@ const docTemplate = `{
         },
         "/sources/{source_id}": {
             "get": {
-                "description": "Retrieve Source provenance metadata by UUID. It does not return Events published by the Source; use ` + "`" + `GET /events?source_ids={source_id}` + "`" + ` for that use case. Description, favicon, and RSS feed metadata may be omitted when unavailable.",
+                "description": "Returns provenance metadata for one Source. Use this route to enrich a citation or inspect publisher metadata, not to retrieve published Events.\nTo find Events from this Source, call ` + "`" + `GET /events?source_ids={source_id}` + "`" + `. Optional description, favicon, and RSS feed fields can be absent when unavailable.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Sources"
                 ],
-                "summary": "Retrieve one intelligence Source",
+                "summary": "Inspect one Source",
                 "operationId": "getIntelligenceSource",
                 "parameters": [
                     {
@@ -1344,7 +1344,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     }
@@ -1391,14 +1391,14 @@ const docTemplate = `{
         },
         "/tags": {
             "get": {
-                "description": "List persisted tag labels available for Event and Signal filtering. Tag filters use fuzzy text matching, so clients can discover useful label vocabulary here without requiring a canonical taxonomy.\n**Pagination**: follow ` + "`" + `pagination.next_page` + "`" + `; ` + "`" + `limit` + "`" + ` defaults to 20 and is capped at 100.\n**Formats**: JSON is canonical; YAML and TOON are token-optimized serializations for MCP and AI-agent clients.",
+                "description": "Use only when an agent needs vocabulary for a fuzzy ` + "`" + `tags` + "`" + ` query. Returns persisted labels for Event and Signal filtering; tags are not a fixed taxonomy or exact-only values.\nIf a useful tag is already known, search Events or Signals directly instead of making a discovery request. Use ` + "`" + `resource` + "`" + ` to limit discovery to Event or Signal labels.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Tags"
                 ],
-                "summary": "Discover tag filters for Espresso intelligence",
+                "summary": "Discover fuzzy tag vocabulary",
                 "operationId": "listIntelligenceTags",
                 "parameters": [
                     {
@@ -1426,7 +1426,7 @@ const docTemplate = `{
                         ],
                         "type": "string",
                         "default": "json",
-                        "description": "Output serialization.",
+                        "description": "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients.",
                         "name": "response_type",
                         "in": "query"
                     },
@@ -1441,7 +1441,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque page token. Follow pagination.next_page for the next page.",
+                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
                         "name": "page",
                         "in": "query"
                     }
@@ -1764,7 +1764,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Espresso API & MCP",
-	Description:      "MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.\nAn **Event** is a concrete intelligence record with kind `event`. A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.\nAgent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Collections use page pagination: `limit` default 20 max 100, and an opaque `page` returned as `next_page`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.\nResponse formats: use `response_type=json` for canonical structured application data. Use `response_type=yaml` or `response_type=toon` for token-optimized output to MCP and AI-agent clients. Public Event and Signal payloads expose flattened intelligence fields without embeddings, relation direction, or a nested internal object.",
+	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_page` unchanged as the next request `page`; never construct or decode page tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

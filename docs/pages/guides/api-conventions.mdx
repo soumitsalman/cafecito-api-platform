@@ -1,0 +1,36 @@
+---
+description: Shared authentication, pagination, result, and response-format conventions for Cafecito APIs.
+---
+
+# API conventions
+
+## Authentication
+
+All gateway API and MCP requests use a Cafecito API key as a Bearer token:
+
+```http
+Authorization: Bearer YOUR-API-KEY
+```
+
+Create and manage keys in [Get an API key](/start/api-keys). The gateway base URL is `https://api.cafecito.tech`.
+
+## Product conventions
+
+| Behavior | Beans | Espresso |
+| --- | --- | --- |
+| Collection pagination | `limit` and `offset` | `limit` and opaque `page` |
+| Continue a collection | Increase or supply `offset` as documented by the route | Send `pagination.next_page` back as `page`; never construct the token |
+| Empty collections | HTTP `204` is not an error | HTTP `200` with `data: []` |
+| Default format | JSON | JSON is canonical; `response_type=yaml` and `response_type=toon` are token-optimized for MCP and AI-agent clients |
+
+Espresso collections return `data`, `pagination`, and `meta`; `pagination.num_results` is the count for the current page, not a total-match count.
+
+Use each product reference for route-specific limits, supported filters, schemas, and status codes: [Beans API](/api/beans) and [Espresso API](/api/espresso).
+
+## Errors and response shapes
+
+Treat successful empty results according to the product behavior above. For validation errors, missing resources, and full response schemas, rely on the interactive API reference for the route you call rather than inferring a shared error envelope.
+
+## MCP and AI agents
+
+Both products expose MCP servers using the same API key. Espresso YAML and TOON output are specifically intended to reduce token use for MCP and AI-agent workflows. See [MCP & AI agents](/guides/mcp-ai-agents) for connection details.

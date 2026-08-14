@@ -1,5 +1,5 @@
 # Cafecito API Implementations
-Updated: 2026-08-13
+Updated: 2026-08-14
 
 ## Coding Guideline (`apis/`)
 
@@ -363,3 +363,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_trend_agg_url ON trend_aggregates(url);
 
 ## Renovation Plan
 Read the files in [docs/](apis/docs) for V1 and future renovation plan
+
+## Documentation dependency map
+
+Swagger annotations, gateway OpenAPI, and portal pages are separate artifacts. Do not assume that generating Swagger updates the public gateway contract or portal documentation.
+
+- Treat route behavior, request/response types, and Swagger annotations in `apis/<service>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`.
+  - Espresso: from `apis/espresso/`, run `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal` after changing `router/routes.go` docstrings or referenced router types.
+  - Beans: use the documented `swag` command in `apis/beans/README.md` after its router annotation changes.
+- For any public Espresso behavior change, then manually update `../config/espresso.oas.json`. It is the gateway contract under `/espresso`, powers `/api/espresso` via `../docs/zudoku.config.tsx`, and supplies the `/espresso/mcp` server plus its exported `operationId` tools. Keep public paths, parameters, schemas, descriptions, errors, and MCP tool mappings in sync with the backend.
+- Reflect that behavior in the relevant portal pages: `../docs/pages/products/espresso/overview.mdx`, `../docs/pages/products/espresso/workflows.mdx`, and `../docs/pages/products/espresso/migration.mdx`; `../docs/pages/guides/mcp-ai-agents.mdx` for MCP changes; and `../docs/pages/guides/api-conventions.mdx` or `../docs/pages/start/first-api-call.mdx` for shared or quickstart behavior. Update `../docs/zudoku.config.tsx` only when API mounting, navigation, redirects, or page structure changes.
+- Apply the same generated-Swagger → `../config/beans.oas.json` → `../docs/pages/products/beans/overview.mdx` review for Beans.
+
+### Public documentation boundary
+
+The public surfaces are gateway OpenAPI files in `config/`, backend Swagger artifacts, and `docs/pages/`. They describe stable client behavior, not implementation. Remove any internal design detail found there; use user-facing behavior or generic availability wording instead.
+
+Never expose:
+
+- database internals: Espresso's `cupboard`, `sips`, `sources`, and `relations` storage; internal relationship values such as `same_as` and `derived_from`; digest payloads and their structure; Beans' `beansack` storage; table, schema, column, foreign-key, index, view, or migration details;
+- retrieval internals: embeddings, vector dimensions/indexes, HNSW, embedder/model settings, caches, query implementation, or relation direction/relationship storage;
+- private implementation and operations: Go package/type/handler names, internal identifiers, backend environment variables and headers, gateway rewrites or policies, infrastructure/vendor topology, credentials, or rate-limit/quota implementation.
+
+Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements are public concepts. Describe them without exposing their storage or implementation.

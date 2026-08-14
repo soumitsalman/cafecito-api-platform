@@ -1,0 +1,125 @@
+---
+description: Connect Cafecito's Beans and Espresso MCP servers to AI-agent clients.
+---
+
+# MCP Integration
+
+Every Cafecito API product ships an **MCP (Model Context Protocol) server** — same auth, same key, zero extra setup. Point your AI agent or MCP client at the endpoint and go.
+
+## Authentication
+<Button className="btn-with-link" asChild>
+  <a href="/settings/api-keys">Get API Key</a>
+</Button>
+:::tip
+Your existing API key works for MCP calls — they share the same rate limit and quota meter as regular API calls.
+:::
+
+## Connecting to MCP Servers
+**Server URL**: `https://api.cafecito.tech/<product>/mcp` 
+
+```
+Authorization: Bearer YOUR-API-KEY
+```
+
+## Beans MCP server
+
+**Server URL**: `https://api.cafecito.tech/beans/mcp` (v0.8)
+
+Recommended agent workflow: discover tag values → search the corpus → use time-ordered feeds → resolve publisher IDs → track story propagation.
+
+| Tool | REST path | Purpose |
+| ---- | --------- | ------- |
+| `listCategories` | `GET /beans/tags/categories` | Discover exact category filter values |
+| `listEntities` | `GET /beans/tags/entities` | Discover exact entity filter values |
+| `listRegions` | `GET /beans/tags/regions` | Discover exact region filter values |
+| `searchArticles` | `GET /beans/articles/search` | Primary full-corpus search |
+| `getLatestArticles` | `GET /beans/articles/latest` | Newest articles (reverse chronological) |
+| `getTrendingArticles` | `GET /beans/articles/trending` | Trending by engagement score |
+| `getTopHeadlines` | `GET /beans/articles/top-headlines` | Top headlines from last 24 hours |
+| `getPublishers` | `GET /beans/sources` | Resolve publisher source metadata |
+| `getArticlePropagation` | `GET /beans/articles/propagation` | Track story spread (CSV URLs) |
+| `postArticlePropagation` | `POST /beans/articles/propagation` | Track story spread (JSON body) |
+
+See the [Beans overview](/products/beans) for parameters, response shapes, and examples.
+
+```python title="Using Beans MCP with your Agent"
+# openai-agents.HostedMCPTool (https://github.com/openai/openai-agents-python)
+import os
+import asyncio
+from agents import Agent, HostedMCPTool, Runner
+
+mcp_tool_config = {
+    "type": "mcp",
+    "server_label": "cafecito_beans",
+    "server_url": "https://api.cafecito.tech/beans/mcp",
+    "authorization": os.getenv("CAFECITO_API_KEY"),    
+    "require_approval": "never",
+}
+
+# SETUP: model client using AsyncOpenAI
+# SETUP: model using OpenAIChatCompletionsModel
+
+agent = Agent(
+    name="News Analyst",
+    instructions="EXTRACT news headlines and associated briefings",
+    tools=[
+        HostedMCPTool(tool_config=mcp_tool_config)
+    ],
+)
+
+PROMPT_TEMPLATE = """
+Today: {date}
+Question: What is trending on middle east today?
+"""
+  
+result = Runner.run_sync(agent, PROMPT_TEMPLATE.format(date=datetime.now().strftime("%Y-%m-%d")))
+print("=== Final output ===")
+print(result.final_output)
+```
+
+## Espresso MCP server
+
+**Server URL**: `https://api.cafecito.tech/espresso/mcp`
+
+Use Espresso MCP tools as a short decision sequence: search **Events** for concrete developments; search **Signals** for conclusions or outlook; use evidence and supporting-Event tools only after selecting an ID. The server uses the same authentication and public contract as the Espresso REST API.
+
+| Tool | REST path | Agent purpose |
+| ---- | --------- | ------------- |
+| `searchEvents` | `GET /espresso/events` | Find concrete developments. |
+| `getEvent` | `GET /espresso/events/{event_id}` | Inspect one selected Event. |
+| `getEventEvidence` | `GET /espresso/events/{event_id}/evidence` | Retrieve related context and available source coverage. |
+| `getEventSignals` | `GET /espresso/events/{event_id}/signals` | Find higher-level conclusions associated with an Event. |
+| `searchSignals` | `GET /espresso/signals` | Find synthesized conclusions or outlooks. |
+| `getSignal` | `GET /espresso/signals/{signal_id}` | Inspect one selected Signal. |
+| `getSignalEvents` | `GET /espresso/signals/{signal_id}/events` | Retrieve Events that support a Signal. |
+| `listIntelligenceSources` | `GET /espresso/sources` | Find a source by metadata before Event filtering. |
+| `getIntelligenceSource` | `GET /espresso/sources/{source_id}` | Inspect one source record. |
+| `listIntelligenceTags` | `GET /espresso/tags` | Discover fuzzy tag vocabulary when needed. |
+| `listIntelligenceEntities` | `GET /espresso/entities` | Discover exact company or people filter values. |
+| `listIntelligenceRegions` | `GET /espresso/regions` | Discover exact region filter values. |
+| `listIntelligenceEventTypes` | `GET /espresso/event-types` | Discover exact Event type filter values. |
+
+### Agent operating guidance
+
+1. Start with the route that matches the question. Do not use a Signal as if it were a raw Event.
+2. Read UUIDs from `data[].id`; carry only selected IDs into detail, evidence, Source, or support calls.
+3. Use fuzzy `tags` for concepts. Use exact normalized snake_case values for structured filters. `categories` and `event_types` are separate Event fields.
+4. Request discovery vocabulary only when a value is unknown. It is not a canonical entity or geography service.
+5. Treat `pagination.next_page` as opaque and send it back unchanged as `page`. `num_results` is only the current-page count.
+6. Prefer `response_type=json` for schema-sensitive processing. Set `response_type=yaml` or `response_type=toon` when the same payload must use fewer tokens in MCP or AI-agent context.
+
+See the [Espresso overview](/products/espresso) for route choice, filters, response envelopes, and examples. See [Espresso workflows](/products/espresso/workflows) for multi-call agent patterns.
+
+## Use cases
+
+- AI assistants and RAG workflows that need fresh news context (Beans)
+- Business intelligence agents monitoring events, signals, and cross-domain outlooks (Espresso)
+- AI agents that monitor trends, entities, or topics in real time
+- LLM pipelines that require enrichment-ready JSON or token-optimized YAML or TOON, not raw HTML
+
+## Related
+- [Beans overview](/products/beans)
+- [Espresso overview](/products/espresso)
+- [Cafecito](https://cafecito.tech)
+- [Pricing and limits](/guides/pricing-limits)
+- [Contact](/contact)

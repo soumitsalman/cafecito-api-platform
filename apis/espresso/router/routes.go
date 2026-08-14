@@ -1,15 +1,17 @@
-// @title 			Espresso API & MCP
-// @version 		0.2
-// @description 	MCP-ready business intelligence over curated intelligence records for agents, dashboards, and automated research workflows.
-// @description  An **Event** is a concrete intelligence record with kind `event`. A **Signal** is a synthesized conclusion derived from Events. The internal storage word `sip` is not part of the public vocabulary.
-// @description 	Agent workflow: (1) listTags to discover filter vocabulary; (2) searchEvents for developments; (3) getEvent and getEventEvidence to trace source coverage; (4) searchSignals and getSignalEvents to trace synthesized conclusions.
-// @description  Conventions: Auth is optional at the backend but API-key protected through the gateway. Collections use page pagination: `limit` default 20 max 100, and an opaque `page` returned as `next_page`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return 404. All IDs are RFC 4122 UUID strings.
-// @description Response formats: use `response_type=json` for canonical structured application data. Use `response_type=yaml` or `response_type=toon` for token-optimized output to MCP and AI-agent clients. Public Event and Signal payloads expose flattened intelligence fields without embeddings, relation direction, or a nested internal object.
-// @schemes 		https
-// @license.name 	MIT
-// @contact.name 	Project Cafecito
-// @contact.url  	http://cafecito.tech
-// @contact.email 	soumitsrah@cafecito.tech
+// @title             Espresso API & MCP
+// @version           0.2
+// @description       Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.
+// @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
+// @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
+// @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
+// @description       **Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_page` unchanged as the next request `page`; never construct or decode page tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.
+// @description       **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
+// @description       **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
+// @schemes           https
+// @license.name      MIT
+// @contact.name      Project Cafecito
+// @contact.url       http://cafecito.tech
+// @contact.email     soumitsrah@cafecito.tech
 package router
 
 import (
@@ -252,8 +254,8 @@ func writeError(c *gin.Context, err error) {
 }
 
 // health godoc
-// @Summary Check API health
-// @Description Lightweight liveness probe. Use it before other tools to confirm the Espresso backend is reachable. This endpoint does not require query parameters and returns only service status.
+// @Summary Check Espresso service availability
+// @Description Use this lightweight endpoint to confirm that the Espresso service is reachable before making intelligence requests. It returns service status only; it does not validate an API key, search data, or report dependency health.
 // @Tags Health
 // @Produce json
 // @Success 200 {object} map[string]string "Service is alive"
@@ -265,11 +267,10 @@ func (r *Configuration) health(c *gin.Context) {
 }
 
 // getEvents godoc
-// @Summary Search Events
-// @Description Find Event records that match optional filters and an optional semantic query. Use this route to find concrete developments before following an Event's detail, evidence, or Signal links.
-// @Description **Time**: `from` and `to` are inclusive ISO date-only bounds on record `created_at`; they are not occurrence or publication timestamps.
-// @Description **Filters**: tags use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after normalizing names to snake_case. `categories` is a separate category filter from `event_types`.
-// @Description **Output**: Event collections contain flattened intelligence fields plus `id`, `created_at`, and `kind`; provenance fields are available on the detail route when usable. YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
+// @Summary Find concrete Events
+// @Description Use when the user asks what happened to a company, person, product, region, or topic. Returns concrete Event records, not article bodies and not synthesized conclusions.
+// @Description Carry a selected `data[].id` into Event detail, evidence, or related-Signals routes. Use `tags` for fuzzy concepts; use structured filters for exact normalized values. `categories` is not an alias for `event_types`.
+// @Description Search Signals instead when the user asks for meaning, implication, or outlook. `from` and `to` bound record `created_at`, not occurrence or publication time.
 // @Tags Events
 // @Produce json
 // @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
@@ -286,9 +287,9 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param regions query []string false "Exact region names in snake_case (CSV), for example north_america,europe." collectionFormat(csv)
 // @Param source_ids query []string false "Restrict to direct Event source UUIDs (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Fuzzy text match against persisted tag labels (CSV)." collectionFormat(csv)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} EventCollectionResponse "Event collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
@@ -324,12 +325,13 @@ func (r *Configuration) getEvents(c *gin.Context) {
 }
 
 // getEvent godoc
-// @Summary Retrieve one Event
-// @Description Retrieve an Event by UUID. The detail payload contains flattened intelligence fields and detail-only provenance, optional Source metadata, relation links, and relation counts. `created_at` is the record creation time, not an Event occurrence date.
+// @Summary Inspect one Event
+// @Description Use after selecting an Event from a collection. Returns its complete public view, optional Source provenance, and links/counts for available evidence and related Signals.
+// @Description Carry the Event ID to `/events/{event_id}/evidence` for supporting context or source coverage, or to `/events/{event_id}/signals` for associated higher-level conclusions. `created_at` is record creation time, not Event occurrence time.
 // @Tags Events
 // @Produce json
 // @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} EventDetailResponse "Event detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
@@ -363,8 +365,9 @@ func (r *Configuration) getEvent(c *gin.Context) {
 }
 
 // getEventEvidence godoc
-// @Summary Retrieve an Event evidence trail
-// @Description Show the directly related records that make up an Event's evidence trail, helping clients assess source coverage. It is not article content or story membership. The item projection exposes record identity, creation time, tags, source ID, and available URLs.
+// @Summary Inspect evidence for an Event
+// @Description Use after selecting an Event when the user needs supporting context, available source coverage, or traceability. Returns directly related evidence records with identity, creation time, tags, Source IDs, and available URLs.
+// @Description This is not an article-body endpoint, a story-clustering endpoint, or a complete record-history export. An empty collection means no evidence records are available for this Event under the supplied filters.
 // @Tags Events
 // @Produce json
 // @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
@@ -372,9 +375,9 @@ func (r *Configuration) getEvent(c *gin.Context) {
 // @Param source_ids query []string false "Restrict direct evidence records to Source UUIDs (CSV)." collectionFormat(csv)
 // @Param from query string false "Inclusive evidence created_at lower bound (YYYY-MM-DD)." format(date)
 // @Param to query string false "Inclusive evidence created_at upper bound (YYYY-MM-DD)." format(date)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
@@ -423,8 +426,9 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 }
 
 // getEventSignals godoc
-// @Summary Retrieve Signals derived from an Event
-// @Description Return the higher-level Signals that were derived from the Event's evidence trail. Use this relation route after retrieving an Event to inspect synthesized conclusions; an existing Event with no matching Signals returns an empty collection.
+// @Summary Find Signals connected to an Event
+// @Description Use after selecting an Event to find higher-level conclusions associated with that development. Returns Signal records that can be inspected individually or followed to their supporting Events.
+// @Description An empty collection means Espresso has no available Signal connected to this Event; it does not invalidate the Event. This route narrows associated Signals; use `/signals` for a new Signal search.
 // @Tags Events
 // @Produce json
 // @Param event_id path string true "Event UUID (RFC 4122)." format(uuid)
@@ -434,9 +438,9 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 // @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
 // @Param impacted_domains query []string false "Exact impacted-domain names in snake_case (CSV), for example public_health,climate." collectionFormat(csv)
 // @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} SignalCollectionResponse "Signals derived from this Event"
 // @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
@@ -482,10 +486,10 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 }
 
 // getSignals godoc
-// @Summary Search Signals
-// @Description Find synthesized Signal records with optional filters and an optional semantic query. Use this route for higher-level conclusions, then follow a Signal detail or supporting-Events link to inspect its basis.
-// @Description **Time**: `from` and `to` are inclusive ISO date-only bounds on Signal `created_at`.
-// @Description **Filters**: tags use fuzzy text matching. Impact levels and impacted domains use exact snake_case matching. Collection items omit provenance fields; use Signal detail when Source metadata is usable.
+// @Summary Find synthesized Signals
+// @Description Use when the user asks what a set of developments means, what impact is expected, or what broader conclusion Espresso has produced. Returns synthesized Signals, not raw observations or article content.
+// @Description Carry a selected `data[].id` into Signal detail, then list supporting Events when the conclusion needs substantiation. Search Events instead when the user needs a concrete development rather than an interpretation.
+// @Description `from` and `to` bound Signal `created_at`; tags are fuzzy text matches, while impact levels and impacted domains are exact normalized values.
 // @Tags Signals
 // @Produce json
 // @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
@@ -495,9 +499,9 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Param impact_levels query []string false "Exact impact-level names (CSV), for example high,medium." collectionFormat(csv)
 // @Param impacted_domains query []string false "Exact impacted-domain names in snake_case (CSV), for example public_health,climate." collectionFormat(csv)
 // @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} SignalCollectionResponse "Signal collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
@@ -532,12 +536,13 @@ func (r *Configuration) getSignals(c *gin.Context) {
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
-// @Summary Retrieve one Signal
-// @Description Retrieve a Signal by UUID. The detail payload contains flattened intelligence fields, optional provenance when a usable Source exists, and links/counts for supporting Events. `created_at` is the Signal record creation time.
+// @Summary Inspect one Signal
+// @Description Use after selecting a Signal from a collection. Returns its complete public fields, optional Source provenance, and a link/count for Events that support the conclusion.
+// @Description Carry the Signal ID to `/signals/{signal_id}/events` when an answer needs concrete supporting developments. `created_at` is record creation time.
 // @Tags Signals
 // @Produce json
 // @Param signal_id path string true "Signal UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} SignalDetailResponse "Signal detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
@@ -571,8 +576,9 @@ func (r *Configuration) getSignal(c *gin.Context) {
 }
 
 // getSignalEvents godoc
-// @Summary Retrieve Events supporting a Signal
-// @Description Return the Events that were used to derive the Signal, so clients can inspect the basis of its conclusion. An existing Signal with no matching Events returns an empty collection.
+// @Summary Inspect Events supporting a Signal
+// @Description Use after selecting a Signal when an agent must explain, verify, or cite the concrete developments behind its conclusion. Returns Events that support the Signal.
+// @Description Apply Event filters only to narrow this existing support set. This route does not perform a new semantic search and does not return unrelated Events. An empty collection means no supporting Events match the supplied filters.
 // @Tags Signals
 // @Produce json
 // @Param signal_id path string true "Signal UUID (RFC 4122)." format(uuid)
@@ -589,9 +595,9 @@ func (r *Configuration) getSignal(c *gin.Context) {
 // @Param tags query []string false "Fuzzy text match against persisted Event tag labels (CSV)." collectionFormat(csv)
 // @Param from query string false "Inclusive Event created_at lower bound (YYYY-MM-DD)." format(date)
 // @Param to query string false "Inclusive Event created_at upper bound (YYYY-MM-DD)." format(date)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} EventCollectionResponse "Events supporting this Signal"
 // @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
@@ -636,15 +642,16 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
-// @Summary List intelligence sources
-// @Description Find provenance Source records for filtering and citation. `q` is case-insensitive metadata matching across domain, name, and URL; it is not semantic search. Optional metadata may be omitted when unavailable.
+// @Summary Find intelligence Sources
+// @Description Use to discover or resolve provenance Sources before filtering Events by `source_ids`, or when an answer needs source metadata for citation. `q` performs case-insensitive metadata matching across source domain, name, and URL; it is not semantic search.
+// @Description Carry a selected `data[].id` into Source detail or `GET /events?source_ids={source_id}`. Source results describe publishers and provenance; they do not contain Events.
 // @Tags Sources
 // @Produce json
 // @Param q query string false "Case-insensitive Source metadata search." maxlength(1024)
 // @Param domains query []string false "Exact Source domain-name filter (CSV)." collectionFormat(csv)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} SourceCollectionResponse "Source collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
@@ -673,12 +680,13 @@ func (r *Configuration) getSources(c *gin.Context) {
 }
 
 // getSource godoc
-// @Summary Retrieve one intelligence Source
-// @Description Retrieve Source provenance metadata by UUID. It does not return Events published by the Source; use `GET /events?source_ids={source_id}` for that use case. Description, favicon, and RSS feed metadata may be omitted when unavailable.
+// @Summary Inspect one Source
+// @Description Returns provenance metadata for one Source. Use this route to enrich a citation or inspect publisher metadata, not to retrieve published Events.
+// @Description To find Events from this Source, call `GET /events?source_ids={source_id}`. Optional description, favicon, and RSS feed fields can be absent when unavailable.
 // @Tags Sources
 // @Produce json
 // @Param source_id path string true "Source UUID (RFC 4122)." format(uuid)
-// @Param response_type query string false "Output serialization. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} SourceItemResponse "Source detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Source with this UUID"
@@ -707,17 +715,16 @@ func (r *Configuration) getSource(c *gin.Context) {
 }
 
 // getTags godoc
-// @Summary Discover tag filters for Espresso intelligence
-// @Description List persisted tag labels available for Event and Signal filtering. Tag filters use fuzzy text matching, so clients can discover useful label vocabulary here without requiring a canonical taxonomy.
-// @Description **Pagination**: follow `pagination.next_page`; `limit` defaults to 20 and is capped at 100.
-// @Description **Formats**: JSON is canonical; YAML and TOON are token-optimized serializations for MCP and AI-agent clients.
+// @Summary Discover fuzzy tag vocabulary
+// @Description Use only when an agent needs vocabulary for a fuzzy `tags` query. Returns persisted labels for Event and Signal filtering; tags are not a fixed taxonomy or exact-only values.
+// @Description If a useful tag is already known, search Events or Signals directly instead of making a discovery request. Use `resource` to limit discovery to Event or Signal labels.
 // @Tags Tags
 // @Produce json
 // @Param q query string false "Case-insensitive substring or prefix match." maxlength(1024)
 // @Param resource query []string false "Optional resource scope (CSV): event, signal." collectionFormat(csv)
-// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Tag value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, page token, or response_type"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
@@ -754,15 +761,16 @@ func (r *Configuration) getTags(c *gin.Context) {
 }
 
 // getEntities godoc
-// @Summary Discover Event entities
-// @Description List exact company and people names available for Event filtering. Values are normalized snake_case filter names, not canonical entity IDs or profiles.
+// @Summary Discover exact Event entity filters
+// @Description Use only when an agent needs available company or people names before applying an exact Event filter. Returned values are normalized snake_case filter strings, not canonical entity IDs or profiles.
+// @Description If a known normalized value is already available, query Events directly. Use `types=company` or `types=people` to reduce the returned vocabulary.
 // @Tags Discovery
 // @Produce json
 // @Param q query string false "Case-insensitive substring filter." maxlength(1024)
 // @Param types query []string false "Entity types (CSV): company, people." collectionFormat(csv)
-// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Entity value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
@@ -792,14 +800,15 @@ func (r *Configuration) getEntities(c *gin.Context) {
 }
 
 // getRegions godoc
-// @Summary Discover Event regions
-// @Description List exact region names available for Event filtering. Values are normalized snake_case names, not structured geography or canonical place records.
+// @Summary Discover exact Event region filters
+// @Description Use only when an agent needs available region values before applying the exact `regions` Event filter. Returned values are normalized snake_case filter strings, not canonical places, coordinates, or structured geography.
+// @Description If a known normalized value is already available, query Events directly.
 // @Tags Discovery
 // @Produce json
 // @Param q query string false "Case-insensitive substring filter." maxlength(1024)
-// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Region value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
@@ -825,14 +834,15 @@ func (r *Configuration) getRegions(c *gin.Context) {
 }
 
 // getEventTypes godoc
-// @Summary Discover Event types
-// @Description List exact Event type names available for Event filtering. These values can be supplied to `event_types`; `categories` is a separate exact category filter.
+// @Summary Discover exact Event type filters
+// @Description Use only when an agent needs available values before applying the exact `event_types` Event filter. Returned values are normalized snake_case filter strings.
+// @Description `event_types` and `categories` filter different Event fields. If a known normalized value is already available, query Events directly.
 // @Tags Discovery
 // @Produce json
 // @Param q query string false "Case-insensitive substring filter." maxlength(1024)
-// @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
+// @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque page token. Follow pagination.next_page for the next page."
+// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Event type value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
