@@ -76,14 +76,16 @@ All collection routes use:
 | Parameter | Type | Contract |
 |---|---|---|
 | limit | Integer 1-100; default 20 | Maximum returned items. |
-| page | Opaque string | Keyset pagination. |
+| cursor | Opaque string | Keyset pagination. |
 | response_type | json, yaml, toon | JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. |
 
 Search collections also use:
+Research Doc: [QUERY_PARAM_NAMES.md](QUERY_PARAM_NAMES.md)
 
 | Parameter | Type | Contract |
 |---|---|---|
 | q | String, max 1024 | Semantic search query. |
+| score_threshold | Number from 0.0 to 1.0; default 0.5 | Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict; applied when q is supplied. |
 | from / to | Date or RFC 3339 date-time | Inclusive record-creation bounds. |
 | sort | recent, relevance | recent is the default. relevance requires q. |
 
@@ -102,8 +104,9 @@ not Espresso request parameters.
 
 | Capability | Industry names | Espresso decision |
 |---|---|---|
-| Pagination | GDELT: cursor; PredictHQ: offset; Perigon: page and size | Maintain page only. It is safe for a changing feed and matches GDELT. |
+| Pagination | GDELT: cursor; PredictHQ: offset; Perigon: page and size | Maintain cursor only. It is safe for a changing feed and matches GDELT. |
 | Search | GDELT: search; PredictHQ and Perigon: q | Maintain q only. |
+| Semantic threshold | Perigon: scoreThreshold; GDELT and PredictHQ do not expose an equivalent threshold parameter | Maintain score_threshold with snake_case naming and a 0.0-1.0 minimum-similarity range. |
 | Creation-time range | GDELT: date_start/date_end; Perigon: from/to | Maintain from/to only. |
 | Page result count | PredictHQ: count and Perigon: numResults are totals; GDELT omits a page count | Return `pagination.num_results` for the current page; do not calculate a separate total by default. |
 
@@ -114,7 +117,7 @@ length from `data.length`.
 
 ### 3.2 Collection response
 
-Espresso uses a data/pagination envelope with page pagination. It intentionally does not include a success field. PredictHQ and Perigon do not use a success field either; Espresso relies on the HTTP status code and the response body.
+Espresso uses a data/pagination envelope with cursor pagination. It intentionally does not include a success field. PredictHQ and Perigon do not use a success field either; Espresso relies on the HTTP status code and the response body.
 
 ~~~json
 {
@@ -122,8 +125,8 @@ Espresso uses a data/pagination envelope with page pagination. It intentionally 
   "pagination": {
     "limit": 20,
     "num_results": 0,
-    "page": null,
-    "next_page": null
+    "cursor": null,
+    "next_cursor": null
   },
   "meta": {
     "as_of": "2026-08-11T15:00:00Z"
@@ -252,7 +255,7 @@ GET /events accepts:
 | entities | Exact company or people names normalized to snake_case, for example `microsoft,nvidia`. |
 | source_ids | Direct source UUID filter. It does not expand evidence. |
 | tags | Fuzzy text matching against persisted tag labels. |
-| search, time, sort, and collection parameters | Section 3. |
+| q, score_threshold, time, sort, and collection parameters | Section 3. |
 
 GET /events/{event_id} returns one Event plus:
 
@@ -284,7 +287,7 @@ Accepted evidence parameters:
 |---|---|
 | source_ids | CSV UUIDs. Restricts direct SAME_AS neighbours to those Source IDs; the requested Event remains included. |
 | from / to | Restrict direct neighbours by creation time. |
-| limit, page, response_type | Common collection parameters. |
+| limit, cursor, response_type | Common collection parameters. |
 
 Evidence does not accept search or sort. It has fixed recent ordering by
 created_at, then id, because it is a provenance drilldown rather than a
@@ -305,11 +308,11 @@ finding derived Signals. It accepts the filters of its returned Signal resource:
 | q | Semantic query. |
 | from / to | Signal creation-time bounds. |
 | sort | recent or relevance; relevance requires q. |
-| limit, page, response_type | Common collection parameters. |
+| limit, cursor, response_type | Common collection parameters. |
 
 ### 4.2 Signal routes
 
-GET /signals accepts ids, impact_levels, impacted_domains, tags, search,
+GET /signals accepts ids, impact_levels, impacted_domains, tags, q, score_threshold,
 time, sort, and the common collection parameters.
 
 GET /signals/{signal_id} returns one Signal plus:
@@ -343,11 +346,11 @@ accepts the filters of its returned Event resource:
 | q | Semantic query. |
 | from / to | Event creation-time bounds. |
 | sort | recent or relevance; relevance requires q. |
-| limit, page, response_type | Common collection parameters. |
+| limit, cursor, response_type | Common collection parameters. |
 
 ### 4.3 Source routes
 
-GET /sources accepts q, domains, limit, page, and response_type.
+GET /sources accepts q, domains, limit, cursor, and response_type.
 Its q parameter is case-insensitive Source text matching, not vector search.
 
 GET /sources/{source_id} returns:
@@ -380,7 +383,7 @@ The public Source mapping is:
 
 ### 4.4 Discovery routes
 
-All discovery routes accept q, limit, page, and response_type.
+All discovery routes accept q, limit, cursor, and response_type.
 
 | Route | Extra parameter | Item payload |
 |---|---|---|
@@ -449,7 +452,7 @@ response is identical to GET /events.
     "tags": ["guidance"]
   },
   "limit": 20,
-  "page": null
+  "cursor": null
 }
 ~~~
 
@@ -461,7 +464,7 @@ response is identical to GET /events.
 3. Semantic queries require s.embedding IS NOT NULL and order by distance, id.
    Recent queries order by created, id.
 4. Exclude year-0001 timestamps from default and time-filtered collections.
-5. Fetch limit+1 items for page pagination.
+5. Fetch limit+1 items for cursor pagination.
 6. SAME_AS is bidirectional. DERIVED_FROM uses its stored direction internally.
 7. Verify a subresource parent before querying children.
 8. Never interpolate a client-supplied JSON key or SQL expression.
@@ -489,7 +492,7 @@ Those comparisons must use ->> followed by = ANY(...).
 
 | Area | Current state | Target correction |
 |---|---|---|
-| Pagination | Default limit 20; page pagination; `num_results` is the page item count. | Default 20; page pagination only. Clients can use `num_results` or data.length for page length. |
+| Pagination | Default limit 20; cursor pagination; `num_results` is the current-page item count. | Default 20; cursor pagination only. Clients can use `num_results` or data.length for current-page length. |
 | Time | Date-only from/to | RFC 3339 support. |
 | Search | Current parameter does not use the target name. | Keep q. |
 | Ordering | No public sort | Add recent and search-only relevance. |

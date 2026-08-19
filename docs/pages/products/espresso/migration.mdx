@@ -64,6 +64,7 @@ These mappings describe the typical adaptation when moving from similar intellig
 | Existing query intent | Espresso parameter | Matching rule |
 | --- | --- | --- |
 | Natural-language topic or question | `q` on Event or Signal search | Semantic search. |
+| Semantic search strictness | `score_threshold` with `q` | Minimum similarity threshold from `0.0` (broad) to `1.0` (strict); default `0.5`. |
 | Topic, theme, or label | `tags` | Fuzzy text matching. |
 | Event type | `event_types` | Exact normalized snake_case value. |
 | Category | `categories` | Exact normalized snake_case value; separate from `event_types`. |
@@ -84,15 +85,15 @@ Espresso collections return one stable envelope:
   "pagination": {
     "limit": 20,
     "num_results": 0,
-    "page": null,
-    "next_page": null
+    "cursor": null,
+    "next_cursor": null
   },
   "meta": {}
 }
 ```
 
 - `pagination.num_results` counts only the records in this page. It is not a total-match count.
-- Send a non-null `pagination.next_page` unchanged as the next request `page`. Never construct, decode, or sort the token.
+- Send a non-null `pagination.next_cursor` unchanged as the next request `cursor`. Never construct, decode, or sort the token.
 - An empty collection is a successful HTTP `200` response with `data: []`.
 - Detail routes return `{ "data": { ... } }`; a missing detail resource returns HTTP `404`.
 
@@ -103,7 +104,7 @@ Use `response_type=json` for the canonical schema. `response_type=yaml` and `res
 1. Classify each old request as an Event question, a Signal question, a provenance question, or a source question.
 2. Change collection parsing to read `data`, `pagination`, and `meta`.
 3. Store returned Event, Signal, and Source UUIDs as opaque identifiers.
-4. Replace offset or cursor construction with pass-through use of `pagination.next_page`.
+4. Replace offset or cursor construction with pass-through use of `pagination.next_cursor`.
 5. Separate fuzzy `tags` from exact structured filters, and keep `categories` distinct from `event_types`.
 6. Treat `from` and `to` as `created_at` bounds.
 7. Use evidence and supporting-Event routes only after a selected record requires explanation or traceability.

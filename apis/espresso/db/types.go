@@ -113,8 +113,8 @@ type Page[T any] struct {
 	NextCursor *Cursor
 }
 
-// TagValue is one exact value exposed by a discovery route.
-type TagValue struct {
+// Tag is one exact value exposed by a discovery route.
+type Tag struct {
 	Value string `db:"value" json:"value" toon:"value"`
 	Type  string `db:"type" json:"type,omitempty" toon:"type,omitempty" example:"region"`
 }
@@ -149,7 +149,7 @@ type Cursor struct {
 	Created  *time.Time `json:"c,omitempty"`
 	Distance *float64   `json:"d,omitempty"`
 	TextKey  *string    `json:"k,omitempty"`
-	EventTag *TagValue  `json:"et,omitempty"`
+	Tag      *Tag       `json:"et,omitempty"`
 }
 
 // PageRequest is the cursor-based page request. Callers (router) own limit defaults and caps.
@@ -190,7 +190,7 @@ func DecodeCursor(raw string) (*Cursor, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, ErrInvalidCursor
 	}
-	if c.Version != _CURSOR_VERSION || (c.ID == nil && c.TextKey == nil && c.EventTag == nil) {
+	if c.Version != _CURSOR_VERSION || (c.ID == nil && c.TextKey == nil && c.Tag == nil) {
 		return nil, ErrInvalidCursor
 	}
 	return &c, nil

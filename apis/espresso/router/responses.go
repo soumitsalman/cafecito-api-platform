@@ -11,15 +11,14 @@ import (
 
 // Pagination is the pagination block returned by every collection response.
 type Pagination struct {
-	Limit      int     `json:"limit" toon:"limit" binding:"required"`
-	NumResults int     `json:"num_results" toon:"num_results" binding:"required"`
-	Cursor     *string `json:"page" toon:"page" binding:"required"`
-	NextCursor *string `json:"next_page" toon:"next_page" binding:"required"`
+	Limit      int     `json:"limit" toon:"limit"`
+	NumResults int     `json:"num_results" toon:"num_results"`
+	NextCursor *string `json:"next_cursor" toon:"next_cursor"`
 }
 
 // ResponseMeta carries freshness metadata for a collection response.
 type ResponseMeta struct {
-	AsOf time.Time `json:"as_of" toon:"as_of" binding:"required"`
+	AsOf time.Time `json:"as_of" toon:"as_of"`
 }
 
 // PageResponse is the canonical envelope for list endpoints.
@@ -34,19 +33,9 @@ type ItemResponse[T any] struct {
 	Data T `json:"data" toon:"data"`
 }
 
-// APIError is the stable public error shape.
-type APIError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-func (e APIError) Error() string {
-	return fmt.Sprintf("Error Code=%s, Message=%s", e.Code, e.Message)
-}
-
 // ErrorResponse is the canonical envelope for error responses.
 type ErrorResponse struct {
-	Error APIError `json:"error"`
+	Error error `json:"error"`
 }
 
 // DigestDocument preserves arbitrary upstream digest members without imposing a closed Event or Signal response schema.
@@ -241,9 +230,9 @@ type StringCollectionResponse struct {
 }
 
 type TagValueCollectionResponse struct {
-	Data       []db.TagValue `json:"data" binding:"required"`
-	Pagination Pagination    `json:"pagination" binding:"required"`
-	Meta       ResponseMeta  `json:"meta"`
+	Data       []db.Tag     `json:"data" binding:"required"`
+	Pagination Pagination   `json:"pagination" binding:"required"`
+	Meta       ResponseMeta `json:"meta"`
 }
 
 type EventEvidenceCollectionResponse struct {
@@ -287,7 +276,7 @@ type SourceItemResponse struct {
 }
 
 type DiscoveryValueCollectionResponse struct {
-	Data       []db.TagValue `json:"data" binding:"required"`
-	Pagination Pagination    `json:"pagination" binding:"required"`
-	Meta       ResponseMeta  `json:"meta" binding:"required"`
+	Data       []db.Tag     `json:"data" binding:"required"`
+	Pagination Pagination   `json:"pagination" binding:"required"`
+	Meta       ResponseMeta `json:"meta" binding:"required"`
 }

@@ -309,14 +309,34 @@ SELECT
 FROM trend_stats
 WHERE GREATEST(likes, comments, shares, related) > 0;
 
-CREATE OR REPLACE VIEW trending_beans_view AS
+
+CREATE VIEW IF NOT EXISTS beans_sources_view AS
+SELECT
+    b.*,
+    p.id AS source_id, p.base_url, p.site_name, p.description, p.favicon, p.rss_feed
+FROM beans b
+LEFT JOIN publishers p ON b.source = p.source;
+
+-- PRIMARY DIFF: between latest vs trending
+-- trending requires some chatter or related items. Hence INNER JOIN trend_aggregates
+-- latest does not require chatter or related items. Hence LEFT JOIN trend_aggregates
+CREATE VIEW IF NOT EXISTS latest_beans_view AS
 SELECT
     b.*,
     tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
-FROM beans b
+FROM beans_sources_view b
+LEFT JOIN trend_aggregates tr ON b.url = tr.url;
+
+
+CREATE VIEW IF NOT EXISTS trending_beans_view AS
+SELECT
+    b.*,
+    tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
+FROM beans_sources_view b
 INNER JOIN trend_aggregates tr ON b.url = tr.url;
 
-CREATE OR REPLACE VIEW aggregated_beans_view AS
+
+CREATE VIEW IF NOT EXISTS aggregated_beans_view AS
 WITH related_groups AS (
     SELECT url, ARRAY_AGG(related_url) AS related_urls
     FROM related_beans
@@ -325,12 +345,10 @@ WITH related_groups AS (
 SELECT
     b.*,
     tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id,
-    rel.related_urls,
-    p.base_url, p.site_name, p.description, p.favicon, p.rss_feed
-FROM beans b
+    rel.related_urls
+FROM beans_sources_view b
 LEFT JOIN trend_aggregates tr ON b.url = tr.url
-LEFT JOIN related_groups rel ON b.url = rel.url
-LEFT JOIN publishers p ON b.source = p.source;
+LEFT JOIN related_groups rel ON b.url = rel.url;
 
 -- INDEXES --
 -- beans
@@ -362,7 +380,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_trend_agg_url ON trend_aggregates(url);
 ```
 
 ## Renovation Plan
-Read the files in [docs/](apis/docs) for V1 and future renovation plan
+Read the files in [design/](apis/design) for V1 and future renovation plan
 
 ## Documentation dependency map
 

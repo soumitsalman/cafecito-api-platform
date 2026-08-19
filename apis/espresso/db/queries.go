@@ -371,39 +371,38 @@ func (p *Cupboard) CountRelations(ctx context.Context, id uuid.UUID) (RelationCo
 // QuerySources returns source records matching the optional query and domain filters.
 func (p *Cupboard) QuerySources(ctx context.Context, q string, domains []string, page PageRequest) (Page[Source], error) {
 	expr_fmt := `
-	SELECT id, base_url, domain_name, site_name, description, favicon, rss_feed
+	SELECT id, base_url, domain_name, site_name
 	FROM sources
-	WHERE base_url > @c_base_url -- base_url is 1:1 with id
-		%s -- q
+	WHERE base_url > @cursor_value
+		AND (
+			STARTS_WITH(LOWER(domain_name), @q) OR
+			STARTS_WITH(LOWER(site_name), @q) OR
+			STARTS_WITH(LOWER(base_url), @q)
+		)
 		%s -- domains
 	ORDER BY base_url ASC 
 	LIMIT @limit
 	`
-	q_expr, domains_expr := "", ""
-	c_base_url := ""
-	if page.Cursor != nil && page.Cursor.TextKey != nil {
-		c_base_url = *page.Cursor.TextKey
-	}
+	domains_expr := ""
 	params := pgx.NamedArgs{
-		"c_base_url": c_base_url,
-		"limit":      page.Limit + 1,
+		"q":            strings.ToLower(strings.TrimSpace(q)),
+		"cursor_value": "",
+		"limit":        page.Limit + 1,
 	}
-	if len(q) > 0 {
-		q_expr = "AND (domain_name ILIKE '%' || @q || '%' OR site_name ILIKE '%' || @q || '%' OR base_url ILIKE '%' || @q || '%')"
-		params["q"] = strings.TrimSpace(q)
+	if page.Cursor != nil && page.Cursor.TextKey != nil {
+		params["cursor_value"] = *page.Cursor.TextKey
 	}
 	if len(domains) > 0 {
 		domains_expr = "AND domain_name = ANY(@domains)"
 		params["domains"] = domains
 	}
 
-	rows, err := fetchAll[Source](ctx, p.db, fmt.Sprintf(expr_fmt, q_expr, domains_expr), params)
+	rows, err := fetchAll[Source](ctx, p.db, fmt.Sprintf(expr_fmt, domains_expr), params)
 	if err != nil {
 		return Page[Source]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(source Source) *Cursor {
-		key := source.BaseURL
-		return &Cursor{Version: _CURSOR_VERSION, TextKey: &key}
+		return &Cursor{Version: _CURSOR_VERSION, TextKey: &source.BaseURL}
 	}), nil
 }
 
@@ -515,7 +514,7 @@ var allEventTagTypes = []string{
 
 // QueryEventTags returns one common discovery payload for any requested Event
 // digest types. Results are ordered by value first and type second.
-func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string, page PageRequest) (Page[TagValue], error) {
+func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string, page PageRequest) (Page[Tag], error) {
 	if len(types) == 0 {
 		types = allEventTagTypes
 	}
@@ -529,7 +528,7 @@ func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string,
 
 		values_query, ok := eventTagQueries[tag_type]
 		if !ok {
-			return Page[TagValue]{}, fmt.Errorf("unsupported event tag type: %s", tag_type)
+			return Page[Tag]{}, fmt.Errorf("unsupported event tag type: %s", tag_type)
 		}
 
 		seen_types[tag_type] = struct{}{}
@@ -542,9 +541,9 @@ func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string,
 		"limit":        page.Limit + 1,
 	}
 	where := []string{"(value, type) > (@cursor_value, @cursor_type)"}
-	if page.Cursor != nil && page.Cursor.EventTag != nil {
-		params["cursor_value"] = page.Cursor.EventTag.Value
-		params["cursor_type"] = page.Cursor.EventTag.Type
+	if page.Cursor != nil && page.Cursor.Tag != nil {
+		params["cursor_value"] = page.Cursor.Tag.Value
+		params["cursor_type"] = page.Cursor.Tag.Type
 	}
 	if q = strings.TrimSpace(q); q != "" {
 		where = append(where, "value ILIKE '%' || @q || '%'")
@@ -556,15 +555,15 @@ func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string,
 		strings.Join(values_queries, " UNION ALL "),
 		strings.Join(where, " AND "),
 	)
-	rows, err := fetchAll[TagValue](ctx, p.db, query, params)
+	rows, err := fetchAll[Tag](ctx, p.db, query, params)
 	if err != nil {
-		return Page[TagValue]{}, err
+		return Page[Tag]{}, err
 	}
 
-	return finalizePage(rows, page.Limit, func(item TagValue) *Cursor {
+	return finalizePage(rows, page.Limit, func(item Tag) *Cursor {
 		return &Cursor{
-			Version:  _CURSOR_VERSION,
-			EventTag: &item,
+			Version: _CURSOR_VERSION,
+			Tag:     &item,
 		}
 	}), nil
 }

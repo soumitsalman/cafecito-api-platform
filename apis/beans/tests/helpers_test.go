@@ -7,25 +7,30 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 )
 
-const testVectorQuery = "market trend changes due to public policy changes"
+const TEST_VECTOR_QUERY = "market trend changes due to public policy changes"
 
 var (
-	testCategories      = []string{"public_policy_and_administration", "art_and_design", "cybersecurity"}
-	testRegions         = []string{"north_america", "europe", "united_states"}
-	testEntities        = []string{"openai", "microsoft", "google"}
-	testTags            = []string{"artificial_intelligence", "cybersecurity"}
-	testSources         = []string{"techcrunch", "slashgear"}
-	testPropagationURLs = []string{
+	test_ctx          = context.Background()
+	test_categories   = []string{"public_policy_and_administration", "art_and_design", "cybersecurity"}
+	test_regions      = []string{"north_america", "europe", "united_states"}
+	test_entities     = []string{"openai", "microsoft", "google"}
+	test_tags         = []string{"artificial_intelligence", "cybersecurity"}
+	test_sentiments   = []string{"analytical", "positive"}
+	test_domains      = []string{"techcrunch.com", "slashgear.com"}
+	test_source_query = "tech"
+	test_authors      = []string{"Reuters"}
+	test_article_urls = []string{
 		"https://www.foxla.com/news/more-us-airlines-raise-baggage-fees-see-list",
 		"https://www.slashgear.com/2143752/us-airlines-increased-fees-fuel-prices/",
 		"http://andersource.dev/2026/03/29/tradeoff-sliders.html",
 		"https://massivelyop.com/2026/04/08/perfect-ten-have-official-mmo-websites-improved-in-the-last-decade/",
 		"https://phys.org/news/2026-04-uncharted-island-nautical.html",
 	}
-	testQueryEmbedding = []float32{
+	test_query_embedding = []float32{
 		-0.1990760862827301,
 		0.0963737741112709,
 		0.05843411013484001,
@@ -349,16 +354,20 @@ var (
 	}
 )
 
-func setupTestDB() db.Beansack {
-	db.NoError(godotenv.Load("../.env"))
-	connStr := os.Getenv("PG_CONNECTION_STRING")
-	return db.NewPGSack(context.Background(), connStr)
+func setupTestDB() *db.PGSack {
+	shared.NoError(godotenv.Load("../.env"))
+	conn_str := os.Getenv("PG_CONNECTION_STRING")
+	return db.NewPGSack(context.Background(), conn_str)
 }
 
-func setupTestEmbedder() *embedding.GRPCEmbedder {
-	db.NoError(godotenv.Load("../.env"))
-	return embedding.NewGRPCEmbedder(
-		os.Getenv("EMBEDDER_BASE_URL"),
+func setupTestEmbedder() embedding.Embedder {
+	shared.NoError(godotenv.Load("../.env"))
+	base_url := os.Getenv("EMBEDDER_BASE_URL")
+	if base_url == "" {
+		base_url = "http://localhost:10000"
+	}
+	return embedding.NewHTTPEmbedder(
+		base_url,
 		os.Getenv("EMBEDDER_API_KEY"),
 		os.Getenv("EMBEDDER_MODEL"),
 	)
@@ -366,4 +375,8 @@ func setupTestEmbedder() *embedding.GRPCEmbedder {
 
 func testSearchFrom() time.Time {
 	return time.Now().UTC().AddDate(0, 0, -7)
+}
+
+func testSearchTo() time.Time {
+	return time.Now().UTC()
 }

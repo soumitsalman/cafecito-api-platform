@@ -24,10 +24,10 @@ unprefixed route. The public resource names are Event, Signal, and Source.
 | Area | V1 documentation rule |
 |---|---|
 | Success and errors | Collections return data, pagination, and meta; details return data. Use HTTP status codes, never success or success=false. |
-| Pagination | limit is 1-100 with default 20. page selects a result page and pagination.next_page identifies the following page. `pagination.num_results` is the number of records in the current page; Espresso does not return a separate total-count query. |
+| Pagination | limit is 1-100 with default 20. cursor is the opaque continuation token and pagination.next_cursor identifies the following position. `pagination.num_results` is the number of records in the current page; Espresso does not return a separate total-count query. |
 | Serialization | response_type is json, yaml, or toon. JSON is canonical; YAML and TOON are token-optimized serializations for MCP and AI-agent clients. Do not document text. |
 | Time | from and to accept ISO date-only input and bound created_at. They are not Event occurrence, article publication, or lifecycle time. RFC 3339 date-time input is deferred. |
-| Search and ordering | Document q only where implemented. Do not document public sort, relation-collection q, or acc in V1. |
+| Search and ordering | Document q and score_threshold only on Event and Signal collection routes. Do not document public sort or relation-collection q in V1. |
 | Payloads | Event and Signal collections omit url, base_url, source_id, and source. Details expose them only when usable. summary is the public narrative field; do not document briefing. |
 | Timestamp quality | Treat year-0001 created_at values as data-quality signals; they are not occurrence or publication timestamps. |
 | Deferred routes | Do not publish /actions/*, POST /events/search, GET /events/summary, or GET /events/count in V1. |
@@ -54,7 +54,7 @@ V1 restrictions from the gap analysis:
     source for generated backend OpenAPI documents.
   - Use Event and Signal, not "Event-family" or kind LIKE event%. Public kinds
     are event and signal only.
-  - Remove text, acc, tag_mode, public sort, offset pagination, fabricated
+  - Remove text, tag_mode, public sort, offset pagination, fabricated
     reported/site_name fields, and Action references.
   - Normalize Swagger placeholders to event_id, signal_id, and source_id so
     backend Swagger and the gateway match.
@@ -65,14 +65,14 @@ V1 restrictions from the gap analysis:
 
   ~~~go
   // @Param from query string false "Inclusive created_at lower date bound (YYYY-MM-DD)."
-  // @Param page query string false "Opaque page token. Follow pagination.next_page."
+  // @Param cursor query string false "Opaque cursor token. Follow pagination.next_cursor."
   // @Param response_type query string false "Output serialization." Enums(json, yaml, toon) default(json)
   // @Success 200 {object} EventCollectionResponse
   ~~~
 
   | Routes | Required annotation content |
   |---|---|
-  | GET /events and GET /signals | Date-only created_at bounds, fuzzy tag matching, exact structured filters, page pagination, q only if active, and optional flattened intelligence fields. |
+  | GET /events and GET /signals | Date-only created_at bounds, fuzzy tag matching, exact structured filters, cursor pagination, q and score_threshold only if active, and optional flattened intelligence fields. |
   | Event and Signal detail | Detail-only provenance, nullable/omitted Source behavior, links, and counts. Do not call created_at an event date. |
   | GET /events/{event_id}/evidence | Show the directly related records that make up an Event's evidence trail, helping clients assess source coverage. It is not article content or story membership. |
   | GET /events/{event_id}/signals | Return the higher-level Signals that were derived from the Event's evidence trail. |
@@ -89,7 +89,7 @@ V1 restrictions from the gap analysis:
     num_results, meta, and errors. Intelligence-field schemas allow optional flattened intelligence members
     without exposing a nested internal object, embeddings, or relation direction.
   - Encode envelopes without success. Collections require data, num_results,
-    and pagination.page/next_page; document meta.as_of where emitted. Details use:
+    and pagination.cursor/next_cursor; document meta.as_of where emitted. Details use:
 
   ~~~json
   {"data": {"id": "event-id"}}
@@ -115,7 +115,7 @@ V1 restrictions from the gap analysis:
   - Mirror every published Swagger operation under /espresso and retain the
     Zuplo rewrite target without that prefix.
   - Copy operation IDs, parameter names, enums, descriptions, success schemas,
-    and error schemas from generated Swagger. Remove Event-family, text, acc,
+    and error schemas from generated Swagger. Remove Event-family and text,
     tag_mode, offset, and success-envelope language.
   - Update shared components before path operations so all routes use the same
     Event, Signal, Source, discovery, pagination, num_results, meta, and error
@@ -143,12 +143,12 @@ V1 restrictions from the gap analysis:
   - Explain two resource types first, then discovery, Event search, Event
     detail/evidence, Signals/supporting Events, and Sources. Keep health as a
     short operational check separate from the data API.
-  - Add a common parameter table for limit, page, response_type, from, to,
-    and route-specific q. Explain that clients follow pagination.next_page
+  - Add a common parameter table for limit, cursor, response_type, from, to,
+    and route-specific q. Explain that clients follow pagination.next_cursor
     rather than use an offset.
   - Replace stale examples with the JSON collection/detail envelope and
     created_at, summary, id, and kind. Only show a second request when
-    next_page is non-null.
+    next_cursor is non-null.
   - Include one short YAML or TOON response after canonical JSON. Explain that
     YAML and TOON are token-optimized output formats for MCP and AI agents; do
     not present response_type=text as an MCP optimization.
@@ -160,7 +160,7 @@ V1 restrictions from the gap analysis:
 
   1. Discover tags, Event types, entities, and regions before filtering.
   2. Find recent Events by tags and date-only created_at; paginate with
-     next_page.
+     next_cursor.
   3. Retrieve an Event for detail-only Source provenance, then follow evidence
      or Signal links.
   4. Search Signals and inspect direct supporting Events.
@@ -181,8 +181,8 @@ V1 restrictions from the gap analysis:
     "pagination": {
       "limit": 20,
       "num_results": 20,
-      "page": "provided-string or null",
-      "next_page": "opaque internally calculated string or null"
+      "cursor": "provided-string or null",
+      "next_cursor": "opaque internally calculated string or null"
     },
     "meta": {"as_of": "2026-08-14T00:00:00Z"}
   }
@@ -194,7 +194,7 @@ V1 restrictions from the gap analysis:
     schemas with config/espresso.oas.json.
   - Validate every how-to request against its gateway path and generated OpenAPI
     schema; do not retain legacy endpoint names or fields.
-  - Check examples use date-only V1 inputs, page/next_page pagination,
+  - Check examples use date-only V1 inputs, cursor/next_cursor pagination,
     num_results, canonical JSON envelopes, and fields returned by the current
     collection/detail shape.
   - Re-check the capability analysis before publishing a target-complete route.
@@ -224,8 +224,8 @@ drop-in replacement for GDELT Cloud, PredictHQ, or Perigon.
 | Capability | GDELT Cloud | PredictHQ | Perigon | Espresso V1 | Documentation message |
 |---|---|---|---|---|---|
 | Page size | limit | limit | size | limit | Espresso returns a numbered page. |
-| Position | cursor | offset | page | page | Request the desired Espresso page. |
-| Continuation | next_cursor | next URL | next page | pagination.next_page | Follow next_page while it is present. |
+| Position | cursor | offset | page | cursor | Follow the returned Espresso cursor. |
+| Continuation | next_cursor | next URL | next page | pagination.next_cursor | Follow next_cursor while it is present. |
 | Text/semantic query | search | q | q; vector prompt body | q where implemented | Source q is text matching. Event vector POST is deferred. |
 | Date bounds | date_start/date_end | start/end/lifecycle | from/to and add/refresh | from/to | Bounds record creation only and accept a date in V1. |
 | Classification | family/category/subcategory | category/label | category/topic/taxonomy/label | event_types, categories, impact_levels, tags | Event types and categories are separate exact snake_case filters; tags use fuzzy text matching. |
@@ -243,7 +243,7 @@ drop-in replacement for GDELT Cloud, PredictHQ, or Perigon.
 |---|---|---|---|---|
 | Success indication | success | HTTP status/payload | status | HTTP 2xx; no body success field |
 | Records | data | results | articles or results | data |
-| Continuation | pagination.next_cursor | next URL | page calculation | pagination.next_page |
+| Continuation | pagination.next_cursor | next URL | page calculation | pagination.next_cursor |
 | Page result count | not standard | count (total) | numResults (total) | num_results |
 | Retrieval metadata | provider-specific | provider-specific | provider-specific | meta.as_of when emitted |
 
@@ -292,7 +292,7 @@ Before publishing or materially revising a route, verify:
    config/espresso.oas.json, and the how-to have identical route names,
    enums, defaults, limits, envelopes, and field names.
 3. The gateway path has /espresso; its Zuplo rewrite target does not.
-4. Each example uses a real V1 field, page/next_page pagination, date-only bounds, and the
+4. Each example uses a real V1 field, cursor/next_cursor pagination, date-only bounds, and the
    route's collection/detail projection.
 5. The capability analysis marks behavior ready, or documentation labels it
    planned rather than available.

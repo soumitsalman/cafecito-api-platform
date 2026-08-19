@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
 )
 
 type bindableParams interface {
@@ -30,13 +31,13 @@ type itemParams struct {
 // base cursor-pagination params for all list queries.
 type paginationParams struct {
 	Limit  int    `form:"limit,default=20" binding:"min=1,max=100"`
-	Cursor string `form:"page"`
+	Cursor string `form:"cursor"`
 	responseTypeParams
 }
 
 type vectorSearchParams struct {
-	Q   string  `form:"q" binding:"max=1024"`
-	Acc float64 `form:"acc,default=0.5" binding:"min=0,max=1"`
+	Q              string  `form:"q" binding:"max=1024"`
+	ScoreThreshold float64 `form:"score_threshold,default=0.5" binding:"min=0,max=1"`
 }
 
 // base search params for all action, event and signal queries.
@@ -126,24 +127,24 @@ type DiscoveryParams struct {
 
 func (params *itemParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindUri(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *EventSearchParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *SignalSearchParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
@@ -151,11 +152,11 @@ func (params *SignalSearchParams) shouldBind(c *gin.Context) error {
 func (params *EventEvidenceParams) shouldBind(c *gin.Context) error {
 	path_params := pathIDParams{}
 	if err := c.ShouldBindUri(&path_params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
@@ -163,11 +164,11 @@ func (params *EventEvidenceParams) shouldBind(c *gin.Context) error {
 func (params *EventSignalsParams) shouldBind(c *gin.Context) error {
 	path_params := pathIDParams{}
 	if err := c.ShouldBindUri(&path_params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
@@ -175,39 +176,39 @@ func (params *EventSignalsParams) shouldBind(c *gin.Context) error {
 func (params *SignalEventsParams) shouldBind(c *gin.Context) error {
 	path_params := pathIDParams{}
 	if err := c.ShouldBindUri(&path_params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	params.pathIDParams = path_params
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *SourcesParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *TagsParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *EntitiesParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
 func (params *DiscoveryParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
-		return APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }

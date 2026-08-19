@@ -74,8 +74,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -87,7 +87,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid limit, page token, or parameters",
+                        "description": "Invalid limit, cursor token, or parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -143,8 +143,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -156,7 +156,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid limit, page token, or parameters",
+                        "description": "Invalid limit, cursor token, or parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -187,6 +187,15 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Optional natural-language semantic query. Max 1024 characters.",
                         "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.5,
+                        "description": "Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.",
+                        "name": "score_threshold",
                         "in": "query"
                     },
                     {
@@ -336,8 +345,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -349,7 +358,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid query parameters, malformed UUID, or malformed page token",
+                        "description": "Invalid query parameters, malformed UUID, or malformed cursor token",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -525,8 +534,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -667,8 +676,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -680,7 +689,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Malformed UUID, invalid page token, or invalid parameters",
+                        "description": "Malformed UUID, invalid cursor token, or invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -778,8 +787,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -791,7 +800,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid limit, page token, or parameters",
+                        "description": "Invalid limit, cursor token, or parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -822,6 +831,15 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Optional natural-language semantic query. Max 1024 characters.",
                         "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "default": 0.5,
+                        "description": "Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.",
+                        "name": "score_threshold",
                         "in": "query"
                     },
                     {
@@ -901,8 +919,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -914,7 +932,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid query parameters, malformed UUID, or malformed page token",
+                        "description": "Invalid query parameters, malformed UUID, or malformed cursor token",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1180,8 +1198,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -1193,7 +1211,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Malformed UUID, invalid page token, or invalid parameters",
+                        "description": "Malformed UUID, invalid cursor token, or invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1265,8 +1283,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
@@ -1290,7 +1308,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid limit, page token, or parameters",
+                        "description": "Invalid limit, cursor token, or parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1441,8 +1459,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it.",
-                        "name": "page",
+                        "description": "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -1454,7 +1472,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid limit, page token, or response_type",
+                        "description": "Invalid limit, cursor token, or response_type",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1626,23 +1644,23 @@ const docTemplate = `{
         "router.Pagination": {
             "type": "object",
             "required": [
+                "cursor",
                 "limit",
-                "next_page",
-                "num_results",
-                "page"
+                "next_cursor",
+                "num_results"
             ],
             "properties": {
+                "cursor": {
+                    "type": "string"
+                },
                 "limit": {
                     "type": "integer"
                 },
-                "next_page": {
+                "next_cursor": {
                     "type": "string"
                 },
                 "num_results": {
                     "type": "integer"
-                },
-                "page": {
-                    "type": "string"
                 }
             }
         },
@@ -1764,7 +1782,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Espresso API & MCP",
-	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_page` unchanged as the next request `page`; never construct or decode page tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
+	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

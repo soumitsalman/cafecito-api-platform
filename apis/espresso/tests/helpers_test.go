@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 )
 
 // Shared fixtures for db + router integration tests.

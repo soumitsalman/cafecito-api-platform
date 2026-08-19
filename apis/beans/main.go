@@ -14,15 +14,14 @@ package main
 import (
 	"context"
 	"os"
-	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
 	_ "github.com/soumitsalman/cafecito-api-platform/apis/beans/docs"
 	r "github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/config"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 )
 
 const (
@@ -36,16 +35,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	connStr := config.GetEnv("PG_CONNECTION_STRING", "", true)
-	beansack := db.NewPGSack(ctx, connStr)
+	conn_str := config.GetEnv("PG_CONNECTION_STRING", "", true)
+	beansack := db.NewPGSack(ctx, conn_str)
 	defer beansack.Close()
-
-	// determine concurrency limit from environment
-	maxStr := config.GetEnv("MAX_CONCURRENT_REQUESTS", "", false)
-	max_requests, err := strconv.Atoi(maxStr)
-	if err != nil && max_requests < 0 {
-		max_requests = 0
-	}
 
 	api := r.NewRouter(
 		beansack,
@@ -55,7 +47,6 @@ func main() {
 			config.GetEnv("EMBEDDER_MODEL", "", false),
 		),
 		config.ParseAPIKeys(os.Getenv("API_KEY")),
-		max_requests,
 	)
 
 	port := config.GetEnv("PORT", DEFAULT_PORT, false)

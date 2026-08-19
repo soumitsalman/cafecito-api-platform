@@ -11,7 +11,7 @@ import (
 
 	"github.com/avast/retry-go/v5"
 	"github.com/rs/zerolog/log"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/config"
 )
 
 type HTTPEmbedder struct {

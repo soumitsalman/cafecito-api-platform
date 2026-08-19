@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/k0kubun/pp"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	datautils "github.com/soumitsalman/data-utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -419,7 +420,7 @@ func TestRouterVectorSearchEvents(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	params.Set("q", TEST_VECTOR_QUERY)
-	params.Set("acc", "0.6")
+	params.Set("score_threshold", "0.6")
 	params.Set("limit", "5")
 	params.Set("from", testSearchFrom().Format("2006-01-02"))
 
@@ -437,7 +438,7 @@ func TestRouterVectorSearchSignals(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	params.Set("q", TEST_VECTOR_QUERY)
-	params.Set("acc", "0.7")
+	params.Set("score_threshold", "0.7")
 	params.Set("limit", "5")
 	params.Set("to", testSearchFrom().Format("2006-01-02"))
 
@@ -588,7 +589,7 @@ func TestRouterEventDetailNotFound(t *testing.T) {
 	bogus := uuid.New().String()
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS+"/"+bogus, nil, "")
 	requireStatus(t, http.StatusNotFound, status, body)
-	assertExpectedAPIError(t, body, router.API_ERROR_NOT_FOUND)
+	assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
 }
 
 func TestRouterCursorPagination(t *testing.T) {
@@ -622,7 +623,7 @@ func TestRouterInvalidCursor(t *testing.T) {
 
 	status, body := routerGET(t, srv.URL, ROUTE_EVENTS, params, "")
 	requireStatus(t, http.StatusBadRequest, status, body)
-	assertExpectedAPIError(t, body, router.API_ERROR_INVALID_REQUEST)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 }
 
 func TestRouterExpectedDefaultPagination(t *testing.T) {

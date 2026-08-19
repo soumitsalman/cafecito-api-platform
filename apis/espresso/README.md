@@ -54,7 +54,7 @@ Primary store for all sip kinds. Rows are immutable after insert (`ON CONFLICT D
 | `kind` | `TEXT` | `action`, `event`, or `signal` |
 | `created` | `TIMESTAMPTZ` | Creation time; drives default list ordering |
 | `source` | `UUID` | Optional FK to `sources.id` (not enforced) |
-| `embedding` | `vector(320)` | Dense vector for semantic search (`q` / `acc` on list routes) |
+| `embedding` | `vector(320)` | Dense vector for semantic search (`q` / `score_threshold` on list routes) |
 | `tags` | `TEXT[]` | Facet tags; AND-filtered on `/events` and `/signals` |
 | `tags_fts` | `tsvector` | Generated stored column: `to_tsvector('simple', immutable_tags_to_text(tags))` |
 | `digest` | `JSONB` | Kind-specific payload; flattened in API responses |
@@ -162,7 +162,7 @@ briefing: Analysts note surging investor optimism...
 
 ```bash
 curl -s $AUTH "$BASE_URL/events?tags=market_trends&from=2026-06-01&response_type=text"
-curl -s $AUTH "$BASE_URL/signals?q=market+volatility&acc=0.75&limit=5&response_type=text"
+curl -s $AUTH "$BASE_URL/signals?q=market+volatility&score_threshold=0.5&limit=5&response_type=text"
 curl -s $AUTH "$BASE_URL/tags?limit=20&response_type=text"
 ```
 
@@ -193,7 +193,7 @@ curl -s "$BASE_URL/health" | jq
 ### Tags
 
 ```bash
-curl -s $AUTH "$BASE_URL/tags?limit=20&offset=0" | jq
+curl -s $AUTH "$BASE_URL/tags?limit=20" | jq
 ```
 
 | | |
@@ -208,7 +208,7 @@ curl -s $AUTH "$BASE_URL/tags?limit=20&offset=0" | jq
 |-----------|------|---------|-------------|
 | `response_type` | string | `json` | `json` or `text` (comma-separated plain text) |
 | `limit` | int | 16 | Page size (1–128) |
-| `offset` | int | 0 | Number of items to skip |
+| `cursor` | string | — | Opaque continuation token from `pagination.next_cursor`. |
 
 **Response:** JSON array of strings by default, e.g. `["gerrymandering", "market_volatility", "supreme_court"]`. With `response_type=text`, a single comma-separated string.
 
@@ -225,7 +225,7 @@ Semantic search example:
 
 ```bash
 curl -s $AUTH \
-  "$BASE_URL/events?q=voting+rights+redistricting&acc=0.8&limit=5" | jq
+  "$BASE_URL/events?q=voting+rights+redistricting&score_threshold=0.8&limit=5" | jq
 ```
 
 Fetch by UUID:
@@ -255,11 +255,11 @@ curl -s $AUTH \
 | `ids` | CSV UUIDs | — | Fetch specific event sips |
 | `tags` | CSV strings | — | Tag filters (AND across supplied tags) |
 | `q` | string | — | Semantic search query (max 1024 chars; requires embedder) |
-| `acc` | float | 0.75 | Minimum embedding similarity for `q` (0.0–1.0; higher = stricter) |
+| `score_threshold` | float | 0.5 | Minimum embedding similarity for `q` (0.0–1.0; higher = stricter) |
 | `from` | date | ~7 days ago | Include events created on or after `YYYY-MM-DD` |
 | `response_type` | string | `json` | `json` or `text` (flat plain-text digests) |
 | `limit` | int | 16 | Page size (1–128) |
-| `offset` | int | 0 | Pagination offset |
+| `cursor` | string | — | Opaque continuation token from `pagination.next_cursor`. |
 
 **Response:** JSON array of flattened event digests when `response_type=json` (default). Example elements:
 
@@ -326,7 +326,7 @@ Semantic search as plain text:
 
 ```bash
 curl -s $AUTH \
-  "$BASE_URL/signals?q=market+volatility&acc=0.75&limit=5&response_type=text"
+  "$BASE_URL/signals?q=market+volatility&score_threshold=0.75&limit=5&response_type=text"
 ```
 
 | | |
@@ -393,7 +393,7 @@ curl -s $AUTH \
 | `ids` | CSV UUIDs | *required* | Source sip UUIDs |
 | `response_type` | string | `json` | `json` or `text` (flat plain-text digests) |
 | `limit` | int | 16 | Page size (1–128) |
-| `offset` | int | 0 | Pagination offset |
+| `cursor` | string | — | Opaque continuation token from `pagination.next_cursor`. |
 
 **Response:** JSON array of flattened digests when `response_type=json` (default). Each item follows the [Event](#events) or [Signal](#signals) field set depending on the related record's kind. With `response_type=text`, plain-text digest blocks as described in [Response format](#response-format-response_type).
 

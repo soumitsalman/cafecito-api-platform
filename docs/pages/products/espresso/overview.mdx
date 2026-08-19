@@ -137,8 +137,8 @@ Collection routes return a stable envelope:
   "pagination": {
     "limit": 20,
     "num_results": 1,
-    "page": null,
-    "next_page": "OPAQUE_TOKEN_OR_NULL"
+    "cursor": null,
+    "next_cursor": "OPAQUE_TOKEN_OR_NULL"
   },
   "meta": {}
 }
@@ -146,16 +146,18 @@ Collection routes return a stable envelope:
 
 - Preserve IDs exactly. Event, Signal, and Source IDs are UUIDs used by follow-up routes.
 - `pagination.num_results` is the count in this page. It is not the total number of possible matches.
-- If `pagination.next_page` is non-null, send that exact value as the next request `page`. Do not create, decode, modify, or sort page tokens.
+- If `pagination.next_cursor` is non-null, send that exact value as the next request `cursor`. Do not create, decode, modify, or sort cursor tokens.
 - Empty collections are successful HTTP `200` responses with `data: []`.
 - Detail routes return `{ "data": { ... } }`. A missing detail record returns HTTP `404`.
 
 ## Query and filter rules
 
-Use `q` for natural-language semantic search on Event and Signal collections. Use it alone before adding filters unless the request calls for a clear structured constraint.
+Use `q` for natural-language semantic search on Event and Signal collections. Use `score_threshold` with `q` to control the minimum semantic similarity: `0.0` is broad, `1.0` is strict, and the default is `0.5`. Use `q` alone before adding filters unless the request calls for a clear structured constraint.
 
 | Parameter | Matching behavior | Example |
 | --- | --- | --- |
+| `q` | Natural-language semantic query. | `semiconductor supply pressure` |
+| `score_threshold` | Minimum semantic similarity for `q`; `0.0` is broad, `1.0` is strict, default `0.5`. | `0.75` |
 | `tags` | Fuzzy text matching. | `supply_chain,policy` |
 | `event_types` | Exact Event type names in snake_case. | `policy_change,market_entry` |
 | `categories` | Exact category names in snake_case. This is separate from `event_types`. | `regulation,technology` |
@@ -271,8 +273,8 @@ The following excerpts use real values from a one-Event response returned by `GE
   "pagination": {
     "limit": 1,
     "num_results": 1,
-    "page": null,
-    "next_page": null
+    "cursor": null,
+    "next_cursor": null
   },
   "meta": {
     "as_of": "2026-08-14T17:44:34.874458971Z"
@@ -315,7 +317,7 @@ pagination:
   limit: 1
   num_results: 1
   page: null
-  next_page: null
+  next_cursor: null
 meta:
   as_of: 2026-08-14T17:44:34.897815116Z
 ```
@@ -340,13 +342,13 @@ pagination:
   limit: 1
   num_results: 1
   page: null
-  next_page: null
+  next_cursor: null
 meta:
   as_of: "2026-08-14T17:44:34.912410727Z"
 ```
 </CodeTabs>
 
-Use JSON when a client needs strict JSON parsing. Use YAML when readable indentation is more useful. Use TOON when an agent needs the same fields in the most compact representation. `pagination.next_page` remains opaque in every format: send it unchanged as the next request `page`.
+Use JSON when a client needs strict JSON parsing. Use YAML when readable indentation is more useful. Use TOON when an agent needs the same fields in the most compact representation. `pagination.next_cursor` remains opaque in every format: send it unchanged as the next request `cursor`.
 
 MCP clients can connect to `https://api.cafecito.tech/espresso/mcp` with the same API key. See [MCP & AI agents](/guides/mcp-ai-agents) for the tool list and agent operating guidance.
 

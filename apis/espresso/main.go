@@ -10,8 +10,8 @@ import (
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	_ "github.com/soumitsalman/cafecito-api-platform/apis/espresso/docs"
 	r "github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/config"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/config"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 )
 
 const (

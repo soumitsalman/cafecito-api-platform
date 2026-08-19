@@ -3,7 +3,6 @@ package gobeansack_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,25 +10,33 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/k0kubun/pp"
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	routeHealth        = "/health"
-	routeTagCategories = "/tags/categories"
-	routeTagEntities   = "/tags/entities"
-	routeTagRegions    = "/tags/regions"
-	routeSources       = "/sources"
-	routeLatest        = "/articles/latest"
-	routeTrending      = "/articles/trending"
-	routeTopHeadlines  = "/articles/top-headlines"
-	routeSearch        = "/articles/search"
-	routePropagation   = "/articles/propagation"
+	ROUTE_HEALTH     = "/health"
+	ROUTE_DOCS       = "/docs/index.html"
+	ROUTE_SEARCH     = "/articles/search"
+	ROUTE_LATEST     = "/articles/latest"
+	ROUTE_TRENDING   = "/articles/trending"
+	ROUTE_HEADLINES  = "/headlines"
+	ROUTE_ARTICLES   = "/articles"
+	ROUTE_COUNT      = "/articles/count"
+	ROUTE_SOURCES    = "/sources"
+	ROUTE_CATEGORIES = "/categories"
+	ROUTE_ENTITIES   = "/entities"
+	ROUTE_REGIONS    = "/regions"
+	ROUTE_SENTIMENTS = "/sentiments"
+	ROUTE_TAGS       = "/tags"
+	ROUTE_STORIES    = "/stories"
 )
 
 func newTestHTTPServer(t *testing.T) *httptest.Server {
@@ -37,11 +44,11 @@ func newTestHTTPServer(t *testing.T) *httptest.Server {
 	db := setupTestDB()
 	embedder := setupTestEmbedder()
 	gin.SetMode(gin.TestMode)
-	engine := router.NewRouter(db, embedder, nil, 0)
+	engine := router.NewRouter(db, embedder, nil)
 	srv := httptest.NewServer(engine)
 	t.Cleanup(func() {
 		srv.Close()
-		embedder.Close()
+		_ = embedder.Close()
 		db.Close()
 	})
 	return srv
@@ -67,39 +74,32 @@ func routerGET(t *testing.T, base, path string, params url.Values) (int, []byte)
 	return resp.StatusCode, body
 }
 
-func routerPOST(t *testing.T, base, path string, payload any) (int, []byte) {
-	t.Helper()
-	data, err := json.Marshal(payload)
-	require.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPost, strings.TrimSuffix(base, "/")+path, bytes.NewReader(data))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp.StatusCode, body
-}
-
 func requireStatus(t *testing.T, expected, actual int, body []byte) {
 	t.Helper()
-	if len(bytes.TrimSpace(body)) > 0 {
-		parseJSONValue(t, body)
-	}
 	require.Equal(t, expected, actual, "response body: %s", string(body))
 }
 
-func parseJSONValue(t *testing.T, body []byte) any {
+type pageEnvelope[T any] struct {
+	Data       []T            `json:"data"`
+	Pagination map[string]any `json:"pagination"`
+	Meta       map[string]any `json:"meta"`
+}
+
+func parseCollection(t *testing.T, body []byte) pageEnvelope[map[string]any] {
 	t.Helper()
-	trimmed := bytes.TrimSpace(body)
-	if len(trimmed) == 0 {
-		return nil
+	var env pageEnvelope[map[string]any]
+	require.NoError(t, json.Unmarshal(body, &env), "response body: %s", string(body))
+	return env
+}
+
+func parseDetailObject(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var detail struct {
+		Data map[string]any `json:"data"`
 	}
-	var v any
-	err := json.Unmarshal(trimmed, &v)
-	require.NoError(t, err, "response body is not valid JSON: %s", string(body))
-	return v
+	require.NoError(t, json.Unmarshal(body, &detail), "response body: %s", string(body))
+	require.NotNil(t, detail.Data)
+	return detail.Data
 }
 
 func printResponse(t *testing.T, label string, body []byte) {
@@ -107,151 +107,431 @@ func printResponse(t *testing.T, label string, body []byte) {
 	if os.Getenv("TEST_PRINT_RESPONSE") == "" && !testing.Verbose() {
 		return
 	}
-	pp.Println(label, parseJSONValue(t, body))
-}
-
-func parseStringArray(t *testing.T, body []byte) []string {
-	t.Helper()
-	v := parseJSONValue(t, body)
-	arr, ok := v.([]any)
-	require.True(t, ok, "expected JSON array of strings, got %T", v)
-	out := make([]string, len(arr))
-	for i, item := range arr {
-		s, ok := item.(string)
-		require.True(t, ok, "expected string at index %d, got %T", i, item)
-		out[i] = s
+	var v any
+	if err := json.Unmarshal(bytes.TrimSpace(body), &v); err != nil {
+		pp.Println(label, string(body))
+		return
 	}
-	return out
+	pp.Println(label, v)
 }
 
-func parseJSONArray(t *testing.T, body []byte) []map[string]any {
+func assertExpectedAPIError(t *testing.T, body []byte, expected_code string) {
 	t.Helper()
-	v := parseJSONValue(t, body)
-	arr, ok := v.([]any)
-	require.True(t, ok, "expected JSON array of objects, got %T", v)
-	out := make([]map[string]any, len(arr))
-	for i, item := range arr {
-		obj, ok := item.(map[string]any)
-		require.True(t, ok, "expected object at index %d, got %T", i, item)
-		out[i] = obj
+	var response struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 	}
-	return out
+	require.NoError(t, json.Unmarshal(body, &response), "response body: %s", string(body))
+	assert.Equal(t, expected_code, response.Error.Code)
+	assert.NotEmpty(t, response.Error.Message)
 }
 
-func addArticleFilters(params url.Values) {
-	params.Set("categories", testCategories[0])
-	params.Set("limit", "5")
+func assertExpectedPagination(t *testing.T, body []byte, expected_limit int) []map[string]any {
+	t.Helper()
+	env := parseCollection(t, body)
+	require.NotNil(t, env.Data)
+	require.Equal(t, float64(expected_limit), env.Pagination["limit"])
+	require.Contains(t, env.Pagination, "next_cursor")
+	assert.NotContains(t, env.Pagination, "page")
+	assert.NotContains(t, env.Pagination, "offset")
+	assert.NotContains(t, env.Pagination, "found")
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(body, &raw))
+	assert.NotContains(t, raw, "success")
+	assert.NotContains(t, raw, "status")
+	return env.Data
+}
+
+func nextCursorFromBody(t *testing.T, body []byte) string {
+	t.Helper()
+	env := parseCollection(t, body)
+	if env.Pagination["next_cursor"] == nil {
+		return ""
+	}
+	cursor, ok := env.Pagination["next_cursor"].(string)
+	require.True(t, ok, "pagination.next_cursor must be a string when present")
+	return cursor
+}
+
+func assertMetaAsOf(t *testing.T, body []byte) {
+	t.Helper()
+	env := parseCollection(t, body)
+	as_of, ok := env.Meta["as_of"].(string)
+	require.True(t, ok, "response is missing RFC3339 meta.as_of")
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err, "invalid meta.as_of: %q", as_of)
+}
+
+func assertStringArrayField(t *testing.T, item map[string]any, field string) {
+	t.Helper()
+	require.Contains(t, item, field)
+	if item[field] == nil {
+		return
+	}
+	_, ok := item[field].([]any)
+	require.True(t, ok, "%s must be an array, got %T", field, item[field])
+}
+
+func assertExpectedSource(t *testing.T, source map[string]any) {
+	t.Helper()
+	require.Contains(t, source, "id")
+	require.Contains(t, source, "domain")
+	require.Contains(t, source, "name")
+	require.Contains(t, source, "url")
+	if id, ok := source["id"].(string); ok && id != "" {
+		_, err := uuid.Parse(id)
+		require.NoError(t, err, "source has invalid id: %q", id)
+	}
+	assert.NotContains(t, source, "base_url")
+}
+
+func assertExpectedArticle(t *testing.T, item map[string]any) {
+	t.Helper()
+	id, ok := item["id"].(string)
+	require.True(t, ok, "article is missing string id")
+	_, err := uuid.Parse(id)
+	require.NoError(t, err, "article has invalid id: %q", id)
+
+	assert.NotEmpty(t, item["url"])
+	assert.Contains(t, item, "content_type")
+	assert.Contains(t, item, "title")
+	assert.Contains(t, item, "summary")
+	assert.Contains(t, item, "author")
+	assert.Contains(t, item, "image_url")
+	assert.Contains(t, item, "story_id")
+
+	published_at, ok := item["published_at"].(string)
+	require.True(t, ok, "article is missing published_at")
+	_, err = time.Parse(time.RFC3339Nano, published_at)
+	require.NoError(t, err, "invalid published_at: %q", published_at)
+
+	source, ok := item["source"].(map[string]any)
+	require.True(t, ok, "article is missing nested source")
+	assertExpectedSource(t, source)
+
+	for _, field := range []string{"categories", "regions", "entities", "sentiments", "tags"} {
+		assertStringArrayField(t, item, field)
+	}
+}
+
+func assertExpectedTrend(t *testing.T, item map[string]any) {
+	t.Helper()
+	trend, ok := item["trend"].(map[string]any)
+	require.True(t, ok, "trending article is missing nested trend")
+	for _, field := range []string{
+		"like_count", "comment_count", "mention_count",
+		"audience_count", "related_article_count", "score",
+	} {
+		require.Contains(t, trend, field)
+	}
+}
+
+func assertExpectedTag(t *testing.T, item map[string]any) {
+	t.Helper()
+	value, ok := item["value"].(string)
+	require.True(t, ok, "discovery item is missing string value")
+	assert.NotEmpty(t, value)
 }
 
 func skipIfEmbedderUnavailable(t *testing.T, status int, body []byte) {
 	t.Helper()
-	if status == http.StatusInternalServerError && strings.Contains(string(body), "Embedder just died") {
-		t.Skip("embedder unavailable:", string(body))
+	if status != http.StatusInternalServerError {
+		return
+	}
+	var response struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &response) != nil {
+		return
+	}
+	if response.Error.Code == shared.API_ERROR_EMBEDDING_ERROR {
+		t.Skip("embedder unavailable:", response.Error.Message)
 	}
 }
 
-func requireOKOrNoContent(t *testing.T, status int, body []byte) {
+func addArticleFilters(params url.Values) {
+	params.Set("categories", test_categories[0])
+	params.Set("limit", "5")
+}
+
+func firstArticleID(t *testing.T, base string) string {
 	t.Helper()
-	require.Contains(t, []int{http.StatusOK, http.StatusNoContent}, status, "response body: %s", string(body))
-	if status == http.StatusOK {
-		parseJSONValue(t, body)
+	params := url.Values{}
+	params.Set("limit", "20")
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	status, body := routerGET(t, base, ROUTE_SEARCH, params)
+	requireStatus(t, http.StatusOK, status, body)
+	items := parseCollection(t, body).Data
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		article_id, _ := item["id"].(string)
+		source, _ := item["source"].(map[string]any)
+		source_id, _ := source["id"].(string)
+		if article_id != "" && source_id != "" {
+			return article_id
+		}
 	}
-}
-
-func repeatURLs(n int) []string {
-	urls := make([]string, n)
-	for i := range urls {
-		urls[i] = fmt.Sprintf("https://example.com/article-%d", i)
-	}
-	return urls
+	id, ok := items[0]["id"].(string)
+	require.True(t, ok)
+	return id
 }
 
 func TestRouterHealth(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	status, body := routerGET(t, srv.URL, routeHealth, nil)
+	status, body := routerGET(t, srv.URL, ROUTE_HEALTH, nil)
 	printResponse(t, "HEALTH", body)
 	requireStatus(t, http.StatusOK, status, body)
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(body, &response))
+	assert.Equal(t, "alive", response["status"])
 }
 
-func TestRouterGetTagCategories(t *testing.T) {
+func TestRouterDocs(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("limit", "5")
-	params.Set("offset", "0")
-
-	status, body := routerGET(t, srv.URL, routeTagCategories, params)
-	printResponse(t, "TAG_CATEGORIES", body)
+	status, body := routerGET(t, srv.URL, ROUTE_DOCS, nil)
 	requireStatus(t, http.StatusOK, status, body)
-	tags := parseStringArray(t, body)
-	assert.NotEmpty(t, tags)
 }
 
-func TestRouterGetTagEntities(t *testing.T) {
+func TestRouterDiscoveryRoutes(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for _, path := range []string{ROUTE_CATEGORIES, ROUTE_ENTITIES, ROUTE_REGIONS, ROUTE_SENTIMENTS, ROUTE_TAGS} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			printResponse(t, path, body)
+			requireStatus(t, http.StatusOK, status, body)
+			items := assertExpectedPagination(t, body, 5)
+			require.NotEmpty(t, items, path)
+			assertExpectedTag(t, items[0])
+		})
+	}
+}
+
+func TestRouterDiscoveryQuery(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
+	params.Set("q", "tech")
 	params.Set("limit", "5")
-
-	status, body := routerGET(t, srv.URL, routeTagEntities, params)
-	printResponse(t, "TAG_ENTITIES", body)
+	status, body := routerGET(t, srv.URL, ROUTE_CATEGORIES, params)
+	printResponse(t, "CATEGORIES_Q", body)
 	requireStatus(t, http.StatusOK, status, body)
-	entities := parseStringArray(t, body)
-	assert.NotEmpty(t, entities)
+	items := assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		assertExpectedTag(t, item)
+	}
 }
 
-func TestRouterGetTagRegions(t *testing.T) {
+func TestRouterInvalidLimit(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("limit", "5")
-
-	status, body := routerGET(t, srv.URL, routeTagRegions, params)
-	printResponse(t, "TAG_REGIONS", body)
-	requireStatus(t, http.StatusOK, status, body)
-	regions := parseStringArray(t, body)
-	assert.NotEmpty(t, regions)
-}
-
-func TestRouterTagsInvalidLimit(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("limit", "0")
-	status, body := routerGET(t, srv.URL, routeTagCategories, params)
-	printResponse(t, "TAG_CATEGORIES_INVALID_LIMIT", body)
-	requireStatus(t, http.StatusBadRequest, status, body)
-}
-
-func TestRouterTagsInvalidLimitHigh(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("limit", "999")
-	status, body := routerGET(t, srv.URL, routeTagCategories, params)
-	printResponse(t, "TAG_CATEGORIES_INVALID_LIMIT_HIGH", body)
-	requireStatus(t, http.StatusBadRequest, status, body)
+	for _, limit := range []string{"0", "101", "999"} {
+		params := url.Values{}
+		params.Set("limit", limit)
+		status, body := routerGET(t, srv.URL, ROUTE_CATEGORIES, params)
+		printResponse(t, "INVALID_LIMIT_"+limit, body)
+		requireStatus(t, http.StatusBadRequest, status, body)
+		assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+	}
 }
 
 func TestRouterGetSources(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
-	params.Set("sources", testSources[0])
 	params.Set("limit", "5")
 
-	status, body := routerGET(t, srv.URL, routeSources, params)
+	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES", body)
 	requireStatus(t, http.StatusOK, status, body)
-	items := parseJSONArray(t, body)
-	assert.NotEmpty(t, items)
+	sources := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, sources)
+	for _, source := range sources {
+		assertExpectedSource(t, source)
+	}
+
+	first_id, ok := sources[0]["id"].(string)
+	require.True(t, ok)
+	status, body = routerGET(t, srv.URL, ROUTE_SOURCES+"/"+first_id, nil)
+	printResponse(t, "SOURCE_DETAIL", body)
+	requireStatus(t, http.StatusOK, status, body)
+	detail := parseDetailObject(t, body)
+	assert.Equal(t, first_id, detail["id"])
+	assertExpectedSource(t, detail)
+	assert.Contains(t, detail, "description")
+	assert.Contains(t, detail, "favicon_url")
+	assert.Contains(t, detail, "rss_feed_url")
+}
+
+func TestRouterGetSourcesByQueryAndDomain(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("q", test_source_query)
+	params.Set("domains", test_domains[0])
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
+	printResponse(t, "SOURCES_FILTERED", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertExpectedPagination(t, body, 5)
+}
+
+func TestRouterSourceNotFound(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_SOURCES+"/"+uuid.New().String(), nil)
+	printResponse(t, "SOURCE_NOT_FOUND", body)
+	requireStatus(t, http.StatusNotFound, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
+}
+
+func TestRouterSearchArticlesUnfiltered(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SEARCH_UNFILTERED", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+		assert.NotContains(t, item, "content")
+	}
+}
+
+func TestRouterSearchArticlesByCategories(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	addArticleFilters(params)
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SEARCH_BY_CATEGORIES", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+	}
+}
+
+func TestRouterSearchArticlesByExactIDsAndURLs(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	article_id := firstArticleID(t, srv.URL)
+
+	params := url.Values{}
+	params.Set("ids", article_id)
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SEARCH_BY_IDS", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	assert.Equal(t, article_id, items[0]["id"])
+
+	params = url.Values{}
+	params.Set("urls", test_article_urls[0])
+	params.Set("limit", "5")
+	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SEARCH_BY_URLS", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items = assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		assert.Equal(t, test_article_urls[0], item["url"])
+	}
+}
+
+func TestRouterSearchArticlesFilters(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("content_type", "news")
+	params.Set("authors", test_authors[0])
+	params.Set("regions", test_regions[2])
+	params.Set("entities", test_entities[0])
+	params.Set("sentiments", test_sentiments[0])
+	params.Set("tags", test_tags[0])
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	params.Set("to", testSearchTo().Format("2006-01-02"))
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SEARCH_FILTERS", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+		assert.Equal(t, "news", item["content_type"])
+	}
+}
+
+func TestRouterVectorSearchArticles(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("q", TEST_VECTOR_QUERY)
+	params.Set("score_threshold", "0.6")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "VECTOR_SEARCH", body)
+	skipIfEmbedderUnavailable(t, status, body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+	}
+}
+
+func TestRouterScoreThresholdRequiresQ(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("score_threshold", "0.6")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "SCORE_THRESHOLD_WITHOUT_Q", body)
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+}
+
+func TestRouterRejectsRFC3339DateParams(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("from", "2026-02-01T00:00:00Z")
+	params.Set("to", "2026-02-02T00:00:00Z")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "RFC3339_DATES", body)
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 }
 
 func TestRouterGetLatestArticles(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	addArticleFilters(params)
+	status, body := routerGET(t, srv.URL, ROUTE_LATEST, params)
+	printResponse(t, "LATEST", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+		assert.NotContains(t, item, "trend")
+	}
+}
 
-	status, body := routerGET(t, srv.URL, routeLatest, params)
-	printResponse(t, "LATEST_ARTICLES", body)
-	requireOKOrNoContent(t, status, body)
-	if status == http.StatusOK {
-		items := parseJSONArray(t, body)
-		assert.NotEmpty(t, items)
+func TestRouterVectorSearchLatest(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("q", TEST_VECTOR_QUERY)
+	params.Set("score_threshold", "0.6")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_LATEST, params)
+	printResponse(t, "VECTOR_SEARCH_LATEST", body)
+	skipIfEmbedderUnavailable(t, status, body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
 	}
 }
 
@@ -259,134 +539,306 @@ func TestRouterGetTrendingArticles(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	addArticleFilters(params)
-
-	status, body := routerGET(t, srv.URL, routeTrending, params)
-	printResponse(t, "TRENDING_ARTICLES", body)
-	if status == http.StatusInternalServerError && strings.Contains(string(body), "DB just died") {
-		t.Skip("trending query failed against live DB:", string(body))
-	}
-	requireOKOrNoContent(t, status, body)
-	if status == http.StatusOK {
-		items := parseJSONArray(t, body)
-		assert.NotEmpty(t, items)
+	status, body := routerGET(t, srv.URL, ROUTE_TRENDING, params)
+	printResponse(t, "TRENDING", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertMetaAsOf(t, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+		assertExpectedTrend(t, item)
 	}
 }
 
-func TestRouterGetTopHeadlines(t *testing.T) {
+func TestRouterGetHeadlines(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	addArticleFilters(params)
-
-	status, body := routerGET(t, srv.URL, routeTopHeadlines, params)
-	printResponse(t, "TOP_HEADLINES", body)
-	if status == http.StatusInternalServerError && strings.Contains(string(body), "DB just died") {
-		t.Skip("top-headlines query failed against live DB:", string(body))
-	}
-	requireOKOrNoContent(t, status, body)
-	if status == http.StatusOK {
-		items := parseJSONArray(t, body)
-		assert.NotEmpty(t, items)
+	status, body := routerGET(t, srv.URL, ROUTE_HEADLINES, params)
+	printResponse(t, "HEADLINES", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertMetaAsOf(t, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
+		assertExpectedTrend(t, item)
 	}
 }
 
-func TestRouterSearchArticlesMissingParam(t *testing.T) {
+func TestRouterLatestAndTrendingRejectExactIdentityFilters(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("limit", "5")
+	article_id := firstArticleID(t, srv.URL)
+	for _, path := range []string{ROUTE_LATEST, ROUTE_TRENDING, ROUTE_HEADLINES} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("ids", article_id)
+			params.Set("urls", test_article_urls[0])
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			printResponse(t, path+"_IDENTITY_FILTERS", body)
+			requireStatus(t, http.StatusBadRequest, status, body)
+			assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+		})
+	}
+}
 
-	status, body := routerGET(t, srv.URL, routeSearch, params)
-	printResponse(t, "SEARCH_MISSING_PARAM", body)
+func TestRouterGetArticle(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	article_id := firstArticleID(t, srv.URL)
+
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id, nil)
+	printResponse(t, "ARTICLE_DETAIL", body)
+	requireStatus(t, http.StatusOK, status, body)
+	detail := parseDetailObject(t, body)
+	assert.Equal(t, article_id, detail["id"])
+	assertExpectedArticle(t, detail)
+	assert.NotContains(t, detail, "content")
+	links, ok := detail["links"].(map[string]any)
+	require.True(t, ok, "article detail is missing links")
+	assert.Equal(t, "/articles/"+article_id+"/similar", links["similar"])
+	assert.Equal(t, "/articles/"+article_id+"/mentions", links["mentions"])
+}
+
+func TestRouterGetArticleFullContent(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	article_id := firstArticleID(t, srv.URL)
+	params := url.Values{}
+	params.Set("full_content", "true")
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id, params)
+	printResponse(t, "ARTICLE_FULL_CONTENT", body)
+	requireStatus(t, http.StatusOK, status, body)
+	detail := parseDetailObject(t, body)
+	require.Contains(t, detail, "content")
+}
+
+func TestRouterArticleNotFound(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+uuid.New().String(), nil)
+	printResponse(t, "ARTICLE_NOT_FOUND", body)
+	requireStatus(t, http.StatusNotFound, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
+}
+
+func TestRouterArticleInvalidID(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/not-a-uuid", nil)
+	printResponse(t, "ARTICLE_INVALID_ID", body)
 	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 }
 
-func TestRouterSearchArticlesByCategories(t *testing.T) {
+func TestRouterSimilarArticles(t *testing.T) {
 	srv := newTestHTTPServer(t)
+	article_id := firstArticleID(t, srv.URL)
 	params := url.Values{}
-	params.Set("categories", testCategories[0])
 	params.Set("limit", "5")
-
-	status, body := routerGET(t, srv.URL, routeSearch, params)
-	printResponse(t, "SEARCH_BY_CATEGORIES", body)
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id+"/similar", params)
+	printResponse(t, "SIMILAR", body)
 	requireStatus(t, http.StatusOK, status, body)
-	items := parseJSONArray(t, body)
-	assert.NotEmpty(t, items)
-}
-
-func TestRouterVectorSearchArticles(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("q", testVectorQuery)
-	params.Set("acc", "0.6")
-	params.Set("limit", "5")
-
-	status, body := routerGET(t, srv.URL, routeSearch, params)
-	printResponse(t, "VECTOR_SEARCH", body)
-	skipIfEmbedderUnavailable(t, status, body)
-	requireStatus(t, http.StatusOK, status, body)
-	items := parseJSONArray(t, body)
-	assert.NotEmpty(t, items)
-}
-
-func TestRouterVectorSearchLatest(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("q", testVectorQuery)
-	params.Set("acc", "0.6")
-	params.Set("limit", "5")
-
-	status, body := routerGET(t, srv.URL, routeLatest, params)
-	printResponse(t, "VECTOR_SEARCH_LATEST", body)
-	skipIfEmbedderUnavailable(t, status, body)
-	requireOKOrNoContent(t, status, body)
-	if status == http.StatusOK {
-		items := parseJSONArray(t, body)
-		assert.NotEmpty(t, items)
+	items := assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		assertExpectedArticle(t, item)
 	}
 }
 
-func TestRouterPropagationGETValid(t *testing.T) {
+func TestRouterArticleMentions(t *testing.T) {
 	srv := newTestHTTPServer(t)
+	article_id := firstArticleID(t, srv.URL)
 	params := url.Values{}
-	params.Set("urls", strings.Join(testPropagationURLs, ","))
-
-	status, body := routerGET(t, srv.URL, routePropagation, params)
-	printResponse(t, "PROPAGATION_GET", body)
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id+"/mentions", params)
+	printResponse(t, "MENTIONS", body)
 	requireStatus(t, http.StatusOK, status, body)
-
-	results := parseJSONArray(t, body)
-	assert.Len(t, results, len(testPropagationURLs))
-	for i, r := range results {
-		assert.Equal(t, testPropagationURLs[i], r["url"])
+	assertMetaAsOf(t, body)
+	items := assertExpectedPagination(t, body, 5)
+	for _, item := range items {
+		require.Contains(t, item, "url")
+		require.Contains(t, item, "platform")
+		require.Contains(t, item, "forum")
+		require.Contains(t, item, "observed_at")
+		engagement, ok := item["engagement"].(map[string]any)
+		require.True(t, ok)
+		require.Contains(t, engagement, "likes")
+		require.Contains(t, engagement, "comments")
+		require.Contains(t, engagement, "audience")
 	}
 }
 
-func TestRouterPropagationPOSTMaxURLs(t *testing.T) {
+func TestRouterMissingArticleSubresources(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	status, body := routerPOST(t, srv.URL, routePropagation, map[string]any{
-		"urls": repeatURLs(129),
-	})
-	printResponse(t, "PROPAGATION_POST_MAX_URLS", body)
+	missing := uuid.New().String()
+	for _, suffix := range []string{"/similar", "/mentions"} {
+		status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+missing+suffix, url.Values{"limit": {"5"}})
+		printResponse(t, "MISSING"+suffix, body)
+		requireStatus(t, http.StatusNotFound, status, body)
+		assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
+	}
+}
+
+func TestRouterStories(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("limit", "5")
+	params.Set("min_article_count", "2")
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	status, body := routerGET(t, srv.URL, ROUTE_STORIES, params)
+	printResponse(t, "STORIES", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertMetaAsOf(t, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	story := items[0]
+	require.Contains(t, story, "id")
+	require.Contains(t, story, "title")
+	require.Contains(t, story, "first_published_at")
+	require.Contains(t, story, "last_published_at")
+	require.Contains(t, story, "article_count")
+	require.Contains(t, story, "source_count")
+	require.Contains(t, story, "top_articles")
+	assert.NotContains(t, story, "links")
+
+	story_id, ok := story["id"].(string)
+	require.True(t, ok)
+	status, body = routerGET(t, srv.URL, ROUTE_STORIES+"/"+story_id, nil)
+	printResponse(t, "STORY_DETAIL", body)
+	requireStatus(t, http.StatusOK, status, body)
+	detail := parseDetailObject(t, body)
+	assert.Equal(t, story_id, detail["id"])
+	links, ok := detail["links"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "/stories/"+story_id+"/articles", links["articles"])
+
+	status, body = routerGET(t, srv.URL, ROUTE_STORIES+"/"+story_id+"/articles", url.Values{"limit": {"5"}})
+	printResponse(t, "STORY_ARTICLES", body)
+	requireStatus(t, http.StatusOK, status, body)
+	members := assertExpectedPagination(t, body, 5)
+	for _, item := range members {
+		assertExpectedArticle(t, item)
+		assert.Equal(t, story_id, item["story_id"])
+		assert.NotContains(t, item, "trend")
+	}
+}
+
+func TestRouterStoryNotFound(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	missing := uuid.New().String()
+	status, body := routerGET(t, srv.URL, ROUTE_STORIES+"/"+missing, nil)
+	printResponse(t, "STORY_NOT_FOUND", body)
+	requireStatus(t, http.StatusNotFound, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
+}
+
+func TestRouterArticlesCount(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	params.Set("to", testSearchTo().Format("2006-01-02"))
+	status, body := routerGET(t, srv.URL, ROUTE_COUNT, params)
+	printResponse(t, "COUNT", body)
+	requireStatus(t, http.StatusOK, status, body)
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(body, &response))
+	data, ok := response["data"].(map[string]any)
+	require.True(t, ok)
+	_, ok = data["count"].(float64)
+	require.True(t, ok)
+	meta, ok := response["meta"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "article", meta["counted_resource"])
+	assert.Equal(t, "published_at", meta["time_field"])
+	as_of, ok := meta["as_of"].(string)
+	require.True(t, ok)
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err)
+
+	params.Set("group_by", "content_type")
+	status, body = routerGET(t, srv.URL, ROUTE_COUNT, params)
+	printResponse(t, "COUNT_GROUP", body)
+	requireStatus(t, http.StatusOK, status, body)
+	require.NoError(t, json.Unmarshal(body, &response))
+	data, ok = response["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "content_type", data["group_by"])
+	_, ok = data["buckets"].([]any)
+	require.True(t, ok)
+}
+
+func TestRouterArticlesCountRequiresDateBounds(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_COUNT, nil)
+	printResponse(t, "COUNT_MISSING_BOUNDS", body)
 	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 }
 
-func TestRouterPropagationGETMaxURLs(t *testing.T) {
+func TestRouterCursorPagination(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
-	params.Set("urls", strings.Join(repeatURLs(129), ","))
-	status, body := routerGET(t, srv.URL, routePropagation, params)
-	printResponse(t, "PROPAGATION_GET_MAX_URLS", body)
-	requireStatus(t, http.StatusBadRequest, status, body)
+	params.Set("limit", "2")
+	params.Set("from", time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02"))
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	requireStatus(t, http.StatusOK, status, body)
+	first := assertExpectedPagination(t, body, 2)
+	require.NotEmpty(t, first)
+
+	cursor := nextCursorFromBody(t, body)
+	if cursor == "" {
+		t.Skip("not enough articles for a second page")
+	}
+
+	params.Set("cursor", cursor)
+	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	requireStatus(t, http.StatusOK, status, body)
+	second := assertExpectedPagination(t, body, 2)
+	require.NotEmpty(t, second)
+	assert.NotEqual(t, first[0]["id"], second[0]["id"])
 }
 
-func TestRouterPropagationPOSTValid(t *testing.T) {
+func TestRouterInvalidCursor(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	status, body := routerPOST(t, srv.URL, routePropagation, map[string]any{"urls": testPropagationURLs})
-	printResponse(t, "PROPAGATION_POST", body)
-	requireStatus(t, http.StatusOK, status, body)
+	params := url.Values{}
+	params.Set("cursor", "not-a-valid-cursor")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "INVALID_CURSOR", body)
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+}
 
-	results := parseJSONArray(t, body)
-	assert.Len(t, results, len(testPropagationURLs))
-	for i, r := range results {
-		assert.Equal(t, testPropagationURLs[i], r["url"])
-	}
+func TestRouterDefaultPagination(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, nil)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 20)
+	require.NotEmpty(t, items)
+	assert.LessOrEqual(t, len(items), 20)
+}
+
+func TestRouterEmptyCollection(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("from", "2000-01-01")
+	params.Set("to", "2000-01-02")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "EMPTY_COLLECTION", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	assert.Empty(t, items)
+	assert.Equal(t, "", nextCursorFromBody(t, body))
+}
+
+func TestRouterFullContentProjection(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("limit", "1")
+	params.Set("full_content", "true")
+	params.Set("from", testSearchFrom().Format("2006-01-02"))
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "FULL_CONTENT", body)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 1)
+	require.NotEmpty(t, items)
+	require.Contains(t, items[0], "content")
 }

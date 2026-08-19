@@ -17,7 +17,7 @@ Every REST scenario includes a complete JavaScript and Python implementation alo
 | Read IDs from `data[].id` and preserve them exactly. | Event, Signal, and Source UUIDs are the handoff between calls. |
 | Use discovery only when an exact value is unknown. | Known normalized values can go directly into a search. |
 | Keep fuzzy `tags` separate from exact structured filters. | `categories`, `event_types`, `companies`, `people`, `products`, and `regions` use exact snake_case values. |
-| Treat `pagination.next_page` as opaque. | Send it back unchanged as `page`; `num_results` is only the count for the current page. |
+| Treat `pagination.next_cursor` as opaque. | Send it back unchanged as `cursor`; `num_results` is only the count for the current page. |
 | Request detail, evidence, or support only for selected records. | This keeps agent context small and the answer traceable. |
 
 ## Scenario 1: Discover vocabulary, find Events, then inspect evidence
@@ -517,8 +517,8 @@ Source `q` matches source metadata such as domain, name, and URL. It is not sema
 **Call sequence:** 4 or more calls
 
 1. Search the first Event page with a bounded query.
-2. Reissue the same search with `page=pagination.next_page`.
-3. Continue only while `next_page` is non-null.
+2. Reissue the same search with `cursor=pagination.next_cursor`.
+3. Continue only while `next_cursor` is non-null.
 4. Retrieve Event detail and evidence only for records that meet the selection criteria.
 
 <CodeTabs syncKey="espresso-scenario-5">
@@ -547,10 +547,10 @@ do {
     from: "2026-05-01",
     to: "2026-05-31",
     limit: 20,
-    ...(nextPage ? { page: nextPage } : {}),
+    ...(nextPage ? { cursor: nextPage } : {}),
   });
   selectedEvents.push(...page.data.slice(0, 3 - selectedEvents.length));
-  nextPage = page.pagination.next_page;
+  nextPage = page.pagination.next_cursor;
 } while (nextPage && selectedEvents.length < 3);
 
 const enrichedEvents = await Promise.all(
@@ -581,7 +581,7 @@ def get(path, params=None):
     return response.json()
 
 selected_events = []
-next_page = None
+next_cursor = None
 while len(selected_events) < 3:
     params = {
         "q": "supply disruption",
@@ -589,13 +589,13 @@ while len(selected_events) < 3:
         "to": "2026-05-31",
         "limit": 20,
     }
-    if next_page:
-        params["page"] = next_page
+    if next_cursor:
+        params["cursor"] = next_cursor
 
     page = get("/espresso/events", params)
     selected_events.extend(page["data"][: 3 - len(selected_events)])
-    next_page = page["pagination"]["next_page"]
-    if not next_page:
+    next_cursor = page["pagination"]["next_cursor"]
+    if not next_cursor:
         break
 
 enriched_events = []
@@ -610,7 +610,7 @@ for event in selected_events:
         }
     )
 
-print({"enriched_events": enriched_events, "next_page": next_page})
+print({"enriched_events": enriched_events, "next_cursor": next_cursor})
 ```
 
 ```bash title="cURL"
@@ -628,7 +628,7 @@ curl -s --get "${BASE_URL}/espresso/events" \
   --data-urlencode "q=supply disruption" \
   --data-urlencode "from=2026-05-01" \
   --data-urlencode "to=2026-05-31" \
-  --data-urlencode "page=OPAQUE_NEXT_PAGE" \
+  --data-urlencode "cursor=OPAQUE_NEXT_CURSOR" \
   --data-urlencode "limit=20"
 
 # Enrich only a selected record.

@@ -15,42 +15,34 @@ import (
 	"time"
 )
 
-// defaultStressBaseURL is the target API base URL. Override with the
-// STRESS_BASE_URL environment variable before running the test.
-const defaultStressBaseURL = "http://localhost:8080"
+const DEFAULT_STRESS_BASE_URL = "http://localhost:8080"
 
-// minConcurrency / maxConcurrency bound the allowed request count.
 const (
-	minConcurrency = 100
-	maxConcurrency = 10000
-	// httpTimeout is the duration used for all HTTP clients in the tests.
-	// set high so we don't abort on long-running queries; tests generally
-	// run for several minutes anyway.
-	httpTimeout = 10 * time.Minute
+	MIN_CONCURRENCY = 100
+	MAX_CONCURRENCY = 10000
+	HTTP_TIMEOUT    = 10 * time.Minute
 )
 
-// stressEndpoint describes one API endpoint with the set of optional query
-// parameters it accepts.
 type stressEndpoint struct {
-	path           string
-	acceptsQ       bool
-	acceptsTags    bool
-	acceptsFrom    bool
-	requiresSources bool
+	path         string
+	accepts_q    bool
+	accepts_tags bool
+	accepts_from bool
 }
 
-var stressEndpoints = []stressEndpoint{
-	{path: "/articles/latest", acceptsQ: true, acceptsTags: true, acceptsFrom: true},
-	{path: "/articles/trending", acceptsQ: true, acceptsTags: true, acceptsFrom: true},
-	{path: "/tags/categories"},
-	{path: "/sources", requiresSources: true},
-	{path: "/tags/entities"},
-	{path: "/tags/regions"},
+var stress_endpoints = []stressEndpoint{
+	{path: ROUTE_SEARCH, accepts_q: true, accepts_tags: true, accepts_from: true},
+	{path: ROUTE_LATEST, accepts_q: true, accepts_tags: true, accepts_from: true},
+	{path: ROUTE_TRENDING, accepts_q: true, accepts_tags: true, accepts_from: true},
+	{path: ROUTE_HEADLINES, accepts_q: true, accepts_tags: true},
+	{path: ROUTE_SOURCES, accepts_q: true},
+	{path: ROUTE_CATEGORIES, accepts_q: true},
+	{path: ROUTE_ENTITIES, accepts_q: true},
+	{path: ROUTE_REGIONS, accepts_q: true},
+	{path: ROUTE_SENTIMENTS, accepts_q: true},
 }
 
-// sampleQueries is a small set of representative natural-language queries used
-// to populate the "q" parameter randomly.
-var sampleQueries = []string{
+var sample_queries = []string{
 	"artificial intelligence",
 	"machine learning",
 	"cloud computing",
@@ -71,152 +63,80 @@ var sampleQueries = []string{
 	"API security",
 	"supply chain resilience",
 	"digital transformation",
-	"autonomous systems",
-	"natural language processing",
-	"computer vision",
-	"distributed systems",
-	"microservices architecture",
 }
 
-// sampleTags is a small set of representative tag / entity values.
-var sampleTags = []string{
-	// Business Leaders
-	"OpenAI",
-	"Elon Musk",
-	"Sam Altman",
-	"Satya Nadella",
-	"Sundar Pichai",
-	"Tim Cook",
-	"Andy Jassy",
-	"Mark Zuckerberg",
-	"Jensen Huang",
-	"Satya Nadella",
-	"Sheryl Sandberg",
-	"Jack Dorsey",
-
-	// Companies
-	"Google",
-	"Microsoft",
-	"Tesla",
-	"Apple",
-	"Amazon",
-	"Meta",
-	"NVIDIA",
-	"OpenAI",
-	"Adobe",
-	"Salesforce",
-	"IBM",
-	"Intel",
-	"Oracle",
-	"Stripe",
-	"Databricks",
-
-	// Countries
-	"US",
-	"Europe",
-	"China",
-	"India",
-	"Japan",
-	"Canada",
-	"UK",
-	"Germany",
-	"France",
-	"Singapore",
-	"Australia",
-	"Brazil",
-	"Mexico",
-	"South Korea",
+var sample_tags = []string{
+	"openai",
+	"google",
+	"microsoft",
+	"united_states",
+	"europe",
+	"artificial_intelligence",
+	"cybersecurity",
+	"public_policy_and_administration",
 }
 
-// sampleSources is a small set of representative publisher source IDs used to
-// satisfy the /sources endpoint's sources query parameter.
-var sampleSources = []string{
-	"techcrunch",
-	"theverge",
-	"wired",
-	"arstechnica",
-	"venturebeat",
-	"forbes",
-	"bloomberg",
-	"cnbc",
-	"reuters",
-	"apnews",
-	"bbc",
-	"cnet",
-	"engadget",
-	"zdnet",
-	"slashdot",
-}
-
-// stressResult holds the outcome of a single stress-test request.
 type stressResult struct {
-	endpoint   string
-	statusCode int
-	latency    time.Duration
-	err        error
-	// number of items returned in the response body (if any)
-	itemCount int
+	endpoint    string
+	status_code int
+	latency     time.Duration
+	err         error
+	item_count  int
 }
 
-// buildStressURL constructs the full request URL for one random request against
-// the given endpoint.
-func buildStressURL(baseURL string, ep stressEndpoint, rng *rand.Rand) string {
+func buildStressURL(base_url string, ep stressEndpoint, rng *rand.Rand) string {
 	params := url.Values{}
 
-	if ep.requiresSources {
-		// Pick 1–3 random sources from the sample pool.
-		n := 1 + rng.Intn(min(3, len(sampleSources)))
-		perm := rng.Perm(len(sampleSources))
+	if ep.accepts_q && rng.Intn(2) == 0 {
+		params.Set("q", sample_queries[rng.Intn(len(sample_queries))])
+	}
+
+	if ep.accepts_tags && rng.Intn(2) == 0 {
+		n := 1 + rng.Intn(min(3, len(sample_tags)))
+		perm := rng.Perm(len(sample_tags))
 		for i := 0; i < n; i++ {
-			params.Add("sources", sampleSources[perm[i]])
+			params.Add("tags", sample_tags[perm[i]])
 		}
 	}
 
-	if ep.acceptsQ && rng.Intn(2) == 0 {
-		params.Set("q", sampleQueries[rng.Intn(len(sampleQueries))])
+	if ep.accepts_from && rng.Intn(2) == 0 {
+		days_ago := 1 + rng.Intn(30)
+		params.Set("from", time.Now().UTC().AddDate(0, 0, -days_ago).Format("2006-01-02"))
 	}
 
-	if ep.acceptsTags && rng.Intn(2) == 0 {
-		n := 1 + rng.Intn(min(3, len(sampleTags)))
-		perm := rng.Perm(len(sampleTags))
-		for i := 0; i < n; i++ {
-			params.Add("tags", sampleTags[perm[i]])
-		}
-	}
-
-	if ep.acceptsFrom && rng.Intn(2) == 0 {
-		daysAgo := 1 + rng.Intn(30)
-		params.Set("from", time.Now().UTC().AddDate(0, 0, -daysAgo).Format("2006-01-02"))
-	}
-
-	// Random limit (1–50) and occasionally a non-zero offset.
 	params.Set("limit", strconv.Itoa(1+rng.Intn(50)))
-	if rng.Intn(4) == 0 {
-		params.Set("offset", strconv.Itoa(rng.Intn(20)))
-	}
 
-	raw := strings.TrimSuffix(baseURL, "/") + ep.path
+	raw := strings.TrimSuffix(base_url, "/") + ep.path
 	if enc := params.Encode(); enc != "" {
 		raw += "?" + enc
 	}
 	return raw
 }
 
-// runStressTest sends `concurrency` requests against the API concurrently and
-// returns a slice of stressResult, one per request.
-func runStressTest(baseURL string, concurrency int, apiKey string) []stressResult {
+func countEnvelopeItems(body []byte) int {
+	var env struct {
+		Data []any `json:"data"`
+	}
+	if json.Unmarshal(body, &env) == nil {
+		return len(env.Data)
+	}
+	var arr []any
+	if json.Unmarshal(body, &arr) == nil {
+		return len(arr)
+	}
+	return 0
+}
+
+func runStressTest(base_url string, concurrency int, api_key string) []stressResult {
 	results := make([]stressResult, concurrency)
 	var wg sync.WaitGroup
 	wg.Add(concurrency)
 
-	client := &http.Client{Timeout: httpTimeout}
-
-	// Pre-generate per-goroutine seeds from a single source to avoid seed
-	// collisions when many goroutines start within the same nanosecond.
-	masterRng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+	client := &http.Client{Timeout: HTTP_TIMEOUT}
+	master_rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	seeds := make([]int64, concurrency)
 	for i := range seeds {
-		seeds[i] = masterRng.Int63()
+		seeds[i] = master_rng.Int63()
 	}
 
 	for i := 0; i < concurrency; i++ {
@@ -224,42 +144,34 @@ func runStressTest(baseURL string, concurrency int, apiKey string) []stressResul
 			defer wg.Done()
 
 			rng := rand.New(rand.NewSource(seeds[idx])) //nolint:gosec
+			ep := stress_endpoints[rng.Intn(len(stress_endpoints))]
+			raw_url := buildStressURL(base_url, ep, rng)
 
-			ep := stressEndpoints[rng.Intn(len(stressEndpoints))]
-			rawURL := buildStressURL(baseURL, ep, rng)
-
-			req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+			req, err := http.NewRequest(http.MethodGet, raw_url, nil)
 			if err != nil {
 				results[idx] = stressResult{endpoint: ep.path, err: err}
 				return
 			}
-			if apiKey != "" {
-				req.Header.Set("X-API-KEY", apiKey)
+			if api_key != "" {
+				req.Header.Set("X-API-KEY", api_key)
 			}
 
 			start := time.Now()
 			resp, err := client.Do(req)
 			latency := time.Since(start)
-
 			if err != nil {
 				results[idx] = stressResult{endpoint: ep.path, latency: latency, err: err}
 				return
 			}
 
-			// read and count JSON array items (most endpoints return slices)
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			count := 0
-			var arr []any
-			if json.Unmarshal(body, &arr) == nil {
-				count = len(arr)
-			}
 
 			results[idx] = stressResult{
-				endpoint:   ep.path,
-				statusCode: resp.StatusCode,
-				latency:    latency,
-				itemCount:  count,
+				endpoint:    ep.path,
+				status_code: resp.StatusCode,
+				latency:     latency,
+				item_count:  countEnvelopeItems(body),
 			}
 		}(i)
 	}
@@ -268,176 +180,144 @@ func runStressTest(baseURL string, concurrency int, apiKey string) []stressResul
 	return results
 }
 
-// printStressSummary logs aggregated metrics for the stress run.
 func printStressSummary(t *testing.T, results []stressResult) {
 	t.Helper()
 
 	type epStats struct {
-		total      int
-		success    int
-		failures   int
-		totalMs    int64
-		totalItems int64
+		total, success, failures int
+		total_ms, total_items    int64
 	}
 
 	stats := map[string]*epStats{}
-	for _, ep := range stressEndpoints {
+	for _, ep := range stress_endpoints {
 		stats[ep.path] = &epStats{}
 	}
 
-	totalSuccess, totalFailure := 0, 0
-
+	total_success, total_failure := 0, 0
 	for _, r := range results {
-		s := stats[r.endpoint]
+		s, ok := stats[r.endpoint]
+		if !ok {
+			s = &epStats{}
+			stats[r.endpoint] = s
+		}
 		s.total++
-		s.totalMs += r.latency.Milliseconds()
-		s.totalItems += int64(r.itemCount)
-
-		if r.err != nil || (r.statusCode >= 500) {
+		s.total_ms += r.latency.Milliseconds()
+		s.total_items += int64(r.item_count)
+		if r.err != nil || r.status_code >= 500 {
 			s.failures++
-			totalFailure++
+			total_failure++
 		} else {
 			s.success++
-			totalSuccess++
+			total_success++
 		}
 	}
 
 	t.Log("=== Stress Test Summary ===")
 	t.Logf("Total requests: %d | Success: %d | Failure: %d",
-		len(results), totalSuccess, totalFailure)
-	// report overall item count
-	totalItems := int64(0)
+		len(results), total_success, total_failure)
+
+	var total_items int64
 	for _, r := range results {
-		totalItems += int64(r.itemCount)
+		total_items += int64(r.item_count)
 	}
-	t.Logf("Total items received: %d", totalItems)
+	t.Logf("Total items received: %d", total_items)
 	t.Log("--- Per-endpoint breakdown ---")
-	for _, ep := range stressEndpoints {
+	for _, ep := range stress_endpoints {
 		s := stats[ep.path]
-		avgMs := int64(0)
-		avgItems := int64(0)
+		avg_ms, avg_items := int64(0), int64(0)
 		if s.total > 0 {
-			avgMs = s.totalMs / int64(s.total)
-			avgItems = s.totalItems / int64(s.total)
+			avg_ms = s.total_ms / int64(s.total)
+			avg_items = s.total_items / int64(s.total)
 		}
 		t.Logf("  %-28s  total=%-5d  ok=%-5d  err=%-5d  avg_latency=%dms  avg_items=%d",
-			ep.path, s.total, s.success, s.failures, avgMs, avgItems)
+			ep.path, s.total, s.success, s.failures, avg_ms, avg_items)
 	}
 
-	// Fail the test if more than 10% of requests returned a 5xx or network error.
 	if len(results) > 0 {
-		failRate := float64(totalFailure) / float64(len(results))
-		if failRate > 0.10 {
-			t.Errorf("stress test failure rate %.1f%% exceeds 10%% threshold", failRate*100)
+		fail_rate := float64(total_failure) / float64(len(results))
+		if fail_rate > 0.10 {
+			t.Errorf("stress test failure rate %.1f%% exceeds 10%% threshold", fail_rate*100)
 		}
 	}
 }
 
-// concurrencyFromEnv reads the desired concurrency from STRESS_CONCURRENCY.
-// Falls back to 200 when unset and clamps the value to [minConcurrency, maxConcurrency].
 func concurrencyFromEnv() int {
 	raw := os.Getenv("STRESS_CONCURRENCY")
 	if raw == "" {
 		return 200
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil || n < minConcurrency {
-		return minConcurrency
+	if err != nil || n < MIN_CONCURRENCY {
+		return MIN_CONCURRENCY
 	}
-	if n > maxConcurrency {
-		return maxConcurrency
+	if n > MAX_CONCURRENCY {
+		return MAX_CONCURRENCY
 	}
 	return n
 }
 
-// TestStressAPI is the main stress-test entry point.
-//
-// Environment variables:
-//
-//	STRESS_BASE_URL    - base URL of a running API server (default: http://localhost:8080)
-//	STRESS_CONCURRENCY - number of concurrent requests to fire, clamped to 100-10000 (default: 200)
-//	STRESS_API_KEY     - optional value for the X-API-Key header
-//
-// Run with an extended timeout to accommodate large concurrency values, e.g.:
-//
-//	STRESS_BASE_URL=http://my-api:8080 go test ./tests/... -run TestStressAPI -v -timeout 5m
-func TestStressAPI(t *testing.T) {
-	baseURL := os.Getenv("STRESS_BASE_URL")
-	if baseURL == "" {
-		baseURL = defaultStressBaseURL
+func stressBaseURL() string {
+	if base_url := os.Getenv("STRESS_BASE_URL"); base_url != "" {
+		return base_url
 	}
-	apiKey := os.Getenv("STRESS_API_KEY")
+	return DEFAULT_STRESS_BASE_URL
+}
+
+func skipIfStressServerUnreachable(t *testing.T, base_url string) {
+	t.Helper()
+	client := &http.Client{Timeout: HTTP_TIMEOUT}
+	if _, err := client.Get(base_url + "/health"); err != nil {
+		t.Skipf("API server not reachable at %s (%v) — skipping stress test", base_url, err)
+	}
+}
+
+func TestStressAPI(t *testing.T) {
+	base_url := stressBaseURL()
+	api_key := os.Getenv("STRESS_API_KEY")
 	concurrency := concurrencyFromEnv()
 
-	t.Logf("Stress testing %s with %d concurrent requests", baseURL, concurrency)
+	t.Logf("Stress testing %s with %d concurrent requests", base_url, concurrency)
+	skipIfStressServerUnreachable(t, base_url)
 
-	// Quick connectivity check before fanning out.
-	client := &http.Client{Timeout: httpTimeout}
-	if _, err := client.Get(baseURL + "/health"); err != nil {
-		t.Skipf("API server not reachable at %s (%v) — skipping stress test", baseURL, err)
-	}
-
-	results := runStressTest(baseURL, concurrency, apiKey)
+	results := runStressTest(base_url, concurrency, api_key)
 	printStressSummary(t, results)
 }
 
-// TestStressAPIEndpoints runs a smaller fixed-size fan-out (one batch per
-// endpoint) to verify that every endpoint responds without a 5xx error.
-// This test can be run in normal CI without a live server; it will skip if
-// the server is unreachable.
 func TestStressAPIEndpoints(t *testing.T) {
-	baseURL := os.Getenv("STRESS_BASE_URL")
-	if baseURL == "" {
-		baseURL = defaultStressBaseURL
-	}
-	apiKey := os.Getenv("STRESS_API_KEY")
+	base_url := stressBaseURL()
+	api_key := os.Getenv("STRESS_API_KEY")
+	skipIfStressServerUnreachable(t, base_url)
 
-	client := &http.Client{Timeout: httpTimeout}
-	if _, err := client.Get(baseURL + "/health"); err != nil {
-		t.Skipf("API server not reachable at %s (%v) — skipping endpoint stress test", baseURL, err)
-	}
-
-	const requestsPerEndpoint = 10
-	concurrency := len(stressEndpoints) * requestsPerEndpoint
+	const REQUESTS_PER_ENDPOINT = 10
+	concurrency := len(stress_endpoints) * REQUESTS_PER_ENDPOINT
 
 	t.Logf("Endpoint smoke stress: %d endpoints × %d requests = %d total",
-		len(stressEndpoints), requestsPerEndpoint, concurrency)
+		len(stress_endpoints), REQUESTS_PER_ENDPOINT, concurrency)
 
-	results := runStressTest(baseURL, concurrency, apiKey)
+	results := runStressTest(base_url, concurrency, api_key)
 	printStressSummary(t, results)
 
-	// Report per-endpoint 5xx failures as individual sub-tests so it is easy
-	// to see which endpoint is misbehaving.
-	epFailures := map[string]int{}
+	failures := map[string]int{}
 	for _, r := range results {
-		if r.err != nil || r.statusCode >= 500 {
-			epFailures[r.endpoint]++
+		if r.err != nil || r.status_code >= 500 {
+			failures[r.endpoint]++
 		}
 	}
-	for _, ep := range stressEndpoints {
-		ep := ep
-		t.Run(fmt.Sprintf("endpoint=%s", ep.path), func(t *testing.T) {
-			if f := epFailures[ep.path]; f > 0 {
-				t.Errorf("%s had %d failure(s)", ep.path, f)
+	for _, ep := range stress_endpoints {
+		path := ep.path
+		t.Run(fmt.Sprintf("endpoint=%s", path), func(t *testing.T) {
+			if f := failures[path]; f > 0 {
+				t.Errorf("%s had %d failure(s)", path, f)
 			}
 		})
 	}
 }
 
-// TestStressVectorSearch stress tests vector search (q parameter) on article endpoints.
-// It focuses exclusively on /articles/latest and /articles/trending with the q parameter.
 func TestStressVectorSearch(t *testing.T) {
-	baseURL := os.Getenv("STRESS_BASE_URL")
-	if baseURL == "" {
-		baseURL = defaultStressBaseURL
-	}
-	apiKey := os.Getenv("STRESS_API_KEY")
+	base_url := stressBaseURL()
+	api_key := os.Getenv("STRESS_API_KEY")
 	concurrency := concurrencyFromEnv()
-
-	client := &http.Client{Timeout: httpTimeout}
-	if _, err := client.Get(baseURL + "/health"); err != nil {
-		t.Skipf("API server not reachable at %s (%v) — skipping vector search stress test", baseURL, err)
-	}
+	skipIfStressServerUnreachable(t, base_url)
 
 	t.Logf("Vector search stress testing with %d concurrent requests", concurrency)
 
@@ -445,39 +325,39 @@ func TestStressVectorSearch(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrency)
 
-	masterRng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+	client := &http.Client{Timeout: HTTP_TIMEOUT}
+	master_rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	seeds := make([]int64, concurrency)
 	for i := range seeds {
-		seeds[i] = masterRng.Int63()
+		seeds[i] = master_rng.Int63()
 	}
 
-	articleEndpoints := []string{"/articles/latest", "/articles/trending"}
+	vector_endpoints := []string{ROUTE_SEARCH, ROUTE_LATEST, ROUTE_TRENDING}
 
 	for i := 0; i < concurrency; i++ {
 		go func(idx int) {
 			defer wg.Done()
 
 			rng := rand.New(rand.NewSource(seeds[idx])) //nolint:gosec
-			endpoint := articleEndpoints[rng.Intn(len(articleEndpoints))]
+			endpoint := vector_endpoints[rng.Intn(len(vector_endpoints))]
 
 			params := url.Values{}
-			params.Set("q", sampleQueries[rng.Intn(len(sampleQueries))])
+			params.Set("q", sample_queries[rng.Intn(len(sample_queries))])
 			params.Set("limit", strconv.Itoa(1+rng.Intn(50)))
 
-			rawURL := baseURL + endpoint + "?" + params.Encode()
-			req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+			raw_url := strings.TrimSuffix(base_url, "/") + endpoint + "?" + params.Encode()
+			req, err := http.NewRequest(http.MethodGet, raw_url, nil)
 			if err != nil {
 				results[idx] = stressResult{endpoint: endpoint, err: err}
 				return
 			}
-			if apiKey != "" {
-				req.Header.Set("X-API-KEY", apiKey)
+			if api_key != "" {
+				req.Header.Set("X-API-KEY", api_key)
 			}
 
 			start := time.Now()
 			resp, err := client.Do(req)
 			latency := time.Since(start)
-
 			if err != nil {
 				results[idx] = stressResult{endpoint: endpoint, latency: latency, err: err}
 				return
@@ -485,17 +365,11 @@ func TestStressVectorSearch(t *testing.T) {
 
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			count := 0
-			var arr []any
-			if json.Unmarshal(body, &arr) == nil {
-				count = len(arr)
-			}
-
 			results[idx] = stressResult{
-				endpoint:   endpoint,
-				statusCode: resp.StatusCode,
-				latency:    latency,
-				itemCount:  count,
+				endpoint:    endpoint,
+				status_code: resp.StatusCode,
+				latency:     latency,
+				item_count:  countEnvelopeItems(body),
 			}
 		}(i)
 	}

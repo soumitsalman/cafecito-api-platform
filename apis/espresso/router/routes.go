@@ -4,7 +4,7 @@
 // @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
 // @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
 // @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
-// @description       **Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_page` unchanged as the next request `page`; never construct or decode page tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.
+// @description       **Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.
 // @description       **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
 // @description       **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
 // @schemes           https
@@ -24,32 +24,22 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/stoewer/go-strcase"
 	"github.com/toon-format/toon-go"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 	datautils "github.com/soumitsalman/data-utils"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const (
-	MIN_WINDOW       = 1
-	DEFAULT_WINDOW   = 7 // DAYS
-	DEFAULT_ACCURACY = 0.5
-	DEFAULT_LIMIT    = 20
-	MAX_LIMIT        = 100
-)
-
-const (
-	API_ERROR_INVALID_REQUEST = "invalid_request"
-	API_ERROR_DB_ERROR        = "db_unavailable"
-	API_ERROR_EMBEDDING_ERROR = "embedder_unavailable"
-	API_ERROR_ENCODING_ERROR  = "encoding_error"
-	API_ERROR_INVALID_DATA    = "invalid_data"
-	API_ERROR_NOT_FOUND       = "not_found"
-	API_ERROR_UNAUTHORIZED    = "unauthorized"
+	MIN_WINDOW              = 1
+	DEFAULT_WINDOW          = 7 // DAYS
+	DEFAULT_SCORE_THRESHOLD = 0.5
+	DEFAULT_LIMIT           = 20
+	MAX_LIMIT               = 100
 )
 
 const (
@@ -76,30 +66,23 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 	}
 	cursor, err := db.DecodeCursor(p.Cursor)
 	if err != nil {
-		return nil, APIError{Code: API_ERROR_INVALID_REQUEST, Message: err.Error()}
+		return nil, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
-}
-
-func normalizeTags(items []string) []string {
-	for i, item := range items {
-		items[i] = strcase.SnakeCase(item)
-	}
-	return items
 }
 
 func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = p.To
-	filters.Tags = normalizeTags(p.Tags)
-	filters.Entities = normalizeTags(p.Entities)
-	filters.Categories = normalizeTags(p.Categories)
-	filters.Companies = normalizeTags(p.Companies)
-	filters.People = normalizeTags(p.People)
-	filters.Products = normalizeTags(p.Products)
-	filters.Regions = normalizeTags(p.Regions)
-	filters.ImpactedDomains = normalizeTags(p.ImpactedDomains)
-	filters.ImpactLevels = normalizeTags(p.ImpactLevels)
+	filters.Tags = utils.NormalizeTags(p.Tags)
+	filters.Entities = utils.NormalizeTags(p.Entities)
+	filters.Categories = utils.NormalizeTags(p.Categories)
+	filters.Companies = utils.NormalizeTags(p.Companies)
+	filters.People = utils.NormalizeTags(p.People)
+	filters.Products = utils.NormalizeTags(p.Products)
+	filters.Regions = utils.NormalizeTags(p.Regions)
+	filters.ImpactedDomains = utils.NormalizeTags(p.ImpactedDomains)
+	filters.ImpactLevels = utils.NormalizeTags(p.ImpactLevels)
 	return nil
 }
 
@@ -107,10 +90,12 @@ func (p *vectorSearchParams) bindFilters(c *gin.Context, config *Configuration, 
 	if len(p.Q) > 0 {
 		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
 		if len(filters.Embedding) == 0 {
-			return APIError{Code: API_ERROR_EMBEDDING_ERROR, Message: API_ERROR_MSG_OUR_BAD}
+			return utils.NewAPIError(utils.API_ERROR_EMBEDDING_ERROR, API_ERROR_MSG_OUR_BAD)
 		}
-		distance := (1 - p.Acc) * 2
-		filters.Distance = &distance
+		if p.ScoreThreshold > 0 {
+			distance := (1 - p.ScoreThreshold) * 2
+			filters.Distance = &distance
+		}
 	}
 	return nil
 }
@@ -120,7 +105,7 @@ func (p *EventSearchParams) createFilters(c *gin.Context, config *Configuration)
 	filters := &db.Filters{
 		IDs:        p.IDs,
 		SourceIDs:  p.SourceIDs,
-		EventTypes: normalizeTags(p.EventTypes),
+		EventTypes: utils.NormalizeTags(p.EventTypes),
 	}
 	if err := p.sipQueryParams.bindFilters(c, config, filters); err != nil {
 		return nil, err
@@ -170,7 +155,7 @@ func (params *SignalEventsParams) createFilters(c *gin.Context, config *Configur
 	filters := &db.Filters{
 		IDs:        params.IDs,
 		SourceIDs:  params.SourceIDs,
-		EventTypes: normalizeTags(params.EventTypes),
+		EventTypes: utils.NormalizeTags(params.EventTypes),
 	}
 	if err := params.sipQueryParams.bindFilters(c, config, filters); err != nil {
 		return nil, err
@@ -196,13 +181,9 @@ func writePage[T any](c *gin.Context, items []T, limit int, cursor string, next_
 	if items == nil {
 		items = []T{}
 	}
-	var cursor_val *string = nil
-	if cursor != "" {
-		cursor_val = &cursor
-	}
 	response := PageResponse[T]{
 		Data:       items,
-		Pagination: Pagination{Limit: limit, NumResults: len(items), Cursor: cursor_val, NextCursor: next_cursor},
+		Pagination: Pagination{Limit: limit, NumResults: len(items), NextCursor: next_cursor},
 		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
 	}
 	switch response_type {
@@ -210,7 +191,7 @@ func writePage[T any](c *gin.Context, items []T, limit int, cursor string, next_
 		c.YAML(http.StatusOK, response)
 	case "toon":
 		if encoded, err := toon.MarshalString(response); err != nil {
-			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
+			writeError(c, utils.NewAPIError(utils.API_ERROR_ENCODING_ERROR, API_ERROR_MSG_TRY_DIFFERENT_FORMAT))
 		} else {
 			c.String(http.StatusOK, encoded)
 		}
@@ -227,7 +208,7 @@ func writeItem[T any](c *gin.Context, item T, response_type string) {
 		c.YAML(http.StatusOK, response)
 	case "toon":
 		if encoded, err := toon.MarshalString(response); err != nil {
-			writeError(c, APIError{Code: API_ERROR_ENCODING_ERROR, Message: API_ERROR_MSG_TRY_DIFFERENT_FORMAT})
+			writeError(c, utils.NewAPIError(utils.API_ERROR_ENCODING_ERROR, API_ERROR_MSG_TRY_DIFFERENT_FORMAT))
 		} else {
 			c.String(http.StatusOK, encoded)
 		}
@@ -240,17 +221,15 @@ func writeItem[T any](c *gin.Context, item T, response_type string) {
 // Uses InternalServerError for DB, Embedding, Encoding errors and default cases
 func writeError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
-	if api_err, ok := err.(APIError); ok {
+	if api_err, ok := err.(utils.APIError); ok {
 		switch api_err.Code {
-		case API_ERROR_INVALID_REQUEST:
+		case utils.API_ERROR_INVALID_REQUEST:
 			status = http.StatusBadRequest
-		case API_ERROR_NOT_FOUND:
+		case utils.API_ERROR_NOT_FOUND:
 			status = http.StatusNotFound
 		}
-		c.AbortWithStatusJSON(status, ErrorResponse{Error: api_err})
-	} else {
-		c.AbortWithStatusJSON(status, ErrorResponse{Error: APIError{Message: API_ERROR_MSG_OUR_BAD}})
 	}
+	c.AbortWithStatusJSON(status, ErrorResponse{Error: err})
 }
 
 // health godoc
@@ -274,6 +253,7 @@ func (r *Configuration) health(c *gin.Context) {
 // @Tags Events
 // @Produce json
 // @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
+// @Param score_threshold query number false "Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param from query string false "Inclusive created_at lower bound (YYYY-MM-DD)." format(date)
 // @Param to query string false "Inclusive created_at upper bound (YYYY-MM-DD)." format(date)
 // @Param ids query []string false "Restrict to Event UUIDs (CSV)." collectionFormat(csv)
@@ -289,9 +269,9 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param tags query []string false "Fuzzy text match against persisted tag labels (CSV)." collectionFormat(csv)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} EventCollectionResponse "Event collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
@@ -318,7 +298,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySips(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -349,16 +329,16 @@ func (r *Configuration) getEvent(c *gin.Context) {
 
 	event, err := r.DB.GetSip(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if event.IsZero() {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_EVENT_NOT_FOUND))
 		return
 	}
 	counts, err := r.DB.CountRelations(c.Request.Context(), params.ID)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writeItem(c, NewDigestDocumentForExtendedSip(&event).addEventDetails(counts), params.ResponseType)
@@ -377,7 +357,7 @@ func (r *Configuration) getEvent(c *gin.Context) {
 // @Param to query string false "Inclusive evidence created_at upper bound (YYYY-MM-DD)." format(date)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
@@ -407,16 +387,16 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 
 	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if !exists {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_EVENT_NOT_FOUND))
 		return
 	}
 	page_out, err := r.DB.QuerySameSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	evidence := datautils.Transform(page_out.Items, func(sip *db.Sip) EventEvidence {
@@ -440,9 +420,9 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 // @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} SignalCollectionResponse "Signals derived from this Event"
-// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
+// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid cursor token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
@@ -470,16 +450,16 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 
 	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_EVENT)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if !exists {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_EVENT_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_EVENT_NOT_FOUND))
 		return
 	}
 	page_out, err := r.DB.QueryDerivedSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -493,6 +473,7 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Tags Signals
 // @Produce json
 // @Param q query string false "Optional natural-language semantic query. Max 1024 characters." maxlength(1024)
+// @Param score_threshold query number false "Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5." default(0.5) minimum(0) maximum(1)
 // @Param from query string false "Inclusive Signal created_at lower bound (YYYY-MM-DD)." format(date)
 // @Param to query string false "Inclusive Signal created_at upper bound (YYYY-MM-DD)." format(date)
 // @Param ids query []string false "Restrict to Signal UUIDs (CSV)." collectionFormat(csv)
@@ -501,9 +482,9 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Param tags query []string false "Fuzzy text match against persisted Signal tag labels (CSV)." collectionFormat(csv)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} SignalCollectionResponse "Signal collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed page token"
+// @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
@@ -530,7 +511,7 @@ func (r *Configuration) getSignals(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySips(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -560,16 +541,16 @@ func (r *Configuration) getSignal(c *gin.Context) {
 
 	signal, err := r.DB.GetSip(c.Request.Context(), params.ID, db.SIP_KIND_SIGNAL)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if signal.IsZero() {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SIGNAL_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SIGNAL_NOT_FOUND))
 		return
 	}
 	counts, err := r.DB.CountRelations(c.Request.Context(), params.ID)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writeItem(c, NewDigestDocumentForExtendedSip(&signal).addSignalDetails(counts), params.ResponseType)
@@ -597,9 +578,9 @@ func (r *Configuration) getSignal(c *gin.Context) {
 // @Param to query string false "Inclusive Event created_at upper bound (YYYY-MM-DD)." format(date)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} EventCollectionResponse "Events supporting this Signal"
-// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid page token, or invalid parameters"
+// @Failure 400 {object} ErrorResponse "Malformed UUID, invalid cursor token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
@@ -627,16 +608,16 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 
 	exists, err := r.DB.SipExists(c.Request.Context(), params.ID, db.SIP_KIND_SIGNAL)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if !exists {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SIGNAL_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SIGNAL_NOT_FOUND))
 		return
 	}
 	page_out, err := r.DB.QuerySupportingSips(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -650,10 +631,10 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 // @Param q query string false "Case-insensitive Source metadata search." maxlength(1024)
 // @Param domains query []string false "Exact Source domain-name filter (CSV)." collectionFormat(csv)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} SourceCollectionResponse "Source collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
@@ -673,7 +654,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 	}
 	page_out, err := r.DB.QuerySources(c.Request.Context(), params.Q, params.Domains, *page_req)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -704,11 +685,11 @@ func (r *Configuration) getSource(c *gin.Context) {
 
 	source, err := r.DB.GetSource(c.Request.Context(), item.ID)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	if source.IsZero() {
-		writeError(c, APIError{Code: API_ERROR_NOT_FOUND, Message: API_ERROR_MSG_SOURCE_NOT_FOUND})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SOURCE_NOT_FOUND))
 		return
 	}
 	writeItem(c, NewSourceDocument(&source), item.ResponseType)
@@ -724,9 +705,9 @@ func (r *Configuration) getSource(c *gin.Context) {
 // @Param resource query []string false "Optional resource scope (CSV): event, signal." collectionFormat(csv)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Tag value collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or response_type"
+// @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or response_type"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
@@ -750,12 +731,12 @@ func (r *Configuration) getTags(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryTags(c.Request.Context(), params.Q, kinds, *page)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	next := encodeNextCursor(page_out.NextCursor)
-	items := datautils.Transform(page_out.Items, func(tag *string) db.TagValue {
-		return db.TagValue{Value: *tag}
+	items := datautils.Transform(page_out.Items, func(tag *string) db.Tag {
+		return db.Tag{Value: *tag}
 	})
 	writePage(c, items, page.Limit, params.Cursor, next, params.ResponseType)
 }
@@ -770,9 +751,9 @@ func (r *Configuration) getTags(c *gin.Context) {
 // @Param types query []string false "Entity types (CSV): company, people." collectionFormat(csv)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Entity value collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceEntities
 // @Router /entities [get]
@@ -793,7 +774,7 @@ func (r *Configuration) getEntities(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, types, *page)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -808,9 +789,9 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @Param q query string false "Case-insensitive substring filter." maxlength(1024)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Region value collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceRegions
 // @Router /regions [get]
@@ -827,7 +808,7 @@ func (r *Configuration) getRegions(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, []string{db.EVENT_TAG_TYPE_REGION}, *page)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -842,9 +823,9 @@ func (r *Configuration) getRegions(c *gin.Context) {
 // @Param q query string false "Case-insensitive substring filter." maxlength(1024)
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
-// @Param page query string false "Opaque continuation token. Send pagination.next_page from a previous response unchanged as page; never construct or decode it."
+// @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Event type value collection envelope"
-// @Failure 400 {object} ErrorResponse "Invalid limit, page token, or parameters"
+// @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
 // @Failure 500 {object} ErrorResponse "Database unavailable; retry"
 // @ID listIntelligenceEventTypes
 // @Router /event-types [get]
@@ -861,7 +842,7 @@ func (r *Configuration) getEventTypes(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryEventTags(c.Request.Context(), params.Q, []string{db.EVENT_TAG_TYPE_EVENT_TYPE}, *page)
 	if err != nil {
-		writeError(c, APIError{Code: API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD})
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
@@ -891,24 +872,33 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 		}),
 	)
 
-	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/health", config.health)
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	// Authenticated group
 	protected := router.Group("/")
 	protected.Use(config.apiKeyMiddleware)
+
+	// TAGS discovery routes
 	protected.GET("/tags", config.getTags)
 	protected.GET("/entities", config.getEntities)
 	protected.GET("/regions", config.getRegions)
 	protected.GET("/event-types", config.getEventTypes)
+
+	// SOURCES routes
+	protected.GET("/sources", config.getSources)
+	protected.GET("/sources/:id", config.getSource)
+
+	// EVENTS routes
 	protected.GET("/events", config.getEvents)
 	protected.GET("/events/:id", config.getEvent)
 	protected.GET("/events/:id/signals", config.getEventSignals)
 	protected.GET("/events/:id/evidence", config.getEventEvidence)
+
+	// SIGNALS routes
 	protected.GET("/signals", config.getSignals)
 	protected.GET("/signals/:id", config.getSignal)
 	protected.GET("/signals/:id/events", config.getSignalEvents)
-	protected.GET("/sources", config.getSources)
-	protected.GET("/sources/:id", config.getSource)
 
 	return router
 }
@@ -925,7 +915,7 @@ func (r *Configuration) apiKeyMiddleware(c *gin.Context) {
 			return
 		}
 	}
-	writeError(c, APIError{Code: API_ERROR_UNAUTHORIZED, Message: API_ERROR_MSG_MISSING_API_KEY})
+	writeError(c, utils.NewAPIError(utils.API_ERROR_UNAUTHORIZED, API_ERROR_MSG_MISSING_API_KEY))
 }
 
 // requestLogger logs request path, query parameters, status and latency in JSON via zerolog

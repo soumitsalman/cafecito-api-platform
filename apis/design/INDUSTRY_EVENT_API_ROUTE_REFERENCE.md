@@ -474,6 +474,22 @@ For route-name and contract comparison, the closest existing patterns are:
 - The provider comparison does not justify replacing event identity with event_id or created with created_at. Those names should be normalized at the Espresso contract boundary if the target contract uses id and created_at.
 - A flexible digest can remain an Espresso-specific extension, but its stable envelope should expose the common fields needed by all three provider families.
 
+### Discovery-route text search
+
+The reviewed provider APIs do not define one universal fuzzy-search parameter for entity, category, region, event-type, or tag discovery routes. The closest common parameter is `q`:
+
+| Espresso discovery route | Comparable industry pattern | Recommended fuzzy text parameter |
+|---|---|---|
+| `/entities` | PredictHQ uses `q` for places and related search; Perigon uses `name` for people and companies. | `q` |
+| `/event-types` | Providers generally expose event classifications as `category`, `label`, or `phq_label` filters rather than as a dedicated discovery route. | `q` for event-type names |
+| `/categories` | Perigon uses `category` as a structured filter, not as a general fuzzy-search parameter. | `q` for category names |
+| `/regions` | PredictHQ Places uses `q`; GDELT geography discovery uses country-scoped administrative-region lookup. | `q` |
+| `/tags` | Providers expose related concepts through `topic`, `taxonomy`, or `label` filters rather than a common tag-discovery route. | `q` for tag names |
+
+For Espresso, `q` should consistently perform optional fuzzy text matching against the names or values returned by these discovery routes. Route-specific fields such as `category`, `topic`, `taxonomy`, `label`, and `country` remain structured filters.
+
+GDELT's `search` parameter is retained as an industry-specific compatibility reference for free-text or semantic event and story retrieval. It is not the recommended parameter name for Espresso discovery routes.
+
 ## 6. Source and version notes
 
 This reference summarizes the providers' public documentation and representative payloads. Provider schemas, route aliases, limits, and authentication rules can change. Before implementing a client or declaring exact compatibility, obtain the provider's current OpenAPI/schema for the account and region being used.

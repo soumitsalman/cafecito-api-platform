@@ -105,7 +105,7 @@ Use Espresso MCP tools as a short decision sequence: search **Events** for concr
 2. Read UUIDs from `data[].id`; carry only selected IDs into detail, evidence, Source, or support calls.
 3. Use fuzzy `tags` for concepts. Use exact normalized snake_case values for structured filters. `categories` and `event_types` are separate Event fields.
 4. Request discovery vocabulary only when a value is unknown. It is not a canonical entity or geography service.
-5. Treat `pagination.next_page` as opaque and send it back unchanged as `page`. `num_results` is only the current-page count.
+5. Treat `pagination.next_cursor` as opaque and send it back unchanged as `cursor`. `num_results` is only the current-page count.
 6. Prefer `response_type=json` for schema-sensitive processing. Set `response_type=yaml` or `response_type=toon` when the same payload must use fewer tokens in MCP or AI-agent context.
 
 See the [Espresso overview](/products/espresso) for route choice, filters, response envelopes, and examples. See [Espresso workflows](/products/espresso/workflows) for multi-call agent patterns.

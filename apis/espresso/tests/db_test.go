@@ -166,14 +166,14 @@ func TestDiscoveryQueries(t *testing.T) {
 	pg_cupboard := setupTestDB()
 	defer pg_cupboard.Close()
 
-	for _, query := range []func() (db.Page[db.TagValue], error){
-		func() (db.Page[db.TagValue], error) {
+	for _, query := range []func() (db.Page[db.Tag], error){
+		func() (db.Page[db.Tag], error) {
 			return pg_cupboard.QueryEventTags(context.Background(), "", []string{db.EVENT_TAG_TYPE_COMPANY, db.EVENT_TAG_TYPE_PEOPLE}, db.PageRequest{Limit: 5})
 		},
-		func() (db.Page[db.TagValue], error) {
+		func() (db.Page[db.Tag], error) {
 			return pg_cupboard.QueryEventTags(context.Background(), "", []string{db.EVENT_TAG_TYPE_REGION}, db.PageRequest{Limit: 5})
 		},
-		func() (db.Page[db.TagValue], error) {
+		func() (db.Page[db.Tag], error) {
 			return pg_cupboard.QueryEventTags(context.Background(), "", []string{db.EVENT_TAG_TYPE_EVENT_TYPE}, db.PageRequest{Limit: 5})
 		},
 	} {
