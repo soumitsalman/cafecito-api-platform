@@ -38,7 +38,7 @@ Primary store for all indexed articles and posts.
 | Column | Type | Notes |
 |--------|------|-------|
 | `url` | `VARCHAR` | Primary key |
-| `kind` | `VARCHAR` | Content type (`news`, `blog`, etc.) |
+| `kind` | `VARCHAR` | Content type (`blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, or `whitepaper`) |
 | `title`, `author`, `source`, `image_url` | `VARCHAR` | Core metadata |
 | `created` | `TIMESTAMP` | Original publish time |
 | `collected` | `TIMESTAMP` | Ingest timestamp |
@@ -237,7 +237,7 @@ These apply to `/articles/search`, `/articles/latest`, `/articles/trending`, and
 |-----------|------|---------|-------------|
 | `q` | string | — | Semantic search query (max 512 chars; requires embedder) |
 | `acc` | float | 0.75 | Minimum embedding similarity for `q` (0.0–1.0; higher = stricter) |
-| `content_type` | string | — | Filter: `news` or `blog` |
+| `content_type` | string | — | Filter by any stored type: `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, or `whitepaper` |
 | `urls` | CSV strings | — | Fetch specific article URLs directly |
 | `tags` | CSV strings | — | Tag search across categories/regions/entities (AND) |
 | `categories` | CSV strings | — | Category filter (OR) |

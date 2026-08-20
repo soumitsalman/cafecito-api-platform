@@ -54,7 +54,7 @@ type SourceDocument struct {
 type ArticleDocument struct {
 	ID         uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
 	URL        string    `json:"url"`
-	Kind       string    `json:"content_type"`
+	Kind       string    `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
 	Created    time.Time `json:"published_at" swaggertype:"string" format:"date-time"`
 	Author     *string   `json:"author"`
 	ImageURL   *string   `json:"image_url"`

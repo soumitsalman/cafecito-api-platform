@@ -1,13 +1,10 @@
 // @title 			Beans News API & MCP
-// @version 		0.8
-// @description 	MCP-ready news and blog intelligence over RSS-sourced articles, semantic enrichment, and propagation tracking.
-// @description 	A **bean** is one article or post keyed by canonical URL. Records include publisher metadata, summary/full text, publish timestamp, inferred categories, regions, entities, sentiments, and optional social trend metrics.
-// @description 	Agent workflow: (1) listCategories, listEntities, listRegions to discover exact filter values; (2) searchArticles for full-corpus retrieval; (3) getLatestArticles, getTrendingArticles, or getTopHeadlines for feed-style monitoring; (4) getPublishers to resolve source IDs; (5) getArticlePropagation or postArticlePropagation to check story spread.
-// @description 	Conventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. Use fuzzy `tags` when spelling is uncertain, exact `categories`/`regions`/`entities` after discovery, and `q` + `acc` for semantic vector search.
+// @version 		1.0
+// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
 // @schemes 		https
 // @license.name 	MIT
 // @contact.name 	Project Cafecito
-// @contact.url  	http://cafecito.tech
+// @contact.url  	https://cafecito.tech
 // @contact.email 	soumitsrah@cafecito.tech
 package main
 

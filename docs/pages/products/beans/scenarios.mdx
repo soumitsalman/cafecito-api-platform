@@ -1,0 +1,341 @@
+---
+title: Scenarios
+description: Compose Beans Article, Source, discovery, and cursor routes into data-serving workflows for a news application.
+---
+
+# Serve a News Application with Beans
+
+Beans can supply publisher-content data for a news application: current Articles, attention-ranked feeds, topic collections, publisher records, Article detail, related reading, and external mention observations. These are backend data workflows only. They do not prescribe presentation, layout, or interaction design.
+
+Set the shared configuration once:
+
+~~~bash
+export API_KEY="YOUR_API_KEY"
+export BASE_URL="https://api.cafecito.tech"
+~~~
+
+## Operating rules
+
+| Rule | Why it matters |
+| --- | --- |
+| Choose a feed route by intent. | `latest` is chronological, `top-headlines` uses a fixed recent attention window, and `trending` ranks observed attention. |
+| Preserve Article and Source UUIDs. | IDs are the handoff between search, detail, similar, mentions, and Source-filtered Article calls. |
+| Keep collection calls independent. | A temporary failure in one collection does not prevent the others from being served. |
+| Request `full_content=true` only for selected Article detail. | Collections remain compact; the Article body is optional and can be unavailable. |
+| Treat `pagination.next_cursor` as opaque. | Send it back only as `cursor` with the same route and filters. |
+| Use discovery only for an unknown value. | Known normalized categories, entities, regions, and sentiments can go directly into Article filters. |
+
+`content_type` accepts every stored Beans type: `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`. Omit it when a collection should include all stored types.
+
+## Shared server helper
+
+The JavaScript examples use the built-in `fetch` in Node.js 18 and later.
+
+~~~js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+async function beansGet(path, query = {}) {
+  const url = new URL(path, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const response = await fetch(url, {
+    headers: { Authorization: "Bearer " + apiKey },
+  });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return response.json();
+}
+~~~
+
+## Scenario 1: Serve independent home-feed collections
+
+**Use when:** A request needs current publication, a fixed headline set, and attention-ranked coverage.
+
+**Call sequence:** 3 independent calls
+
+1. `GET /beans/articles/latest` for chronological publication.
+2. `GET /beans/articles/top-headlines` for the fixed recent attention window.
+3. `GET /beans/articles/trending` for attention-ranked coverage over a supplied or default date window.
+
+~~~js
+const settled = await Promise.allSettled([
+  beansGet("/beans/articles/latest", {
+    content_type: "news",
+    limit: 24,
+  }),
+  beansGet("/beans/articles/top-headlines", {
+    content_type: "news",
+    limit: 12,
+  }),
+  beansGet("/beans/articles/trending", {
+    content_type: "news",
+    from: "2026-08-12",
+    to: "2026-08-19",
+    limit: 12,
+  }),
+]);
+
+function collection(result) {
+  if (result.status === "fulfilled") {
+    return { ...result.value, error: null };
+  }
+  return {
+    data: [],
+    pagination: { next_cursor: null },
+    meta: {},
+    error: "collection unavailable",
+  };
+}
+
+const [latest, headlines, trending] = settled.map(collection);
+
+const payload = {
+  latest: latest.data,
+  headlines: headlines.data,
+  trending: trending.data,
+  cursors: {
+    latest: latest.pagination.next_cursor,
+    headlines: headlines.pagination.next_cursor,
+    trending: trending.pagination.next_cursor,
+  },
+  asOf: {
+    latest: latest.meta.as_of,
+    headlines: headlines.meta.as_of,
+    trending: trending.meta.as_of,
+  },
+  errors: {
+    latest: latest.error,
+    headlines: headlines.error,
+    trending: trending.error,
+  },
+};
+~~~
+
+~~~bash
+curl -s --get "$BASE_URL/beans/articles/latest" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=24"
+
+curl -s --get "$BASE_URL/beans/articles/top-headlines" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=12"
+
+curl -s --get "$BASE_URL/beans/articles/trending" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "from=2026-08-12" \
+  --data-urlencode "to=2026-08-19" \
+  --data-urlencode "limit=12"
+~~~
+
+**Serving rule:** Preserve each route as a separate collection. `top-headlines` and `trending` are different rankings; do not merge them into one ordered list or substitute one when the other is empty.
+
+## Scenario 2: Resolve a topic, then serve filtered Articles
+
+**Use when:** A request contains a human topic label and needs an accepted Beans filter before Article retrieval.
+
+**Call sequence:** 2 calls
+
+1. `GET /beans/categories?q={term}` to discover an accepted category value when it is unknown.
+2. `GET /beans/articles/search` with the selected category and optional natural-language query.
+
+~~~js
+const categoryPage = await beansGet("/beans/categories", {
+  q: "climate",
+  limit: 20,
+});
+const category = categoryPage.data.at(0)?.value;
+
+const articlePage = category
+  ? await beansGet("/beans/articles/search", {
+      q: "climate policy",
+      categories: category,
+      content_type: "news",
+      from: "2026-08-01",
+      limit: 20,
+    })
+  : { data: [], pagination: { next_cursor: null }, meta: {} };
+
+const payload = {
+  resolvedCategory: category ?? null,
+  articles: articlePage.data,
+  nextCursor: articlePage.pagination.next_cursor,
+  asOf: articlePage.meta.as_of,
+};
+~~~
+
+~~~bash
+# Skip discovery when the normalized category is already known.
+curl -s --get "$BASE_URL/beans/categories" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "q=climate" \
+  --data-urlencode "limit=20"
+
+curl -s --get "$BASE_URL/beans/articles/search" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "q=climate policy" \
+  --data-urlencode "categories=CATEGORY_VALUE" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+~~~
+
+**Serving rule:** Return the selected normalized filter value with the Article collection so later requests can reuse it. Different filter fields combine with AND; multiple values within one include field use OR.
+
+## Scenario 3: Resolve a publisher, then serve its Articles
+
+**Use when:** A request starts with a publisher or domain and needs current coverage from that publisher.
+
+**Call sequence:** 3 calls
+
+1. `GET /beans/sources` to resolve a Source UUID from domain, name, or URL metadata.
+2. `GET /beans/sources/{id}` for one Source record.
+3. `GET /beans/articles/search?sources={id}` for the Source Article collection.
+
+~~~js
+const sourcePage = await beansGet("/beans/sources", {
+  q: "publisher.example",
+  domains: "publisher.example",
+  limit: 10,
+});
+const source = sourcePage.data.at(0);
+
+const payload = source
+  ? await Promise.all([
+      beansGet("/beans/sources/" + source.id),
+      beansGet("/beans/articles/search", {
+        sources: source.id,
+        from: "2026-08-01",
+        limit: 20,
+      }),
+    ]).then(([sourceDetail, articlePage]) => ({
+      source: sourceDetail.data,
+      articles: articlePage.data,
+      nextCursor: articlePage.pagination.next_cursor,
+    }))
+  : { source: null, articles: [], nextCursor: null };
+~~~
+
+~~~bash
+curl -s --get "$BASE_URL/beans/sources" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "q=publisher.example" \
+  --data-urlencode "domains=publisher.example" \
+  --data-urlencode "limit=10"
+
+curl -s "$BASE_URL/beans/sources/SOURCE_UUID" \
+  -H "Authorization: Bearer $API_KEY"
+
+curl -s --get "$BASE_URL/beans/articles/search" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "sources=SOURCE_UUID" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+~~~
+
+**Serving rule:** A Source describes a publisher. Use its UUID for `sources`; do not send a domain value to the `sources` filter.
+
+## Scenario 4: Enrich one selected Article
+
+**Use when:** A known Article needs its available body, related publisher coverage, and external observations.
+
+**Call sequence:** 3 calls
+
+1. `GET /beans/articles/{id}?full_content=true` for the selected Article.
+2. `GET /beans/articles/{id}/similar` for related publisher reading.
+3. `GET /beans/articles/{id}/mentions` for external social or forum observations.
+
+~~~js
+const articleId = "ARTICLE_UUID";
+
+const [article, similar, mentions] = await Promise.all([
+  beansGet("/beans/articles/" + articleId, { full_content: true }),
+  beansGet("/beans/articles/" + articleId + "/similar", { limit: 10 }),
+  beansGet("/beans/articles/" + articleId + "/mentions", { limit: 20 }),
+]);
+
+const payload = {
+  article: article.data,
+  similarArticles: similar.data,
+  mentions: mentions.data,
+  cursors: {
+    similar: similar.pagination.next_cursor,
+    mentions: mentions.pagination.next_cursor,
+  },
+};
+~~~
+
+~~~bash
+curl -s --get "$BASE_URL/beans/articles/ARTICLE_UUID" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "full_content=true"
+
+curl -s "$BASE_URL/beans/articles/ARTICLE_UUID/similar?limit=10" \
+  -H "Authorization: Bearer $API_KEY"
+
+curl -s "$BASE_URL/beans/articles/ARTICLE_UUID/mentions?limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+~~~
+
+**Serving rule:** `similar` returns related reading, not guaranteed Story membership. `mentions` returns external observations, not replacement publisher Articles. `content` can be null even when `full_content=true` if a body is unavailable.
+
+## Scenario 5: Continue a collection without offset pagination
+
+**Use when:** A server needs the next bounded batch from an existing route and filter set.
+
+**Call sequence:** 2 or more calls
+
+1. Request the first collection page without `cursor`.
+2. Return `pagination.next_cursor` with the collection data.
+3. Reissue the exact route and filters with that token as `cursor` only when it is non-null.
+
+~~~js
+async function latestArticles(cursor = null) {
+  const page = await beansGet("/beans/articles/latest", {
+    content_type: "news",
+    limit: 20,
+    cursor,
+  });
+
+  return {
+    articles: page.data,
+    nextCursor: page.pagination.next_cursor,
+    asOf: page.meta.as_of,
+  };
+}
+
+const firstPage = await latestArticles();
+const secondPage = firstPage.nextCursor
+  ? await latestArticles(firstPage.nextCursor)
+  : null;
+~~~
+
+~~~bash
+curl -s --get "$BASE_URL/beans/articles/latest" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=20"
+
+curl -s --get "$BASE_URL/beans/articles/latest" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=20" \
+  --data-urlencode "cursor=NEXT_CURSOR_FROM_FIRST_RESPONSE"
+~~~
+
+**Serving rule:** Keep the route and all filters identical while continuing. Do not use `offset`, `page`, `pageSize`, or a cursor from another collection. Stop when `next_cursor` is null.
+
+## Data-serving checklist
+
+1. Select the feed route from the requested data intent rather than applying local ordering to a generic search.
+2. Return API `data` items without inventing Article, Source, trend, or mention fields.
+3. Keep selected Article and Source UUIDs as opaque values for follow-up calls.
+4. Preserve separate collection cursors and freshness metadata.
+5. Treat empty `data: []` as a successful result and HTTP 404 as a missing Article or Source.
+6. Use [Beans migration](/products/beans/migration) for provider parameter mapping and the [Beans API reference](/api/beans) for request and response schemas.

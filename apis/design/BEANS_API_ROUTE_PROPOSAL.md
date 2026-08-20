@@ -350,7 +350,7 @@ returns content: null; it does not remove the Article from the result.
 
 ### 3.5 Trend payload
 
-Trending and top-headline items add a nested trend object to the Article:
+Trending items add a nested trend object to the Article:
 
 ~~~json
 {
@@ -380,7 +380,8 @@ Trending and top-headline items add a nested trend object to the Article:
     "comments": 42,
     "mentions": 8,
     "audiences": 25000,
-    "related": 4    
+    "related": 4,
+    "trend_score": 91.7
   }
 }
 ~~~
@@ -390,13 +391,13 @@ the number of observed external mentions, not a publisher-reported share total.
 
 ### 3.5.1 Article route response profiles
 
-The Article data item uses one canonical field set across B01, B03, B05, and
-B02. The route-specific differences are:
+The Article data item uses one canonical field set across B01, B03, B04, B05, and B02. The route-specific differences are:
 
 | Route | Response data item | Route-specific response behavior |
 |---|---|---|
 | B01 — `/articles/search` | Canonical Article object | Collection envelope; `content` follows the `full_content` projection rule. |
 | B03 — `/articles/latest` | Canonical Article object | Collection envelope; recent-publication ordering; no `trend` object. |
+| B04 — `/articles/top-headlines` | Canonical Article object | Collection envelope; server-defined headline ordering; no `trend` object. |
 | B05 — `/articles/trending` | Canonical Article object plus `trend` | Collection envelope; trend-score ordering; `meta.as_of` identifies the changing observation time. |
 | B02 — `/articles/{id}` | One canonical Article object | Detail envelope; may add `links.similar`, `links.mentions`, and optional `links.story`; no `pagination` or `meta.as_of`. |
 
@@ -421,7 +422,7 @@ B05 uses the same collection envelope with conditional trend metadata:
 }
 ~~~
 
-B01 and B03 omit `meta.as_of` unless a future implementation makes their
+B01, B03, and B04 omit `meta.as_of` unless a future implementation makes their
 results depend on changing trend, Story, or mention observations.
 
 ### 3.5.2 NewsAPI.ai detail-enrichment comparison
@@ -607,7 +608,7 @@ Gateway paths add /beans. Backend routes omit that prefix.
 | B01 | GET /articles/search | Searches News and Blog Articles. | World News /search-news; GNews /search; NewsAPI.ai getArticles; NewsAPI.org /everything; Currents /search. | Existing + Renovation |
 | B02 | GET /articles/{id} | Retrieves one Article by UUID. | TheNewsAPI /news/uuid/{uuid}; World News /retrieve-news; NewsAPI.ai getArticle. | Current-data + Renovation |
 | B03 | GET /articles/latest | Returns recently published Articles. | NewsData.io /latest; Currents /latest-news. | Existing + Renovation |
-| B04 | GET /headlines | Returns high-attention Articles from a fixed recent window. | GNews and NewsAPI.org /top-headlines; TheNewsAPI /headlines. | Existing + Renovation |
+| B04 | GET /articles/top-headlines | Returns current headline Articles from a fixed recent window. | GNews and NewsAPI.org /top-headlines; TheNewsAPI /news/headlines. | Existing + Renovation |
 | B05 | GET /articles/trending | Returns Articles ranked by measured attention. | Closest to World News /top-news and TheNewsAPI /news/top; trend metrics are a Beans extension. | Existing + Renovation |
 | B06 | GET /articles/{id}/similar | Returns known related publisher coverage. | TheNewsAPI /news/similar/{uuid}. | Current-data + Renovation |
 | B07 | GET /articles/{id}/mentions | Returns observed social or forum links to an Article. | Beans extension. | Current-data + Renovation |
@@ -674,27 +675,32 @@ The story link is omitted when the Article has no published Story membership.
 
 #### B03 — GET /articles/latest
 
-Accepts the B01 filters except ids and urls. Results use published_at descending.
-When from and to are omitted, the route uses the previous seven UTC dates. q
-narrows the result but does not replace the feed's recent-first ordering.
-score_threshold is accepted only when q is present.
+Accepts the B01 filters except ids, urls, from, and to. The route always uses
+the previous seven UTC dates and orders results by published_at descending, then
+Article UUID. q narrows the candidate set but does not replace the feed's
+recent-first ordering. score_threshold is accepted only when q is present.
 
 #### B04 — GET /articles/top-headlines
 
-Accepts q, content_type, Source filters, authors, enrichment filters,
-full_content, cursor, and limit. Its previous-24-hour publication window is
-fixed and cannot be overridden with from or to. Results use the server-defined
-headline ranking.
+Accepts the B01 filters except ids, urls, from, and to. Its previous-24-hour
+publication window is fixed. q and score_threshold narrow the candidate set but
+do not replace the server-defined headline ranking. published_at descending and
+Article UUID provide deterministic tie-breakers.
 
 #### B05 — GET /articles/trending
 
-Accepts the B01 filters except ids and urls. from and to constrain Article
-publication time. Results use trend score descending and Article UUID as the
-stable tie-breaker.
+Accepts the B01 filters except ids and urls. By default, the route ranks
+Articles using attention observations from the previous 24 hours. Optional from
+and to define the inclusive, bounded UTC observation window used to calculate
+trend_score; they are not merely Article publication filters. q and
+score_threshold narrow the candidate set but do not replace trend ordering.
+Results use trend_score descending, published_at descending, and then Article
+UUID.
 
-Exact identity filters are intentionally not accepted on B03 or B05. These
-routes are feed operations: B03 defines a recent-publication window and B05
-defines an attention-ranked result set. They are not exact retrieval operations.
+Exact identity filters are intentionally not accepted on B03, B04, or B05.
+These routes are feed operations: B03 defines a recent-publication window, B04
+defines a headline-ranked result set, and B05 defines an attention-ranked result
+set. They are not exact retrieval operations.
 
 This follows the market pattern documented in
 `NEWS_AND_BLOG_API_MARKET_REPORT.md`: World News separates filtered search from

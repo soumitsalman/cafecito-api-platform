@@ -1,75 +1,28 @@
 ---
 description: Create and safely use an API key across Cafecito APIs and MCP servers.
 ---
+
 import { Stepper } from "zudoku/ui/Stepper";
 
 # API Keys
 
-No keys, no data. Here's how to get yours.
-
-## Get a key
+One Cafecito API key works across the gateway REST APIs and MCP servers.
 
 <Stepper>
-1. Go to **[API Keys](/settings/api-keys)**.
-2. Hit **Create** — give it a name (It's free during the launch preview, so might as well).
-3. Copy the key and stash it somewhere safe (environment variable, secret manager, tattoo on your arm — your call).
+1. Go to [API Keys](/settings/api-keys).
+2. Create a key and copy it into a secret manager or environment variable.
+3. Send it as Authorization: Bearer YOUR-API-KEY.
 </Stepper>
 
-You can create **as many keys as you want**. For each product they share the same rate limit and quota meter. Don't think you're gaming the system with 37,000 keys 😉.
+## Example
 
-:::info{title="One API Key, Multiple Products"}
-Same API Key would work for all Cafecito API & MCP products. But as a best practice, consider using different keys for different apps or environments (dev vs. prod) to keep things organized and secure.
-:::
+~~~bash
+curl -s --get "https://api.cafecito.tech/beans/articles/latest" \
+  --data-urlencode "content_type=blog" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer YOUR-API-KEY"
+~~~
 
-## Use it in requests
+Use separate keys per app or environment, rotate leaked keys, and never commit keys to source control.
 
-Every request needs your key in the `Authorization` header as a Bearer token:
-
-```
-Authorization: Bearer YOUR-API-KEY
-```
-
-Example:
-
-<CodeTabs>
-```sh
-curl -X GET "https://api.cafecito.tech/beans/articles/latest?tags=us&sources=techcrunch" \
--H "Authorization: Bearer YOUR-API-KEY"
-```
-</CodeTabs>
-
-## Works for MCP too
-
-The same API key works for MCP endpoints — no separate token, no extra setup. Just pass the same `Authorization: Bearer` header when connecting to an MCP server (e.g. `POST /beans/mcp`) and you're good.
-
-## Launch Preview limits
-
-During the preview (free through **June 30, 2026**):
-
-| | |
-| --- | --- |
-| **Rate limit** | 100 requests / minute |
-| **Quota** | 50,000 requests / month |
-
-All your keys share the same meter. Creating more keys doesn't give you more quota.
-
-## Key hygiene
-
-- Use separate keys per app or environment (dev vs. prod).
-- Rotate keys periodically — it doesn't cost you anything.
-- Revoke immediately if a key leaks. Don't think about it, just do it.
-- **Never** commit keys to source control. `.env` files exist for a reason.
-
-## Troubleshooting
-
-| Status | What it means |
-| ------ | ------------- |
-| `401 Unauthorized` | Missing or invalid key |
-| `403 Forbidden` | Key lacks permissions (or your subscription expired) |
-| `429 Too Many Requests` | You hit the rate limit or quota — take a chill pill |
-
-## Product guides
-
-- [Beans API](/products/beans)
-- [Espresso API](/products/espresso)
-- [Beans API Reference](/api/beans)
+The same key works for https://api.cafecito.tech/beans/mcp and https://api.cafecito.tech/espresso/mcp.

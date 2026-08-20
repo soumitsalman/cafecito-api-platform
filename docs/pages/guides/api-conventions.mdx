@@ -1,36 +1,40 @@
 ---
-description: Shared authentication, pagination, result, and response-format conventions for Cafecito APIs.
+description: Shared authentication, pagination, response, and route-selection conventions for Cafecito APIs.
 ---
 
 # API conventions
 
 ## Authentication
 
-All gateway API and MCP requests use a Cafecito API key as a Bearer token:
+All gateway REST and MCP requests use a Cafecito API key as a Bearer token:
 
-```http
+~~~http
 Authorization: Bearer YOUR-API-KEY
-```
+~~~
 
-Create and manage keys in [Get an API key](/start/api-keys). The gateway base URL is `https://api.cafecito.tech`.
+The gateway base URL is https://api.cafecito.tech.
 
 ## Product conventions
 
 | Behavior | Beans | Espresso |
 | --- | --- | --- |
-| Collection pagination | `limit` and `offset` | `limit` and opaque `page` |
-| Continue a collection | Increase or supply `offset` as documented by the route | Send `pagination.next_page` back as `page`; never construct the token |
-| Empty collections | HTTP `204` is not an error | HTTP `200` with `data: []` |
-| Default format | JSON | JSON is canonical; `response_type=yaml` and `response_type=toon` are token-optimized for MCP and AI-agent clients |
+| Collection pagination | limit plus opaque cursor | limit plus opaque cursor |
+| Continue a collection | Send pagination.next_cursor unchanged as cursor | Send pagination.next_cursor unchanged as cursor |
+| Empty collections | HTTP 200 with data: [] | HTTP 200 with data: [] |
+| Canonical format | JSON | JSON |
+| AI-agent formats | Use the REST/MCP JSON contract | YAML and TOON may be used where the Espresso contract supports them |
 
-Espresso collections return `data`, `pagination`, and `meta`; `pagination.num_results` is the count for the current page, not a total-match count.
+Beans V1 Article filters accept all stored content types listed in the Beans contract; omitting content_type includes all stored types. Espresso filters and resource meanings are separate. Use each product reference for route-specific limits, filters, schemas, and status codes: [Beans API](/api/beans) and [Espresso API](/api/espresso).
 
-Use each product reference for route-specific limits, supported filters, schemas, and status codes: [Beans API](/api/beans) and [Espresso API](/api/espresso).
+## Envelope rules
 
-## Errors and response shapes
+Collections return pagination and data, plus meta when the route exposes freshness metadata. Detail routes return data. Empty collections are successful HTTP 200 responses with data: [].
 
-Treat successful empty results according to the product behavior above. For validation errors, missing resources, and full response schemas, rely on the interactive API reference for the route you call rather than inferring a shared error envelope.
+Follow the returned cursor exactly. Do not construct a cursor or substitute offset, page, pageSize, or size.
 
-## MCP and AI agents
+## Product choice
 
-Both products expose MCP servers using the same API key. Espresso YAML and TOON output are specifically intended to reduce token use for MCP and AI-agent workflows. See [MCP & AI agents](/guides/mcp-ai-agents) for connection details.
+- Use Beans for publisher Articles, citations, full Article content when available, Source metadata, similar reading, and external Article mentions.
+- Use Espresso for structured Events, Signals, impact, forecasts, and evidence relationships.
+
+See [MCP and AI agents](/guides/mcp-ai-agents) for tool selection.

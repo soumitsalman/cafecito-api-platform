@@ -1,0 +1,109 @@
+---
+title: Migration
+description: Migrate article, news, blog, and publisher workflows to the Beans Article and Source API.
+---
+
+# Migrate to Beans
+
+Beans is a read-only publisher-content API for finding, checking, and citing Articles. It is designed for workflows that need publisher text and metadata. It is not a business-intelligence API; use [Espresso](/products/espresso) for Events, Signals, evidence, and synthesized conclusions.
+
+## Choose the right target
+
+| If your current workflow needs | Use Beans | Notes |
+| --- | --- | --- |
+| Topic, identity, Source, or URL search | `GET /beans/articles/search` | Use `q` for natural-language search, `ids` or `urls` for exact lookup, and Article filters for narrowing. |
+| A newest-first publication feed | `GET /beans/articles/latest` | Use inclusive `from` and `to` dates when the recent default window is not sufficient. |
+| A fixed recent headline feed | `GET /beans/articles/top-headlines` | This route uses a fixed recent window and does not accept custom date bounds. |
+| Attention-ranked Articles | `GET /beans/articles/trending` | Use the date window and follow cursor pagination. Trend metrics may be absent. |
+| Detail for one selected Article | `GET /beans/articles/{id}` | Use after a collection result provides the Article UUID. Request `full_content=true` only when the body is needed. |
+| Related publisher reading | `GET /beans/articles/{id}/similar` | Results are related reading and are not a guarantee of durable Story membership. |
+| External observations about an Article URL | `GET /beans/articles/{id}/mentions` | Mentions are observations on external platforms, not publisher Articles. |
+| Publisher metadata | `GET /beans/sources` or `GET /beans/sources/{id}` | Resolve Source UUIDs for citations or Article Source filters. |
+| Normalized filter values | `GET /beans/categories`, `/entities`, `/regions`, or `/sentiments` | Discover values before sending Article filters. |
+
+## Public content types
+
+Beans V1 exposes all stored public `content_type` values:
+
+`blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`
+
+Omit `content_type` to include all stored types. Provider labels such as `pr` are not aliases.
+
+## Translate the data model
+
+| Familiar concept | Beans concept | How an agent should use it |
+| --- | --- | --- |
+| News or blog item | **Article** | Search a collection, preserve `data[].id`, then retrieve detail when citation or full content is needed. |
+| Publisher record | **Source** | Resolve metadata with Source search and reuse the UUID in Article filters. |
+| Topic or label | Article filter | Use `categories`, `entities`, `regions`, `sentiments`, `tags`, `authors`, or Source filters according to the route. |
+| Story or cluster | Deferred Beans capability | Do not depend on Stories until persistent Story UUID and membership behavior is published. |
+| Social or forum discussion | **Mention** | Use the Article mentions route for external observations tied to a known Article. |
+
+## Route migration
+
+| Common existing pattern | Beans route sequence |
+| --- | --- |
+| Search an archive, then open one result | `GET /beans/articles/search` -> `GET /beans/articles/{id}` |
+| Build a newest-first feed | `GET /beans/articles/latest` -> follow `pagination.next_cursor` |
+| Build a headline or attention feed | `GET /beans/articles/top-headlines` or `GET /beans/articles/trending` |
+| Find related coverage after selecting an Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/similar` |
+| Check external discussion for a selected Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/mentions` |
+| Find a publisher, then filter its Articles | `GET /beans/sources?q=...` -> `GET /beans/articles/search?sources={source_id}` |
+
+Do not fetch detail for every search result. Collection items are intended to help an agent select relevant Article IDs; detail and follow-up routes are targeted calls.
+
+## Adapt queries and filters
+
+| Existing query intent | Beans parameter or route | Matching rule |
+| --- | --- | --- |
+| Natural-language topic search | `q` on search or feed routes | Semantic search. |
+| Search strictness | `score_threshold` with `q` | Requires `q`; higher values are stricter. |
+| Exact Article lookup | `ids` or `urls` on search | Exact UUID or URL matching. |
+| Public content type | `content_type` | Any stored type listed above; omission means all stored types. |
+| Publisher or domain narrowing | `sources`, `domains`, `exclude_sources`, or `exclude_domains` | Use Source UUIDs or domain values as documented by the route. |
+| Article labels | `authors`, `categories`, `exclude_categories`, `entities`, `regions`, `sentiments`, or `tags` | Include values within one field use OR; different fields combine with AND. |
+| Publication bounds | `from` and `to` | Inclusive `YYYY-MM-DD` bounds on routes that support them. |
+| Larger Article projection | `full_content=true` | Requests available body content and may increase payload size. |
+
+## Adapt pagination and responses
+
+Beans collections use one stable JSON envelope:
+
+```json
+{
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "num_results": 0,
+    "next_cursor": null
+  },
+  "meta": {
+    "as_of": "2026-08-19T00:00:00Z"
+  }
+}
+```
+
+- `pagination.num_results` counts records in the current page, not total matches.
+- Send a non-null `pagination.next_cursor` unchanged as the next request `cursor`.
+- An empty collection is a successful HTTP 200 response with `data: []`.
+- Detail routes return `{ "data": { ... } }`; a missing Article or Source returns HTTP 404.
+- Do not construct an `offset` or `page` parameter. Beans V1 uses cursor pagination.
+- Error responses use the standard error envelope with HTTP 400, 401, 404, 429, or 500 as applicable.
+
+## Migration checklist
+
+1. Classify each old request as Article search, recency, headline attention, trend ranking, Source lookup, related reading, or external mention lookup.
+2. Change collection parsing to read `data`, `pagination`, and `meta`.
+3. Store Article and Source UUIDs as opaque identifiers.
+4. Replace offset or page construction with pass-through use of `pagination.next_cursor`.
+5. Accept every stored type listed above; do not translate stored kinds or provider `pr` labels into Beans values.
+6. Treat `from` and `to` as route-specific date bounds in `YYYY-MM-DD` form.
+7. Fetch detail, similar, or mentions only after a collection call selects an Article.
+8. Keep Espresso Events, Signals, and evidence workflows on the Espresso product.
+
+## Next steps
+
+- [Beans overview](/products/beans)
+- [Beans API reference](/api/beans)
+- [Espresso migration guide](/products/espresso/migration)
+- [MCP & AI agents](/guides/mcp-ai-agents)

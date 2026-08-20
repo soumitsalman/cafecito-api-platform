@@ -1,44 +1,42 @@
 ---
-description: Make a minimal authenticated Cafecito API request with Beans or Espresso.
+description: Make a minimal authenticated Cafecito API request.
 ---
 
 # First API call
 
-Cafecito APIs use the same gateway base URL and Bearer API-key header. Create a key first if you do not have one.
+Cafecito APIs use the same gateway base URL and Bearer API-key header.
 
-```bash
+~~~bash
 export CAFECITO_API_KEY="YOUR_API_KEY"
 export BASE_URL="https://api.cafecito.tech"
-```
+~~~
 
-## Choose a product
+## Beans: retrieve recent publisher Articles
 
-### Beans: retrieve recent news and blog articles
+Use Beans when the question needs publisher Article material; this example filters to news.
 
-Use Beans when you need article-level news intelligence, including search, feeds, trends, and propagation.
+~~~bash
+curl -s --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+~~~
 
-```bash
-curl -s "${BASE_URL}/beans/articles/latest?tags=us&sources=techcrunch" \
-  -H "Authorization: Bearer ${CAFECITO_API_KEY}"
-```
+The public content_type enum includes all stored types listed in the Beans overview; this example uses news. Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans).
 
-Continue with the [Beans overview and quickstart](/products/beans) or browse the [Beans API reference](/api/beans).
+## Espresso: find structured developments
 
-### Espresso: find concrete business developments
+Use Espresso when the question is what happened or what it may mean.
 
-Use Espresso when you need structured Events, synthesized Signals, evidence, source metadata, or agent-oriented response formats. Start with Events when the question is what happened.
-
-```bash
-curl -s --get "${BASE_URL}/espresso/events" \
-  -H "Authorization: Bearer ${CAFECITO_API_KEY}" \
+~~~bash
+curl -s --get "$BASE_URL/espresso/events" \
   --data-urlencode "q=semiconductor supply pressure" \
-  --data-urlencode "limit=5"
-```
-
-Continue with the [Espresso overview and quickstart](/products/espresso) or browse the [Espresso API reference](/api/espresso).
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+~~~
 
 ## Next steps
 
 - [Create or manage API keys](/start/api-keys)
 - [API conventions](/guides/api-conventions)
-- [MCP & AI agents](/guides/mcp-ai-agents)
+- [MCP and AI agents](/guides/mcp-ai-agents)

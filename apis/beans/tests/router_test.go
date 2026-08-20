@@ -137,11 +137,19 @@ func assertExpectedPagination(t *testing.T, body []byte, expected_limit int) []m
 	assert.NotContains(t, env.Pagination, "page")
 	assert.NotContains(t, env.Pagination, "offset")
 	assert.NotContains(t, env.Pagination, "found")
+	assert.NotContains(t, env.Pagination, "returned")
+	assert.NotContains(t, env.Pagination, "num_results")
 	var raw map[string]any
 	require.NoError(t, json.Unmarshal(body, &raw))
 	assert.NotContains(t, raw, "success")
 	assert.NotContains(t, raw, "status")
 	return env.Data
+}
+
+func assertNoCollectionMeta(t *testing.T, body []byte) {
+	t.Helper()
+	env := parseCollection(t, body)
+	assert.Empty(t, env.Meta)
 }
 
 func nextCursorFromBody(t *testing.T, body []byte) string {
@@ -158,20 +166,50 @@ func nextCursorFromBody(t *testing.T, body []byte) string {
 func assertMetaAsOf(t *testing.T, body []byte) {
 	t.Helper()
 	env := parseCollection(t, body)
+	require.Len(t, env.Meta, 1)
 	as_of, ok := env.Meta["as_of"].(string)
 	require.True(t, ok, "response is missing RFC3339 meta.as_of")
 	_, err := time.Parse(time.RFC3339Nano, as_of)
 	require.NoError(t, err, "invalid meta.as_of: %q", as_of)
 }
 
+func assertDetailMetaAsOf(t *testing.T, body []byte) {
+	t.Helper()
+	var response struct {
+		Meta map[string]any `json:"meta"`
+	}
+	require.NoError(t, json.Unmarshal(body, &response), "response body: %s", string(body))
+	require.Len(t, response.Meta, 1)
+	as_of, ok := response.Meta["as_of"].(string)
+	require.True(t, ok, "response is missing RFC3339 meta.as_of")
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err, "invalid meta.as_of: %q", as_of)
+}
+
+func assertStoryArticleMeta(t *testing.T, body []byte, story_id string) {
+	t.Helper()
+	env := parseCollection(t, body)
+	require.Len(t, env.Meta, 2)
+	assert.Equal(t, story_id, env.Meta["story_id"])
+	as_of, ok := env.Meta["as_of"].(string)
+	require.True(t, ok, "response is missing RFC3339 meta.as_of")
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err, "invalid meta.as_of: %q", as_of)
+}
+
+func assertNoDetailMeta(t *testing.T, body []byte) {
+	t.Helper()
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(body, &response), "response body: %s", string(body))
+	assert.NotContains(t, response, "meta")
+}
+
 func assertStringArrayField(t *testing.T, item map[string]any, field string) {
 	t.Helper()
 	require.Contains(t, item, field)
-	if item[field] == nil {
-		return
-	}
-	_, ok := item[field].([]any)
+	values, ok := item[field].([]any)
 	require.True(t, ok, "%s must be an array, got %T", field, item[field])
+	require.NotNil(t, values, "%s must be [] rather than null", field)
 }
 
 func assertExpectedSource(t *testing.T, source map[string]any) {
@@ -184,6 +222,8 @@ func assertExpectedSource(t *testing.T, source map[string]any) {
 		_, err := uuid.Parse(id)
 		require.NoError(t, err, "source has invalid id: %q", id)
 	}
+	assert.NotEmpty(t, source["domain"])
+	assert.NotEmpty(t, source["url"])
 	assert.NotContains(t, source, "base_url")
 }
 
@@ -196,7 +236,10 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 
 	assert.NotEmpty(t, item["url"])
 	assert.Contains(t, item, "content_type")
-	assert.Contains(t, item, "title")
+	content_type, ok := item["content_type"].(string)
+	require.True(t, ok, "article has invalid content_type")
+	assert.Contains(t, []string{"blog", "contract", "earnings_report", "enforcement_action", "financial_report", "lawsuit", "news", "official_statement", "podcast", "post", "press_release", "research_paper", "site", "technical_documentation", "whitepaper"}, content_type)
+	assert.NotEmpty(t, item["title"])
 	assert.Contains(t, item, "summary")
 	assert.Contains(t, item, "author")
 	assert.Contains(t, item, "image_url")
@@ -210,6 +253,9 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 	source, ok := item["source"].(map[string]any)
 	require.True(t, ok, "article is missing nested source")
 	assertExpectedSource(t, source)
+	for _, field := range []string{"description", "favicon_url", "rss_feed_url"} {
+		assert.NotContains(t, source, field)
+	}
 
 	for _, field := range []string{"categories", "regions", "entities", "sentiments", "tags"} {
 		assertStringArrayField(t, item, field)
@@ -221,10 +267,71 @@ func assertExpectedTrend(t *testing.T, item map[string]any) {
 	trend, ok := item["trend"].(map[string]any)
 	require.True(t, ok, "trending article is missing nested trend")
 	for _, field := range []string{
-		"like_count", "comment_count", "mention_count",
-		"audience_count", "related_article_count", "score",
+		"likes", "comments", "mentions", "audience", "related",
 	} {
 		require.Contains(t, trend, field)
+		if trend[field] != nil {
+			_, ok := trend[field].(float64)
+			require.True(t, ok, "trend.%s must be numeric or null", field)
+		}
+	}
+	assert.NotContains(t, trend, "score")
+}
+
+func assertExpectedStory(t *testing.T, story map[string]any) {
+	t.Helper()
+	story_id, ok := story["id"].(string)
+	require.True(t, ok, "story is missing string id")
+	_, err := uuid.Parse(story_id)
+	require.NoError(t, err, "story has invalid id: %q", story_id)
+	assert.NotEmpty(t, story["title"])
+	for _, field := range []string{"first_published_at", "last_published_at"} {
+		value, ok := story[field].(string)
+		require.True(t, ok, "story is missing %s", field)
+		_, err := time.Parse(time.RFC3339Nano, value)
+		require.NoError(t, err, "invalid story.%s: %q", field, value)
+	}
+	for _, field := range []string{"article_count", "source_count"} {
+		value, ok := story[field].(float64)
+		require.True(t, ok, "story is missing numeric %s", field)
+		require.GreaterOrEqual(t, value, float64(1))
+	}
+	for _, field := range []string{"categories", "regions", "entities", "tags"} {
+		assertStringArrayField(t, story, field)
+	}
+	previews, ok := story["top_articles"].([]any)
+	require.True(t, ok, "story is missing top_articles")
+	require.NotNil(t, previews)
+	require.GreaterOrEqual(t, len(previews), 1)
+	require.LessOrEqual(t, len(previews), 3)
+	for _, raw_preview := range previews {
+		preview, ok := raw_preview.(map[string]any)
+		require.True(t, ok)
+		assertExpectedStoryPreview(t, preview)
+	}
+	assert.NotContains(t, story, "links")
+}
+
+func assertExpectedStoryPreview(t *testing.T, preview map[string]any) {
+	t.Helper()
+	article_id, ok := preview["id"].(string)
+	require.True(t, ok, "story preview is missing string id")
+	_, err := uuid.Parse(article_id)
+	require.NoError(t, err, "story preview has invalid id: %q", article_id)
+	assert.NotEmpty(t, preview["url"])
+	assert.NotEmpty(t, preview["title"])
+	published_at, ok := preview["published_at"].(string)
+	require.True(t, ok, "story preview is missing published_at")
+	_, err = time.Parse(time.RFC3339Nano, published_at)
+	require.NoError(t, err, "invalid story preview published_at: %q", published_at)
+	source, ok := preview["source"].(map[string]any)
+	require.True(t, ok, "story preview is missing source")
+	assertExpectedSource(t, source)
+	for _, field := range []string{"description", "favicon_url", "rss_feed_url"} {
+		assert.NotContains(t, source, field)
+	}
+	for _, field := range []string{"content_type", "summary", "content", "author", "image_url", "story_id", "categories", "regions", "entities", "sentiments", "tags", "trend", "links"} {
+		assert.NotContains(t, preview, field)
 	}
 }
 
@@ -306,6 +413,7 @@ func TestRouterDiscoveryRoutes(t *testing.T) {
 			status, body := routerGET(t, srv.URL, path, params)
 			printResponse(t, path, body)
 			requireStatus(t, http.StatusOK, status, body)
+			assertNoCollectionMeta(t, body)
 			items := assertExpectedPagination(t, body, 5)
 			require.NotEmpty(t, items, path)
 			assertExpectedTag(t, items[0])
@@ -321,6 +429,7 @@ func TestRouterDiscoveryQuery(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_CATEGORIES, params)
 	printResponse(t, "CATEGORIES_Q", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedTag(t, item)
@@ -347,6 +456,7 @@ func TestRouterGetSources(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	sources := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, sources)
 	for _, source := range sources {
@@ -358,6 +468,7 @@ func TestRouterGetSources(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SOURCES+"/"+first_id, nil)
 	printResponse(t, "SOURCE_DETAIL", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoDetailMeta(t, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, first_id, detail["id"])
 	assertExpectedSource(t, detail)
@@ -375,6 +486,7 @@ func TestRouterGetSourcesByQueryAndDomain(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES_FILTERED", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	assertExpectedPagination(t, body, 5)
 }
 
@@ -393,6 +505,7 @@ func TestRouterSearchArticlesUnfiltered(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_UNFILTERED", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -409,6 +522,7 @@ func TestRouterSearchArticlesByCategories(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_CATEGORIES", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -426,6 +540,7 @@ func TestRouterSearchArticlesByExactIDsAndURLs(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_IDS", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	assert.Equal(t, article_id, items[0]["id"])
@@ -436,6 +551,7 @@ func TestRouterSearchArticlesByExactIDsAndURLs(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_URLS", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items = assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assert.Equal(t, test_article_urls[0], item["url"])
@@ -457,6 +573,7 @@ func TestRouterSearchArticlesFilters(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_FILTERS", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -474,6 +591,7 @@ func TestRouterVectorSearchArticles(t *testing.T) {
 	printResponse(t, "VECTOR_SEARCH", body)
 	skipIfEmbedderUnavailable(t, status, body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -511,6 +629,7 @@ func TestRouterGetLatestArticles(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_LATEST, params)
 	printResponse(t, "LATEST", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -529,6 +648,7 @@ func TestRouterVectorSearchLatest(t *testing.T) {
 	printResponse(t, "VECTOR_SEARCH_LATEST", body)
 	skipIfEmbedderUnavailable(t, status, body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -591,6 +711,7 @@ func TestRouterGetArticle(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id, nil)
 	printResponse(t, "ARTICLE_DETAIL", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoDetailMeta(t, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, article_id, detail["id"])
 	assertExpectedArticle(t, detail)
@@ -609,6 +730,7 @@ func TestRouterGetArticleFullContent(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id, params)
 	printResponse(t, "ARTICLE_FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoDetailMeta(t, body)
 	detail := parseDetailObject(t, body)
 	require.Contains(t, detail, "content")
 }
@@ -637,6 +759,7 @@ func TestRouterSimilarArticles(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id+"/similar", params)
 	printResponse(t, "SIMILAR", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -681,7 +804,6 @@ func TestRouterStories(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	params.Set("limit", "5")
-	params.Set("min_article_count", "2")
 	params.Set("from", testSearchFrom().Format("2006-01-02"))
 	status, body := routerGET(t, srv.URL, ROUTE_STORIES, params)
 	printResponse(t, "STORIES", body)
@@ -690,22 +812,23 @@ func TestRouterStories(t *testing.T) {
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	story := items[0]
-	require.Contains(t, story, "id")
-	require.Contains(t, story, "title")
-	require.Contains(t, story, "first_published_at")
-	require.Contains(t, story, "last_published_at")
-	require.Contains(t, story, "article_count")
-	require.Contains(t, story, "source_count")
-	require.Contains(t, story, "top_articles")
-	assert.NotContains(t, story, "links")
+	assertExpectedStory(t, story)
 
 	story_id, ok := story["id"].(string)
 	require.True(t, ok)
 	status, body = routerGET(t, srv.URL, ROUTE_STORIES+"/"+story_id, nil)
 	printResponse(t, "STORY_DETAIL", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertDetailMetaAsOf(t, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, story_id, detail["id"])
+	detail_story := make(map[string]any, len(detail)-1)
+	for key, value := range detail {
+		if key != "links" {
+			detail_story[key] = value
+		}
+	}
+	assertExpectedStory(t, detail_story)
 	links, ok := detail["links"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "/stories/"+story_id+"/articles", links["articles"])
@@ -713,6 +836,7 @@ func TestRouterStories(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_STORIES+"/"+story_id+"/articles", url.Values{"limit": {"5"}})
 	printResponse(t, "STORY_ARTICLES", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertStoryArticleMeta(t, body, story_id)
 	members := assertExpectedPagination(t, body, 5)
 	for _, item := range members {
 		assertExpectedArticle(t, item)
@@ -810,6 +934,7 @@ func TestRouterDefaultPagination(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, nil)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 20)
 	require.NotEmpty(t, items)
 	assert.LessOrEqual(t, len(items), 20)
@@ -824,6 +949,7 @@ func TestRouterEmptyCollection(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "EMPTY_COLLECTION", body)
 	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	assert.Empty(t, items)
 	assert.Equal(t, "", nextCursorFromBody(t, body))
@@ -833,12 +959,26 @@ func TestRouterFullContentProjection(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
 	params.Set("limit", "1")
-	params.Set("full_content", "true")
 	params.Set("from", testSearchFrom().Format("2006-01-02"))
+
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	printResponse(t, "WITHOUT_FULL_CONTENT", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
+	without_content := assertExpectedPagination(t, body, 1)
+	require.NotEmpty(t, without_content)
+	assert.NotContains(t, without_content[0], "content")
+
+	params.Set("full_content", "true")
+	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
-	items := assertExpectedPagination(t, body, 1)
-	require.NotEmpty(t, items)
-	require.Contains(t, items[0], "content")
+	assertNoCollectionMeta(t, body)
+	with_content := assertExpectedPagination(t, body, 1)
+	require.NotEmpty(t, with_content)
+	assert.Equal(t, without_content[0]["id"], with_content[0]["id"])
+	if content, present := with_content[0]["content"]; present && content != nil {
+		_, ok := content.(string)
+		require.True(t, ok, "content must be a string or null")
+	}
 }

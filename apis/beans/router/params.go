@@ -33,7 +33,7 @@ type itemIDParams struct {
 // articleFilterParams contains the non-query, non-identity Article filters
 // shared by B01, B03, B04, B05, and B06 target requests.
 type articleFilterParams struct {
-	ContentType       string      `form:"content_type" binding:"omitempty,oneof=blog contract earnings_report enforcement_action financial_report lawsuit news official_statement podcast press_release research_paper site technical_documentation whitepaper"`
+	ContentType       string      `form:"content_type" binding:"omitempty,oneof=blog contract earnings_report enforcement_action financial_report lawsuit news official_statement podcast post press_release research_paper site technical_documentation whitepaper"`
 	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	Domains           []string    `form:"domains" collection_format:"csv" binding:"max=100"`

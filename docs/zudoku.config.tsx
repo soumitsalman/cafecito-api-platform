@@ -161,6 +161,8 @@ const config: ZudokuConfig = {
               link: { type: "doc", file: "products/beans/overview", path: "/products/beans" },
               items: [
                 { type: "doc", file: "products/beans/overview", path: "/products/beans" },
+                { type: "doc", file: "products/beans/scenarios", path: "/products/beans/scenarios" },
+                { type: "doc", file: "products/beans/migration", path: "/products/beans/migration" },
                 { type: "link", to: "/api/beans", label: "API reference" },
               ],
             },
