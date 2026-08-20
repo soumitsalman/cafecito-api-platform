@@ -1431,7 +1431,7 @@
     "/beans/articles/latest": {
       "get": {
         "summary": "List Latest Articles",
-        "description": "Answers: What publisher Articles were published most recently?\n\nReturns: A cursor-paginated collection ordered by published_at descending.\n\nUse when: a recent monitoring feed is needed and publication recency matters more than archive relevance.\n\nDo not use when: semantic archive search, headlines, or attention ranking is needed; use search, top-headlines, or trending.\n\nSearch/filter behavior: q with optional score_threshold and shared Article filters; include values are OR within a field and fields combine with AND.\n\nTime: from and to are inclusive UTC publication dates in YYYY-MM-DD; omitted from defaults to the most recent 7 days.\n\nSort/pagination: Newest first; follow pagination.next_cursor unchanged as cursor; limit defaults to 20 and maxes at 100.\n\nMissing fields: Article enrichment, Source metadata, summary, and content may be null or omitted.\n\nNext step: Use /articles/{id} for detail.\n\nProvider parallel: NewsData.io latest and Currents latest-news are comparable recent feeds; Beans returns normalized Article UUIDs and cursor pagination.",
+        "description": "Answers: What publisher Articles were published most recently?\n\nReturns: A cursor-paginated collection ordered by published_at descending.\n\nUse when: a recent monitoring feed is needed and publication recency matters more than archive relevance.\n\nDo not use when: semantic archive search, headlines, or attention ranking is needed; use search, top-headlines, or trending.\n\nSearch/filter behavior: q with optional score_threshold and shared Article filters; include values are OR within a field and fields combine with AND.\n\nTime: This feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.\n\nSort/pagination: Newest first; follow pagination.next_cursor unchanged as cursor; limit defaults to 20 and maxes at 100.\n\nMissing fields: Article enrichment, Source metadata, summary, and content may be null or omitted.\n\nNext step: Use /articles/{id} for detail.\n\nProvider parallel: NewsData.io latest and Currents latest-news are comparable recent feeds; Beans returns normalized Article UUIDs and cursor pagination.",
         "tags": [
           "Articles"
         ],
@@ -1477,12 +1477,6 @@
           },
           {
             "$ref": "#/components/parameters/tags"
-          },
-          {
-            "$ref": "#/components/parameters/from"
-          },
-          {
-            "$ref": "#/components/parameters/to"
           },
           {
             "$ref": "#/components/parameters/full_content"
@@ -2053,7 +2047,7 @@
       "get": {
         "operationId": "getSimilarArticles",
         "summary": "Find Similar Articles",
-        "description": "Answers: Which other publisher Articles are useful related reading?\n\nReturns: A cursor-paginated similarity-ranked collection for the anchor Article; it is not a guarantee of Story membership.\n\nUse when: comparable coverage or related context is needed for a selected Article.\n\nDo not use when: all durable Story members or external mentions are needed.\n\nSearch/filter behavior: the path UUID is the anchor; Source, domain, author, label, type, and date filters narrow candidates; q, score_threshold, ids, and urls are unsupported.\n\nTime: from and to are inclusive UTC publication dates in YYYY-MM-DD.\n\nSort/pagination: Similarity-ranked; follow pagination.next_cursor unchanged as cursor; limit defaults to 20 and maxes at 100.\n\nMissing fields: Article enrichment, Source metadata, and content may be null or omitted.\n\nNext step: Use /articles/{id} on a selected result.\n\nProvider parallel: TheNewsAPI similar-by-UUID is the closest reviewed provider route; Beans states that similar is not Story membership.",
+        "description": "Answers: Which other publisher Articles are useful related reading?\n\nReturns: A cursor-paginated collection of related publisher coverage for the anchor Article, ordered newest first; it is not a guarantee of Story membership.\n\nUse when: comparable coverage or related context is needed for a selected Article.\n\nDo not use when: all durable Story members or external mentions are needed.\n\nSearch/filter behavior: the path UUID is the related-coverage anchor; Source, domain, author, label, type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are unsupported.\n\nTime: from and to are inclusive UTC publication dates in YYYY-MM-DD.\n\nSort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor; limit defaults to 20 and maxes at 100.\n\nMissing fields: Article enrichment, Source metadata, and content may be null or omitted.\n\nNext step: Use /articles/{id} on a selected result.\n\nProvider parallel: TheNewsAPI similar-by-UUID is the closest reviewed provider route; Beans states that similar is not Story membership.",
         "tags": [
           "Articles"
         ],
@@ -2102,6 +2096,9 @@
           },
           {
             "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/full_content"
           },
           {
             "$ref": "#/components/parameters/limit"

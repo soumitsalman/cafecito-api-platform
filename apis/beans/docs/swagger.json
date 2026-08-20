@@ -19,7 +19,7 @@
     "paths": {
         "/articles/latest": {
             "get": {
-                "description": "Answers: What Articles were published most recently within the requested filters?\nReturns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].\nUse when: publication recency matters more than full-corpus relevance.\nDo not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.\nSearch/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.\nTime: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD; omitted from defaults to the most recent 7 days.\nSort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.\nNext step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.",
+                "description": "Answers: What Articles were published most recently within the requested filters?\nReturns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].\nUse when: publication recency matters more than full-corpus relevance.\nDo not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.\nSearch/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.\nTime: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.\nSort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.\nNext step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.",
                 "produces": [
                     "application/json"
                 ],
@@ -73,51 +73,6 @@
                 ],
                 "summary": "Search Articles",
                 "operationId": "searchArticles",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/router.ArticleCollectionResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/articles/top-headlines": {
-            "get": {
-                "description": "Answers: Which Articles are attracting headline-level attention in the fixed recent window?\nReturns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].\nUse when: a breaking-news or daily-headline feed is needed without choosing a custom time range.\nDo not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.\nSearch/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.\nTime: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.\nSort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.\nNext step: use GET /articles/{id} when a headline needs citable detail or full content.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Articles"
-                ],
-                "summary": "List Top Headlines",
-                "operationId": "getTopHeadlines",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -212,7 +167,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/router.ArticleDetailItemResponse"
+                            "$ref": "#/definitions/router.ArticleDetailResponse"
                         }
                     },
                     "400": {
@@ -301,7 +256,7 @@
         },
         "/articles/{id}/similar": {
             "get": {
-                "description": "Answers: Which other publisher Articles are useful related reading for this Article?\nReturns: A cursor-paginated collection ranked by similarity to the path Article; this is a recommendation, not a guarantee of Story membership.\nUse when: an agent has selected an Article and wants comparable coverage or related context.\nDo not use when: all Articles in a durable Story or external mentions are needed.\nSearch/filter behavior: the path UUID is the similarity anchor. Source, domain, author, label, content-type, and date filters narrow candidates; q, score_threshold, ids, and urls are not accepted.\nTime: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.\nSort/pagination: similarity-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment, Source metadata, and content may be null or omitted.\nNext step: use GET /articles/{id} on a selected result for detail and optional full content.",
+                "description": "Answers: Which other publisher Articles are useful related reading for this Article?\nReturns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.\nUse when: an agent has selected an Article and wants comparable coverage or related context.\nDo not use when: all Articles in a durable Story or external mentions are needed.\nSearch/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.\nTime: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.\nSort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment, Source metadata, and content may be null or omitted.\nNext step: use GET /articles/{id} on a selected result for detail and optional full content.",
                 "produces": [
                     "application/json"
                 ],
@@ -532,7 +487,7 @@
         },
         "/sources": {
             "get": {
-                "description": "Answers: Which publisher Sources match this metadata query?\nReturns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.\nUse when: an agent needs Source metadata for citations or a Source UUID for Article filtering.\nDo not use when: Article content or publication search is needed; use GET /articles/search or a feed.\nSearch/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters; ids selects known Source UUIDs.\nTime: no time filter applies; Source metadata is current as returned.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.\nNext step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.",
+                "description": "Answers: Which publisher Sources match this metadata query?\nReturns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.\nUse when: an agent needs Source metadata for citations or a Source UUID for Article filtering.\nDo not use when: Article content or publication search is needed; use GET /articles/search or a feed.\nSearch/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.\nTime: no time filter applies; Source metadata is current as returned.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.\nNext step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.",
                 "produces": [
                     "application/json"
                 ],
@@ -625,6 +580,51 @@
                     }
                 }
             }
+        },
+        "/top-headlines": {
+            "get": {
+                "description": "Answers: Which Articles are attracting headline-level attention in the fixed recent window?\nReturns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].\nUse when: a breaking-news or daily-headline feed is needed without choosing a custom time range.\nDo not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.\nSearch/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.\nTime: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.\nSort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.\nNext step: use GET /articles/{id} when a headline needs citable detail or full content.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "List Top Headlines",
+                "operationId": "getTopHeadlines",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -650,7 +650,7 @@
                 }
             }
         },
-        "router.ArticleDetailItem": {
+        "router.ArticleDetail": {
             "type": "object",
             "properties": {
                 "author": {
@@ -744,14 +744,14 @@
                 }
             }
         },
-        "router.ArticleDetailItemResponse": {
+        "router.ArticleDetailResponse": {
             "type": "object",
             "required": [
                 "data"
             ],
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/router.ArticleDetailItem"
+                    "$ref": "#/definitions/router.ArticleDetail"
                 }
             }
         },
@@ -1060,6 +1060,9 @@
                 },
                 "related": {
                     "type": "integer"
+                },
+                "trend_score": {
+                    "type": "number"
                 }
             }
         }

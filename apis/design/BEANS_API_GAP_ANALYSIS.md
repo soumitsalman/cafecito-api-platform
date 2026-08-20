@@ -1,10 +1,29 @@
 # Beans API Gap Assessment
 
-Live checked on 2026-08-20 against `http://0.0.0.0:8080`. Collection requests used `limit=5` or `limit=20`.
+Live rechecked on 2026-08-20 from 20:40-20:43 UTC against `http://0.0.0.0:8080`. Collection requests used `limit=5` or `limit=20`.
 
 ## Overall assessment
 
 The implementation is not ready for the proposed V1 contract. Core Article, Source, Similar, and Mention routes respond, but the public data boundary, response schema, feed windows, discovery routes, Stories, and count route have material gaps.
+
+## Latest live re-run
+
+- `/health`: HTTP 200.
+- `/articles/search?limit=5`, `/articles/latest?limit=5`, `/articles/trending?limit=5`, and `/sources?limit=5`: HTTP 200 with five records and cursors.
+- Opaque search cursor continuation: HTTP 200 with five additional records.
+- `/articles/search?from=1900-01-01&to=1900-01-02&limit=5`: HTTP 200 with zero records, confirming Search applies date filters.
+- `/articles/latest?from=1900-01-01&to=1900-01-02&limit=5`: HTTP 200 with five 2026 records, confirming Latest ignores those bounds.
+- `/articles/trending?from=1900-01-01&to=1900-01-02&limit=5`: HTTP 200 with five records, confirming Trending ignores those bounds.
+- `/articles/latest?q=google&limit=5`: HTTP 400 because `score_threshold` is required.
+- `/top-headlines?limit=5`: HTTP 200 with `data: []`.
+- `/regions?limit=5` and `/stories?limit=5`: no response within 45 seconds during the re-run. An earlier same-day Stories probe returned HTTP 500 `db_unavailable`.
+- `/tags?limit=5`: HTTP 404.
+- `/articles/count?limit=5`: HTTP 400 because `count` is parsed by the Article UUID route.
+- Article detail with `full_content=true`: HTTP 200; content is returned, but the sampled Article still has `source: null` and `content_type: post`.
+- Similar Articles: HTTP 200 with an empty collection. Mentions: HTTP 200 with one record. Source detail: HTTP 200.
+- An impossible Source UUID filter still returned five Sources.
+
+The refreshed 20-record profile was unchanged: Search and Latest each returned `blog`, `news`, `podcast`, and `post`; `source` was null for 16/20 records, `regions` for 8/20, and `entities` for 18/20. Trending returned trend objects for 20/20 records, but `trend_score` was present for 0/20.
 
 ## Highest-priority gaps
 
@@ -13,8 +32,8 @@ The implementation is not ready for the proposed V1 contract. Core Article, Sour
 | P0 | Article scope is not restricted to News and Blog | `/articles/search?limit=5` returned `post`; `content_type=post` is accepted. The proposal requires public queries to return only `news` and `blog`. |
 | P0 | Required payload normalization is not enforced | In 20-Article samples, `source` was null for 16/20; `regions` and `entities` were frequently null. The proposal requires nested Source and enrichment arrays as `[]`. |
 | P0 | Latest/trending date windows are ignored | `latest?from=1900-01-01&to=1900-01-02&limit=5` still returned 2026 Articles. Trending behaved similarly. Date-window code is commented out in `apis/beans/router/routes.go`. |
-| P0 | Stories are exposed before persistent Story identity exists | `/stories?limit=5` returned HTTP 500 `db_unavailable`. Live Article `story_id` values were URL-like cluster keys, not stable UUIDs. |
-| P0 | Regions discovery is unusable at the requested page size | `/regions?limit=5` timed out after 25 seconds. |
+| P0 | Stories are exposed before persistent Story identity exists | `/stories?limit=5` did not complete within 45 seconds on the latest run; an earlier same-day probe returned HTTP 500 `db_unavailable`. Live Article `story_id` values were URL-like cluster keys, not stable UUIDs. |
+| P0 | Regions discovery is unusable at the requested page size | `/regions?limit=5` produced no response within 45 seconds. |
 | P1 | `/tags` and `/articles/count` are unavailable | `/tags?limit=5` returned 404. `/articles/count?limit=5` was captured by `/articles/:id` and returned a UUID parsing error. Registration is absent in `apis/beans/router/routes.go`. |
 | P1 | Trending payload omits `trend_score` | 20 live trending records contained no `trend.trend_score`, although the proposal requires it. `toArticleDocument` does not populate it in `apis/beans/router/responses.go`. |
 | P1 | Source UUID filtering is ignored | An impossible UUID filter still returned the first five Sources. `sourceListParams.IDs` is never passed into `QuerySources`. |

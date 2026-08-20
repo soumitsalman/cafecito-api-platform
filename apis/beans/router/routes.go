@@ -271,7 +271,7 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Description Use when: publication recency matters more than full-corpus relevance.
 // @Description Do not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.
 // @Description Search/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.
-// @Description Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD; omitted from defaults to the most recent 7 days.
+// @Description Time: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.
 // @Description Sort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
 // @Description Missing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.
 // @Description Next step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.
@@ -441,7 +441,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 // @Description Next step: follow links.similar for ranked related reading or links.mentions for external observations.
 // @Tags Articles
 // @Produce json
-// @Success 200 {object} ArticleDetailItemResponse
+// @Success 200 {object} ArticleDetailResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
@@ -471,12 +471,12 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // getSimilarArticles godoc
 // @Summary Find Similar Articles
 // @Description Answers: Which other publisher Articles are useful related reading for this Article?
-// @Description Returns: A cursor-paginated collection ranked by similarity to the path Article; this is a recommendation, not a guarantee of Story membership.
+// @Description Returns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.
 // @Description Use when: an agent has selected an Article and wants comparable coverage or related context.
 // @Description Do not use when: all Articles in a durable Story or external mentions are needed.
-// @Description Search/filter behavior: the path UUID is the similarity anchor. Source, domain, author, label, content-type, and date filters narrow candidates; q, score_threshold, ids, and urls are not accepted.
+// @Description Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
 // @Description Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.
-// @Description Sort/pagination: similarity-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
+// @Description Sort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
 // @Description Missing fields: Article enrichment, Source metadata, and content may be null or omitted.
 // @Description Next step: use GET /articles/{id} on a selected result for detail and optional full content.
 // @Tags Articles
@@ -571,7 +571,7 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 // @Description Returns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.
 // @Description Use when: an agent needs Source metadata for citations or a Source UUID for Article filtering.
 // @Description Do not use when: Article content or publication search is needed; use GET /articles/search or a feed.
-// @Description Search/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters; ids selects known Source UUIDs.
+// @Description Search/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.
 // @Description Time: no time filter applies; Source metadata is current as returned.
 // @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
 // @Description Missing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.

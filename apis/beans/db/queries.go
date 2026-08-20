@@ -817,7 +817,7 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Cluster, e
 	}
 
 	top_query := fmt.Sprintf(`
-		SELECT %s
+		SELECT *
 		FROM (
 			SELECT %s,
 				ROW_NUMBER() OVER (
@@ -829,8 +829,7 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Cluster, e
 		) ranked
 		WHERE rn <= 3
 		ORDER BY cluster_id, rn`,
-		BEAN_COLUMNS_WITHOUT_TREND,
-		BEAN_COLUMNS_WITHOUT_TREND,
+		_BEAN_COLUMNS_BASE,
 	)
 	articles, err := utils.FetchAll[Bean](ctx, b.db, top_query, params)
 	if err != nil {

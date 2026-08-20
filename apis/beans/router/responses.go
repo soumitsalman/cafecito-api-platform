@@ -127,43 +127,39 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 		Summary:    nullStringPtr(bean.Summary),
 		Content:    nullStringPtr(bean.Content),
 		StoryID:    nullStringPtr(bean.ClusterID),
+		Trend:      nullArticleTrendPtr(bean),
+		Source:     nullArticleSourcePtr(bean),
 	}
+	return doc
+}
+
+func nullArticleSourcePtr(bean *db.Bean) *SourceDocument {
 	if bean.SourceID != uuid.Nil {
-		doc.Source = toArticleSource(bean)
+		return &SourceDocument{
+			ID:          bean.SourceID,
+			BaseURL:     bean.BaseURL.String,
+			DomainName:  bean.Source,
+			SiteName:    nullStringPtr(bean.SiteName),
+			Description: nullStringPtr(bean.Description),
+			Favicon:     nullStringPtr(bean.Favicon),
+			RSSFeed:     nullStringPtr(bean.RSSFeed),
+		}
 	}
+	return nil
+}
+
+func nullArticleTrendPtr(bean *db.Bean) *Trend {
 	if bean.Likes.Valid || bean.Comments.Valid || bean.Shares.Valid || bean.Subscribers.Valid || bean.Related.Valid {
-		doc.Trend = &Trend{
+		return &Trend{
 			Likes:       nullInt64Ptr(bean.Likes),
 			Comments:    nullInt64Ptr(bean.Comments),
 			Shares:      nullInt64Ptr(bean.Shares),
 			Subscribers: nullInt64Ptr(bean.Subscribers),
 			Related:     nullInt64Ptr(bean.Related),
+			TrendScore:  nullFloat64Ptr(bean.TrendScore),
 		}
 	}
-	return doc
-}
-
-func toArticleSource(bean *db.Bean) *SourceDocument {
-	return &SourceDocument{
-		ID:          bean.SourceID,
-		BaseURL:     bean.BaseURL.String,
-		DomainName:  bean.Source,
-		SiteName:    nullStringPtr(bean.SiteName),
-		Description: nullStringPtr(bean.Description),
-		Favicon:     nullStringPtr(bean.Favicon),
-		RSSFeed:     nullStringPtr(bean.RSSFeed),
-	}
-}
-
-func toArticleTrend(bean *db.Bean) *Trend {
-	return &Trend{
-		Likes:       nullInt64Ptr(bean.Likes),
-		Comments:    nullInt64Ptr(bean.Comments),
-		Shares:      nullInt64Ptr(bean.Shares),
-		Subscribers: nullInt64Ptr(bean.Subscribers),
-		Related:     nullInt64Ptr(bean.Related),
-		TrendScore:  nullFloat64Ptr(bean.TrendScore),
-	}
+	return nil
 }
 
 func toArticleDocuments(beans []db.Bean) []ArticleDocument {
@@ -259,7 +255,7 @@ type ArticleCollectionResponse struct {
 
 // ArticleDetailResponse names the Article detail schema for Swagger.
 type ArticleDetailResponse struct {
-	Data ArticleDocument `json:"data" binding:"required"`
+	Data ArticleDetail `json:"data" binding:"required"`
 }
 
 // SourceCollectionResponse names the Source collection schema for Swagger.
@@ -319,11 +315,11 @@ func concatArrays(arrays ...[]string) []string {
 
 // StoryArticlePreviewDocument is a compact Article preview for Story top_articles.
 type StoryArticlePreviewDocument struct {
-	ID          uuid.UUID      `json:"id" swaggertype:"string" format:"uuid"`
-	URL         string         `json:"url"`
-	Title       string         `json:"title"`
-	PublishedAt time.Time      `json:"published_at" swaggertype:"string" format:"date-time"`
-	Source      SourceDocument `json:"source"`
+	ID          uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
+	URL         string          `json:"url"`
+	Title       string          `json:"title"`
+	PublishedAt time.Time       `json:"published_at" swaggertype:"string" format:"date-time"`
+	Source      *SourceDocument `json:"source"`
 }
 
 func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
@@ -332,7 +328,7 @@ func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
 		URL:         bean.URL,
 		Title:       bean.Title.String,
 		PublishedAt: bean.Created,
-		Source:      *toArticleSource(bean),
+		Source:      nullArticleSourcePtr(bean),
 	}
 }
 
