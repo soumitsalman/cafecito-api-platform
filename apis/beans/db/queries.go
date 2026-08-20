@@ -12,6 +12,10 @@ import (
 	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
 )
 
+const (
+	MIN_CANDIDATE_LIMIT = 256
+)
+
 var (
 	ErrNonExistentID = errors.New("Item with this ID does not exist")
 )
@@ -31,7 +35,7 @@ func finalizePage[T any](rows []T, limit int, cursor_of func(item T) *Cursor) Pa
 	return Page[T]{Items: items, NextCursor: next}
 }
 
-func buildBeanSelect(columns string, full_content bool) string {
+func buildSelect(columns string, full_content bool) string {
 	if columns == "" {
 		columns = _BEAN_COLUMNS_ALL
 	}
@@ -41,9 +45,9 @@ func buildBeanSelect(columns string, full_content bool) string {
 	return columns
 }
 
-// buildArticleFilters constructs the shared WHERE clause predicates for article queries.
+// buildScalarWhere constructs the shared WHERE clause predicates for article queries.
 // All filters reference columns on the beans table (or views that inherit beans.*).
-func buildArticleFilters(filters *Filters) ([]string, pgx.NamedArgs) {
+func buildScalarWhere(filters *Filters) ([]string, pgx.NamedArgs) {
 	where := []string{}
 	params := pgx.NamedArgs{}
 
@@ -129,21 +133,35 @@ func buildArticleFilters(filters *Filters) ([]string, pgx.NamedArgs) {
 	return where, params
 }
 
-// buildScalarQuery constructs the query for latest and trending beans
+// buildScalarOrderQuery constructs the query for latest and trending beans
 // table: latest_beans_view or trending_beans_view or aggregated_beans_view.
-// sort: created or trend_score
-func buildScalarQuery(table string, filters *Filters, page *PageRequest, sort string, columns string) (string, pgx.NamedArgs) {
-	where, params := buildArticleFilters(filters)
-	order_by := fmt.Sprintf("%s DESC, id DESC", sort)
+// sort: Present in page.Cursor.Sort. page must have a cursor and a valid sort value or else the query will fail
+// if filters.Embedding is present, then filter.Distance must be present. Default/not-assigned value = 0.0, returns exact match
+func buildScalarOrderQuery(table string, filters *Filters, page *PageRequest, select_columns string) (string, pgx.NamedArgs) {
+	where, params := buildScalarWhere(filters)
+	if len(filters.Embedding) > 0 {
+		where = append(where, "embedding <=> @embedding <= @distance")
+		params["embedding"] = pgvector.NewVector(filters.Embedding)
+		params["distance"] = filters.Distance
+	}
+
+	order_by := ""
 	if page.Cursor != nil {
-		if page.Cursor.Created != nil && page.Cursor.ID != nil {
-			where = append(where, "(created, id) < (@cursor_created, @cursor_id)")
-			params["cursor_created"] = *page.Cursor.Created
-			params["cursor_id"] = *page.Cursor.ID
-		} else if page.Cursor.TrendScore != nil && page.Cursor.ID != nil {
-			where = append(where, "(trend_score, id) < (@cursor_trend_score, @cursor_id)")
-			params["cursor_trend_score"] = *page.Cursor.TrendScore
-			params["cursor_id"] = *page.Cursor.ID
+		switch page.Cursor.Sort {
+		case SORT_RECENT:
+			order_by = "created DESC, id DESC"
+			if page.Cursor.ID != nil {
+				where = append(where, fmt.Sprintf("(created, id) < (@cursor_value, @cursor_id)"))
+				params["cursor_value"] = *page.Cursor.Created
+				params["cursor_id"] = *page.Cursor.ID
+			}
+		case SORT_TRENDING:
+			order_by = "trend_score DESC, id DESC"
+			if page.Cursor.ID != nil {
+				where = append(where, fmt.Sprintf("(trend_score, id) < (@cursor_value, @cursor_id)"))
+				params["cursor_value"] = *page.Cursor.TrendScore
+				params["cursor_id"] = *page.Cursor.ID
+			}
 		}
 	}
 	where_expr := ""
@@ -158,7 +176,7 @@ func buildScalarQuery(table string, filters *Filters, page *PageRequest, sort st
 		%s -- WHERE
 		ORDER BY %s -- order by created DESC, id DESC or trend_score DESC, id DESC
 		LIMIT @limit`,
-		buildBeanSelect(columns, filters.FullContent),
+		buildSelect(select_columns, filters.FullContent),
 		table,
 		where_expr,
 		order_by,
@@ -166,11 +184,19 @@ func buildScalarQuery(table string, filters *Filters, page *PageRequest, sort st
 	return query, params
 }
 
-// buildVectorSearch constructs the vector (semantic) search query for both latest and trending beans
-// table: latest_beans_view or trending_beans_view or aggregated_beans_view with cosine distance CTE.
-func buildVectorSearch(table string, filters *Filters, page *PageRequest, columns string) (string, pgx.NamedArgs) {
-	where, params := buildArticleFilters(filters)
+func searchCandidateLimit(limit int) int {
+	candidate_limit := limit * 4
+	if candidate_limit < MIN_CANDIDATE_LIMIT {
+		candidate_limit = MIN_CANDIDATE_LIMIT
+	}
+	return candidate_limit
+}
 
+// buildKNNSearchQuery constructs the vector (semantic) search query for both latest and trending beans
+// table: latest_beans_view or trending_beans_view or aggregated_beans_view with cosine distance CTE.
+// filters.Embedding, filters.Limit must be present. filters.Distance will be considered only if > 0.0
+func buildKNNSearchQuery(table string, filters *Filters, page *PageRequest, columns string) (string, pgx.NamedArgs) {
+	where, params := buildScalarWhere(filters)
 	if page.Cursor != nil && page.Cursor.Distance != nil && page.Cursor.ID != nil {
 		where = append(where, "(embedding <=> @embedding, id) > (@cursor_distance, @cursor_id)")
 		params["cursor_distance"] = *page.Cursor.Distance
@@ -181,12 +207,12 @@ func buildVectorSearch(table string, filters *Filters, page *PageRequest, column
 		inner_where_expr = "WHERE " + strings.Join(where, " AND ")
 	}
 	outer_where_expr := ""
-	if filters.Distance != nil {
+	if filters.Distance > 0 {
 		outer_where_expr = "WHERE distance <= @distance"
-		params["distance"] = *filters.Distance
+		params["distance"] = filters.Distance
 	}
 	params["embedding"] = pgvector.NewVector(filters.Embedding)
-	params["candidate_limit"] = page.Limit * 4
+	params["candidate_limit"] = searchCandidateLimit(page.Limit)
 	params["limit"] = page.Limit + 1
 
 	query := fmt.Sprintf(`
@@ -203,45 +229,63 @@ func buildVectorSearch(table string, filters *Filters, page *PageRequest, column
 		LIMIT @limit`,
 		table,
 		inner_where_expr,
-		buildBeanSelect(columns, filters.FullContent),
+		buildSelect(columns, filters.FullContent),
 		outer_where_expr,
 	)
 	return query, params
 }
 
 // TrendingArticles returns articles ranked by trend_score descending.
-func (b *PGSack) QueryTrendingBeans(ctx context.Context, filters Filters, page PageRequest, columns string) (Page[Bean], error) {
-	var query string
-	var params pgx.NamedArgs
-	if len(filters.Embedding) > 0 {
-		query, params = buildVectorSearch("trending_beans_view", &filters, &page, columns)
-	} else {
-		query, params = buildScalarQuery("trending_beans_view", &filters, &page, "trend_score", columns)
+// Forces sort by created descending
+func (b *PGSack) QueryLatestBeans(ctx context.Context, filters Filters, page PageRequest, columns string) (Page[Bean], error) {
+	if page.Cursor == nil {
+		page.Cursor = &Cursor{Sort: SORT_RECENT}
 	}
+	page.Cursor.Sort = SORT_RECENT
 
+	query, params := buildScalarOrderQuery("latest_beans_view", &filters, &page, columns)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
 	if err != nil {
 		return Page[Bean]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
-		if len(filters.Embedding) > 0 {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &bean.ID, Distance: &bean.Distance.Float64}
-		} else {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &bean.ID, TrendScore: &bean.TrendScore.Float64}
-		}
+		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RECENT, ID: &bean.ID, Created: &bean.Created}
 	}), nil
 }
 
-// QueryArticles returns articles matching filters, ordered by created descending.
-// Dispatches to vector (cosine distance CTE) or scalar query based on whether an
-// embedding is present in the filters.
+// TrendingArticles returns articles ranked by trend_score descending.
+// Forces sort by trend_score descending
+func (b *PGSack) QueryTrendingBeans(ctx context.Context, filters Filters, page PageRequest, columns string) (Page[Bean], error) {
+	if page.Cursor == nil {
+		page.Cursor = &Cursor{Sort: SORT_TRENDING}
+	}
+	page.Cursor.Sort = SORT_TRENDING
+	query, params := buildScalarOrderQuery("trending_beans_view", &filters, &page, columns)
+	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
+	if err != nil {
+		return Page[Bean]{}, err
+	}
+	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
+		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_TRENDING, ID: &bean.ID, TrendScore: &bean.TrendScore.Float64}
+	}), nil
+}
+
+// QueryBeans returns beans matching filters, ordered by created descending.
+// Dispatches to vector (cosine distance CTE) or scalar query based on whether an embedding is present in the filters.
+// Forces sort by created descending if no embedding is present.
+// Forces sort by relevance if an embedding is present and filters.Distance > 0.0.
 func (b *PGSack) QueryBeans(ctx context.Context, filters Filters, page PageRequest, columns string) (Page[Bean], error) {
+	if page.Cursor == nil {
+		page.Cursor = &Cursor{}
+	}
 	var query string
 	var params pgx.NamedArgs
 	if len(filters.Embedding) > 0 {
-		query, params = buildVectorSearch("latest_beans_view", &filters, &page, columns)
+		page.Cursor.Sort = SORT_RELEVANT
+		query, params = buildKNNSearchQuery("latest_beans_view", &filters, &page, columns)
 	} else {
-		query, params = buildScalarQuery("latest_beans_view", &filters, &page, "created", columns)
+		page.Cursor.Sort = SORT_RECENT
+		query, params = buildScalarOrderQuery("latest_beans_view", &filters, &page, columns)
 	}
 
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
@@ -294,7 +338,7 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Fi
 		return Page[Bean]{}, err
 	}
 
-	where, params := buildArticleFilters(&filters)
+	where, params := buildScalarWhere(&filters)
 	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.ID != nil {
 		where = append(where, "(created, id) < (@cursor_created, @cursor_id)")
 		params["cursor_created"] = *page.Cursor.Created
@@ -321,7 +365,7 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Fi
 			%s -- additional where
 		ORDER BY created DESC, id DESC
 		LIMIT @limit`,
-		buildBeanSelect(columns, filters.FullContent),
+		buildSelect(columns, filters.FullContent),
 		where_expr,
 	)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
@@ -526,7 +570,7 @@ func storyCandidateLimit(limit int) int {
 }
 
 func buildStoryMemberWhere(filters *Filters) ([]string, pgx.NamedArgs) {
-	where, params := buildArticleFilters(filters)
+	where, params := buildScalarWhere(filters)
 	where = append([]string{"cluster_id IS NOT NULL", "cluster_id <> ''"}, where...)
 	return where, params
 }
@@ -538,48 +582,44 @@ func (b *PGSack) StoryExists(ctx context.Context, story_id string) (bool, error)
 	return utils.FetchOneScalar[bool](
 		ctx,
 		b.db,
-		`SELECT EXISTS(SELECT 1 FROM latest_beans_view WHERE cluster_id = @cluster_id)`,
+		`SELECT EXISTS(SELECT 1 FROM trend_aggregates WHERE cluster_id = @cluster_id)`,
 		pgx.NamedArgs{"cluster_id": story_id},
 	)
 }
 
-func (b *PGSack) GetStory(ctx context.Context, story_id string) (Story, error) {
+func (b *PGSack) GetStory(ctx context.Context, story_id string) (Cluster, error) {
 	if story_id == "" {
-		return Story{}, ErrNonExistentID
+		return Cluster{}, ErrNonExistentID
 	}
 	stories, err := b.hydrateStories(ctx, []string{story_id})
 	if err != nil {
-		return Story{}, err
+		return Cluster{}, err
 	}
 	if len(stories) == 0 {
-		return Story{}, ErrNonExistentID
+		return Cluster{}, ErrNonExistentID
 	}
 	return stories[0], nil
 }
 
-func (b *PGSack) QueryStories(ctx context.Context, filters Filters, page PageRequest, min_article_count int) (Page[Story], error) {
-	if min_article_count < 2 {
-		min_article_count = 2
-	}
-
-	var rows []storyPageRow
+func (b *PGSack) QueryStories(ctx context.Context, filters Filters, page PageRequest) (Page[Cluster], error) {
+	var rows []clusterBase
 	var err error
 	if len(filters.Embedding) > 0 {
-		rows, err = b.queryStoryPageByRelevance(ctx, &filters, &page, min_article_count)
+		rows, err = b.queryStoryPageByRelevance(ctx, &filters, &page)
 	} else {
-		rows, err = b.queryStoryPageByRecency(ctx, &filters, &page, min_article_count)
+		rows, err = b.queryStoryPageByRecency(ctx, &filters, &page)
 	}
 	if err != nil {
-		return Page[Story]{}, err
+		return Page[Cluster]{}, err
 	}
 
-	paged := finalizePage(rows, page.Limit, func(row storyPageRow) *Cursor {
+	paged := finalizePage(rows, page.Limit, func(row clusterBase) *Cursor {
 		id := row.ID
 		if len(filters.Embedding) > 0 {
 			distance := row.Distance.Float64
 			return &Cursor{Version: _CURSOR_VERSION, TextKey: &id, Distance: &distance}
 		}
-		created := row.LastPublishedAt
+		created := row.LastCreated
 		return &Cursor{Version: _CURSOR_VERSION, TextKey: &id, Created: &created}
 	})
 
@@ -589,49 +629,48 @@ func (b *PGSack) QueryStories(ctx context.Context, filters Filters, page PageReq
 	}
 	stories, err := b.hydrateStories(ctx, ids)
 	if err != nil {
-		return Page[Story]{}, err
+		return Page[Cluster]{}, err
 	}
-	return Page[Story]{Items: stories, NextCursor: paged.NextCursor}, nil
+	return Page[Cluster]{Items: stories, NextCursor: paged.NextCursor}, nil
 }
 
-func (b *PGSack) queryStoryPageByRecency(ctx context.Context, filters *Filters, page *PageRequest, min_article_count int) ([]storyPageRow, error) {
+func (b *PGSack) queryStoryPageByRecency(ctx context.Context, filters *Filters, page *PageRequest) ([]clusterBase, error) {
 	where, params := buildStoryMemberWhere(filters)
 	cursor_where := ""
 	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.TextKey != nil {
-		cursor_where = "WHERE (last_published_at, id) < (@cursor_created, @cursor_id)"
+		cursor_where = "WHERE (last_created, id) < (@cursor_created, @cursor_id)"
 		params["cursor_created"] = *page.Cursor.Created
 		params["cursor_id"] = *page.Cursor.TextKey
 	}
-	params["min_article_count"] = min_article_count
+	params["min_bean_count"] = filters.MinBeanCount
 	params["limit"] = page.Limit + 1
 
 	query := fmt.Sprintf(`
-		WITH matched_stories AS (
+		WITH matched AS (
 			SELECT DISTINCT cluster_id
-			FROM latest_beans_view
+			FROM trending_beans_view
 			WHERE %s
 		),
-		story_stats AS (
+		stats AS (
 			SELECT
 				b.cluster_id AS id,
-				MAX(b.created) AS last_published_at
-			FROM latest_beans_view b
-			INNER JOIN matched_stories m ON m.cluster_id = b.cluster_id
+				MAX(b.created) AS last_created
+			FROM trending_beans_view b
+			INNER JOIN matched m ON m.cluster_id = b.cluster_id
 			GROUP BY b.cluster_id
-			HAVING COUNT(*) >= @min_article_count
+			HAVING COUNT(*) >= @min_bean_count
 		)
-		SELECT id, last_published_at
-		FROM story_stats
+		SELECT * FROM stats
 		%s
-		ORDER BY last_published_at DESC, id DESC
+		ORDER BY last_created DESC, id DESC
 		LIMIT @limit`,
 		strings.Join(where, " AND "),
 		cursor_where,
 	)
-	return utils.FetchAll[storyPageRow](ctx, b.db, query, params)
+	return utils.FetchAll[clusterBase](ctx, b.db, query, params)
 }
 
-func (b *PGSack) queryStoryPageByRelevance(ctx context.Context, filters *Filters, page *PageRequest, min_article_count int) ([]storyPageRow, error) {
+func (b *PGSack) queryStoryPageByRelevance(ctx context.Context, filters *Filters, page *PageRequest) ([]clusterBase, error) {
 	where, params := buildStoryMemberWhere(filters)
 	cursor_where := ""
 	if page.Cursor != nil && page.Cursor.Distance != nil && page.Cursor.TextKey != nil {
@@ -640,41 +679,40 @@ func (b *PGSack) queryStoryPageByRelevance(ctx context.Context, filters *Filters
 		params["cursor_id"] = *page.Cursor.TextKey
 	}
 	distance_having := ""
-	if filters.Distance != nil {
+	if filters.Distance > 0 {
 		distance_having = "HAVING MIN(distance) <= @distance"
-		params["distance"] = *filters.Distance
+		params["distance"] = filters.Distance
 	}
 	params["embedding"] = pgvector.NewVector(filters.Embedding)
 	params["candidate_limit"] = storyCandidateLimit(page.Limit)
-	params["min_article_count"] = min_article_count
+	params["min_bean_count"] = filters.MinBeanCount
 	params["limit"] = page.Limit + 1
 
 	query := fmt.Sprintf(`
 		WITH nearest AS MATERIALIZED (
 			SELECT cluster_id, embedding <=> @embedding AS distance
-			FROM latest_beans_view
+			FROM trending_beans_view
 			WHERE %s
 			ORDER BY distance ASC
 			LIMIT @candidate_limit
 		),
 		matched AS (
-			SELECT cluster_id, MIN(distance) AS best_distance
+			SELECT cluster_id, MIN(distance) AS distance
 			FROM nearest
 			GROUP BY cluster_id
 			%s
 		),
-		story_stats AS (
+		stats AS (
 			SELECT
 				m.cluster_id AS id,
-				m.best_distance AS distance,
-				MAX(b.created) AS last_published_at
+				m.distance AS distance,
+				MAX(b.created) AS last_created
 			FROM matched m
-			INNER JOIN latest_beans_view b ON b.cluster_id = m.cluster_id
-			GROUP BY m.cluster_id, m.best_distance
-			HAVING COUNT(*) >= @min_article_count
+			INNER JOIN trending_beans_view b ON b.cluster_id = m.cluster_id
+			GROUP BY m.cluster_id, m.distance
+			HAVING COUNT(*) >= @min_bean_count
 		)
-		SELECT id, last_published_at, distance
-		FROM story_stats
+		SELECT * FROM stats
 		%s
 		ORDER BY distance ASC, id ASC
 		LIMIT @limit`,
@@ -682,97 +720,78 @@ func (b *PGSack) queryStoryPageByRelevance(ctx context.Context, filters *Filters
 		distance_having,
 		cursor_where,
 	)
-	return utils.FetchAll[storyPageRow](ctx, b.db, query, params)
+	return utils.FetchAll[clusterBase](ctx, b.db, query, params)
 }
 
-func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Story, error) {
+func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Cluster, error) {
 	if len(ids) == 0 {
-		return []Story{}, nil
+		return []Cluster{}, nil
 	}
 	params := pgx.NamedArgs{"ids": ids}
 	stats_query := `
-		WITH members AS (
-			SELECT cluster_id, created, source, source_id, categories, regions, entities
-			FROM latest_beans_view
-			WHERE cluster_id = ANY(@ids)
+		WITH members AS MATERIALIZED (
+			SELECT tr.cluster_id, b.created, b.source, b.categories, b.regions, b.entities
+			FROM beans b
+			INNER JOIN trend_aggregates tr ON b.url = tr.url
+			WHERE tr.cluster_id = ANY(@ids)
 		),
 		stats AS (
 			SELECT
 				cluster_id AS id,
-				MIN(created) AS first_published_at,
-				MAX(created) AS last_published_at,
-				COUNT(*)::int AS article_count,
+				MIN(created) AS first_created,
+				MAX(created) AS last_created,
+				COUNT(*)::int AS bean_count,
 				COUNT(DISTINCT source)::int AS source_count
 			FROM members
 			GROUP BY cluster_id
 		),
-		cat_ranked AS (
-			SELECT cluster_id, val, cnt,
-				ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY cnt DESC, val ASC) AS rn
-			FROM (
-				SELECT cluster_id, val, COUNT(*) AS cnt
-				FROM members, LATERAL unnest(COALESCE(categories, '{}')) AS val
-				GROUP BY cluster_id, val
-			) cat_freq
+		label_freq AS (
+			SELECT m.cluster_id, lbl.type, lbl.val, COUNT(*) AS cnt
+			FROM members m
+			CROSS JOIN LATERAL (
+				SELECT 'category' AS type, v AS val FROM unnest(COALESCE(m.categories, '{}')) AS v
+				UNION ALL
+				SELECT 'region', v FROM unnest(COALESCE(m.regions, '{}')) AS v
+				UNION ALL
+				SELECT 'entity', v FROM unnest(COALESCE(m.entities, '{}')) AS v
+			) lbl
+			GROUP BY m.cluster_id, lbl.type, lbl.val
+		),
+		ranked AS (
+			SELECT cluster_id, type, val, cnt,
+				ROW_NUMBER() OVER (PARTITION BY cluster_id, type ORDER BY cnt DESC, val ASC) AS rn
+			FROM label_freq
 		),
 		cat_agg AS (
 			SELECT cluster_id, ARRAY_AGG(val ORDER BY cnt DESC, val ASC) AS categories
-			FROM cat_ranked
-			WHERE rn <= 10
-			GROUP BY cluster_id
-		),
-		region_ranked AS (
-			SELECT cluster_id, val, cnt,
-				ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY cnt DESC, val ASC) AS rn
-			FROM (
-				SELECT cluster_id, val, COUNT(*) AS cnt
-				FROM members, LATERAL unnest(COALESCE(regions, '{}')) AS val
-				GROUP BY cluster_id, val
-			) region_freq
+			FROM ranked WHERE type = 'category' AND rn <= 10 GROUP BY cluster_id
 		),
 		region_agg AS (
 			SELECT cluster_id, ARRAY_AGG(val ORDER BY cnt DESC, val ASC) AS regions
-			FROM region_ranked
-			WHERE rn <= 10
-			GROUP BY cluster_id
-		),
-		entity_ranked AS (
-			SELECT cluster_id, val, cnt,
-				ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY cnt DESC, val ASC) AS rn
-			FROM (
-				SELECT cluster_id, val, COUNT(*) AS cnt
-				FROM members, LATERAL unnest(COALESCE(entities, '{}')) AS val
-				GROUP BY cluster_id, val
-			) entity_freq
+			FROM ranked WHERE type = 'region' AND rn <= 10 GROUP BY cluster_id
 		),
 		entity_agg AS (
 			SELECT cluster_id, ARRAY_AGG(val ORDER BY cnt DESC, val ASC) AS entities
-			FROM entity_ranked
-			WHERE rn <= 10
-			GROUP BY cluster_id
+			FROM ranked WHERE type = 'entity' AND rn <= 10 GROUP BY cluster_id
+		),
+		tag_freq AS (
+			SELECT cluster_id, val, SUM(cnt) AS cnt
+			FROM label_freq GROUP BY cluster_id, val
 		),
 		tag_ranked AS (
 			SELECT cluster_id, val, cnt,
 				ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY cnt DESC, val ASC) AS rn
-			FROM (
-				SELECT cluster_id, val, COUNT(*) AS cnt
-				FROM members, LATERAL unnest(
-					COALESCE(categories, '{}') || COALESCE(regions, '{}') || COALESCE(entities, '{}')
-				) AS val
-				GROUP BY cluster_id, val
-			) tag_freq
+			FROM tag_freq
 		),
 		tag_agg AS (
 			SELECT cluster_id, ARRAY_AGG(val ORDER BY cnt DESC, val ASC) AS tags
-			FROM tag_ranked
-			WHERE rn <= 10
-			GROUP BY cluster_id
+			FROM tag_ranked WHERE rn <= 10 GROUP BY cluster_id
 		)
 		SELECT
 			s.id,
-			s.first_published_at,
-			s.last_published_at,
-			s.article_count,
+			s.first_created,
+			s.last_created,
+			s.bean_count,
 			s.source_count,
 			COALESCE(c.categories, '{}') AS categories,
 			COALESCE(r.regions, '{}') AS regions,
@@ -784,11 +803,11 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Story, err
 		LEFT JOIN entity_agg e ON e.cluster_id = s.id
 		LEFT JOIN tag_agg t ON t.cluster_id = s.id`
 
-	stats, err := utils.FetchAll[Story](ctx, b.db, stats_query, params)
+	stats, err := utils.FetchAll[Cluster](ctx, b.db, stats_query, params)
 	if err != nil {
 		return nil, err
 	}
-	by_id := make(map[string]Story, len(stats))
+	by_id := make(map[string]Cluster, len(stats))
 	for _, story := range stats {
 		story.Categories = coalesceStrings(story.Categories)
 		story.Regions = coalesceStrings(story.Regions)
@@ -800,16 +819,17 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Story, err
 	top_query := fmt.Sprintf(`
 		SELECT %s
 		FROM (
-			SELECT *,
+			SELECT %s,
 				ROW_NUMBER() OVER (
 					PARTITION BY cluster_id
 					ORDER BY trend_score DESC NULLS LAST, created DESC, id DESC
 				) AS rn
-			FROM latest_beans_view
+			FROM trending_beans_view
 			WHERE cluster_id = ANY(@ids)
 		) ranked
 		WHERE rn <= 3
 		ORDER BY cluster_id, rn`,
+		BEAN_COLUMNS_WITHOUT_TREND,
 		BEAN_COLUMNS_WITHOUT_TREND,
 	)
 	articles, err := utils.FetchAll[Bean](ctx, b.db, top_query, params)
@@ -824,7 +844,7 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []string) ([]Story, err
 		grouped[article.ClusterID.String] = append(grouped[article.ClusterID.String], article)
 	}
 
-	stories := make([]Story, 0, len(ids))
+	stories := make([]Cluster, 0, len(ids))
 	for _, id := range ids {
 		story, ok := by_id[id]
 		if !ok {

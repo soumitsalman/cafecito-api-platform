@@ -177,7 +177,7 @@ func TestVectorSearchBeans(t *testing.T) {
 	distance := 0.4
 	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{
 		Embedding:   test_query_embedding,
-		Distance:    &distance,
+		Distance:    distance,
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
@@ -189,6 +189,20 @@ func TestVectorSearchBeans(t *testing.T) {
 	pp.Println("VECTOR_SEARCH", page.Items)
 }
 
+func TestVectorSearchLatestBeans(t *testing.T) {
+	pg_sack := setupTestDB()
+	defer pg_sack.Close()
+
+	distance := 0.4
+	page, err := pg_sack.QueryLatestBeans(test_ctx, db.Filters{
+		Embedding: test_query_embedding,
+		Distance:  distance,
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	require.NoError(t, err)
+	assert.NotEmpty(t, page.Items)
+	pp.Println("VECTOR_LATEST", page.Items)
+}
+
 func TestVectorSearchTrendingBeans(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
@@ -196,8 +210,8 @@ func TestVectorSearchTrendingBeans(t *testing.T) {
 	distance := 0.4
 	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
 		Embedding: test_query_embedding,
-		Distance:  &distance,
-	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+		Distance:  distance,
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
 	assert.NotEmpty(t, page.Items)
 	pp.Println("VECTOR_TRENDING", page.Items)
@@ -462,13 +476,14 @@ func TestQueryStories(t *testing.T) {
 	defer pg_sack.Close()
 
 	page, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom: testSearchFrom(),
-	}, db.PageRequest{Limit: 5}, 2)
+		CreatedFrom:  testSearchFrom(),
+		MinBeanCount: 2,
+	}, db.PageRequest{Limit: 5})
 	require.NoError(t, err)
 	require.NotEmpty(t, page.Items)
 	for _, story := range page.Items {
 		assert.NotEmpty(t, story.ID)
-		assert.GreaterOrEqual(t, story.ArticleCount, 2)
+		assert.GreaterOrEqual(t, story.BeanCount, 2)
 		assert.GreaterOrEqual(t, story.SourceCount, 1)
 		assert.NotEmpty(t, story.TopArticles)
 		assert.LessOrEqual(t, len(story.TopArticles), 3)
@@ -485,8 +500,9 @@ func TestGetStory(t *testing.T) {
 	defer pg_sack.Close()
 
 	list, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom: testSearchFrom(),
-	}, db.PageRequest{Limit: 1}, 2)
+		CreatedFrom:  testSearchFrom(),
+		MinBeanCount: 2,
+	}, db.PageRequest{Limit: 1})
 	require.NoError(t, err)
 	require.NotEmpty(t, list.Items)
 	want := list.Items[0]
@@ -495,7 +511,7 @@ func TestGetStory(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, story.IsZero())
 	assert.Equal(t, want.ID, story.ID)
-	assert.GreaterOrEqual(t, story.ArticleCount, 2)
+	assert.GreaterOrEqual(t, story.BeanCount, 2)
 	assert.NotEmpty(t, story.TopArticles)
 	pp.Println("STORY", story)
 }
@@ -514,8 +530,9 @@ func TestQueryStoryArticles(t *testing.T) {
 	defer pg_sack.Close()
 
 	list, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom: testSearchFrom(),
-	}, db.PageRequest{Limit: 1}, 2)
+		CreatedFrom:  testSearchFrom(),
+		MinBeanCount: 2,
+	}, db.PageRequest{Limit: 1})
 	require.NoError(t, err)
 	require.NotEmpty(t, list.Items)
 	story_id := list.Items[0].ID
@@ -538,15 +555,15 @@ func TestQueryStoriesCursor(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	filters := db.Filters{CreatedFrom: testSearchFrom()}
-	first, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2}, 2)
+	filters := db.Filters{CreatedFrom: testSearchFrom(), MinBeanCount: 2}
+	first, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2})
 	require.NoError(t, err)
 	require.NotEmpty(t, first.Items)
 	if first.NextCursor == nil {
 		t.Skip("not enough stories for a second page")
 	}
 
-	second, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2, Cursor: first.NextCursor}, 2)
+	second, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2, Cursor: first.NextCursor})
 	require.NoError(t, err)
 	require.NotEmpty(t, second.Items)
 	assert.NotEqual(t, first.Items[0].ID, second.Items[0].ID)

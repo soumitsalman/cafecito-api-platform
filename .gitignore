@@ -4,7 +4,16 @@ dist/
 node_modules/
 .env
 .env.zuplo
+
+
+# graphify and coding agents
 graphify-out
+.codex
+.cursor
+.opencode
+.claude
+.agents
+skills-lock.json
 
 # Go apis
 .beansack

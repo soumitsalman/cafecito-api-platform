@@ -15,10 +15,6 @@ const (
 	MAX_FILTER_VALUES    = 128
 )
 
-type bindableParams interface {
-	shouldBind(c *gin.Context) error
-}
-
 // paginationParams is embedded by collection requests for B01, B03-B07, B12,
 // and B14-B18. B02, B10, and B13 are detail routes without collection pagination.
 type paginationParams struct {
@@ -53,35 +49,20 @@ type vectorSearchParams struct {
 	ScoreThreshold float64 `form:"score_threshold" binding:"min=0,max=1"`
 }
 
-// articleHeadlineParams is the B04 GET /articles/top-headlines target request.
-// Its fixed recent window intentionally has no from or to parameters.
-// getTopHeadlinesArticles in routes.go binds this target request.
-type headlinesParams struct {
-	articleFilterParams
-	vectorSearchParams
-	paginationParams
-}
-
-func (params *headlinesParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindQuery(params); err != nil {
-		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
-	}
-	return nil
-}
-
-// articleFeedParams is shared by B03 GET /articles/latest and B05 GET /articles/trending target requests.
-// getLatestArticles and getTrendingArticles in routes.go bind this type.
+// articleFeedParams is shared by B03 GET /articles/latest, B04 GET /articles/top-headlines, and B05 GET /articles/trending target requests.
+// getLatestArticles, getTopHeadlines, and getTrendingArticles in routes.go bind this type.
 type articleFeedParams struct {
 	articleFilterParams
 	vectorSearchParams
-	From time.Time `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
-	To   time.Time `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	paginationParams
 }
 
 func (params *articleFeedParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
+	}
+	if len(params.Q) > 0 && params.ScoreThreshold == 0 {
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "`score_threshold` is required when `q` is present")
 	}
 	return nil
 }
@@ -92,6 +73,8 @@ type articleSearchParams struct {
 	articleFeedParams
 	IDs  []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	URLs []string    `form:"urls" collection_format:"csv" binding:"max=100"`
+	From time.Time   `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
+	To   time.Time   `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	paginationParams
 }
 

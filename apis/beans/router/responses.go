@@ -2,7 +2,7 @@ package router
 
 import (
 	"database/sql"
-	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,6 +50,44 @@ type SourceDocument struct {
 	RSSFeed     *string   `json:"rss_feed_url,omitempty"`
 }
 
+func toSourceDocument(source *db.Source) *SourceDocument {
+	doc := &SourceDocument{
+		ID:         source.ID,
+		BaseURL:    source.BaseURL,
+		DomainName: source.DomainName,
+	}
+	if source.SiteName.Valid {
+		doc.SiteName = &source.SiteName.String
+	}
+	if source.Description.Valid {
+		doc.Description = &source.Description.String
+	}
+	if source.Favicon.Valid {
+		doc.Favicon = &source.Favicon.String
+	}
+	if source.RSSFeed.Valid {
+		doc.RSSFeed = &source.RSSFeed.String
+	}
+	return doc
+}
+
+func toSourceDocuments(sources []db.Source) []SourceDocument {
+	return datautils.Transform(sources, func(source *db.Source) SourceDocument {
+		return *toSourceDocument(source)
+	})
+
+}
+
+// Trend contains nullable attention metrics for headline and trending Articles.
+type Trend struct {
+	Likes       *int64   `json:"likes,omitempty"`
+	Comments    *int64   `json:"comments,omitempty"`
+	Shares      *int64   `json:"mentions,omitempty"`
+	Subscribers *int64   `json:"audience,omitempty"`
+	Related     *int64   `json:"related,omitempty"`
+	TrendScore  *float64 `json:"trend_score,omitempty"`
+}
+
 // ArticleDocument is the normalized public Article payload.
 type ArticleDocument struct {
 	ID         uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
@@ -91,15 +129,7 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 		StoryID:    nullStringPtr(bean.ClusterID),
 	}
 	if bean.SourceID != uuid.Nil {
-		doc.Source = &SourceDocument{
-			ID:          bean.SourceID,
-			BaseURL:     bean.BaseURL.String,
-			DomainName:  bean.Source,
-			SiteName:    nullStringPtr(bean.SiteName),
-			Description: nullStringPtr(bean.Description),
-			Favicon:     nullStringPtr(bean.Favicon),
-			RSSFeed:     nullStringPtr(bean.RSSFeed),
-		}
+		doc.Source = toArticleSource(bean)
 	}
 	if bean.Likes.Valid || bean.Comments.Valid || bean.Shares.Valid || bean.Subscribers.Valid || bean.Related.Valid {
 		doc.Trend = &Trend{
@@ -113,19 +143,63 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 	return doc
 }
 
+func toArticleSource(bean *db.Bean) *SourceDocument {
+	return &SourceDocument{
+		ID:          bean.SourceID,
+		BaseURL:     bean.BaseURL.String,
+		DomainName:  bean.Source,
+		SiteName:    nullStringPtr(bean.SiteName),
+		Description: nullStringPtr(bean.Description),
+		Favicon:     nullStringPtr(bean.Favicon),
+		RSSFeed:     nullStringPtr(bean.RSSFeed),
+	}
+}
+
+func toArticleTrend(bean *db.Bean) *Trend {
+	return &Trend{
+		Likes:       nullInt64Ptr(bean.Likes),
+		Comments:    nullInt64Ptr(bean.Comments),
+		Shares:      nullInt64Ptr(bean.Shares),
+		Subscribers: nullInt64Ptr(bean.Subscribers),
+		Related:     nullInt64Ptr(bean.Related),
+		TrendScore:  nullFloat64Ptr(bean.TrendScore),
+	}
+}
+
 func toArticleDocuments(beans []db.Bean) []ArticleDocument {
 	return datautils.Transform(beans, func(bean *db.Bean) ArticleDocument {
 		return *toArticleDocument(bean)
 	})
 }
 
-// Trend contains nullable attention metrics for headline and trending Articles.
-type Trend struct {
-	Likes       *int64 `json:"likes,omitempty"`
-	Comments    *int64 `json:"comments,omitempty"`
-	Shares      *int64 `json:"mentions,omitempty"`
-	Subscribers *int64 `json:"audience,omitempty"`
-	Related     *int64 `json:"related,omitempty"`
+// ArticleLinks is the ArticleLinks object for the ArticleDocument.
+type ArticleLinks struct {
+	Similar  string `json:"similar,omitempty"`
+	Mentions string `json:"mentions,omitempty"`
+	Story    string `json:"story,omitempty"`
+}
+
+type ArticleDetail struct {
+	*ArticleDocument
+	Links *ArticleLinks `json:"links,omitempty"`
+}
+
+func toArticleDetail(bean *db.Bean) *ArticleDetail {
+	return &ArticleDetail{
+		ArticleDocument: toArticleDocument(bean),
+		Links:           toArticleLinks(bean),
+	}
+}
+
+func toArticleLinks(bean *db.Bean) *ArticleLinks {
+	links := &ArticleLinks{
+		Similar:  fmt.Sprintf("/articles/%s/similar", bean.ID),
+		Mentions: fmt.Sprintf("/articles/%s/mentions", bean.ID),
+	}
+	if bean.ClusterID.Valid {
+		links.Story = fmt.Sprintf("/stories/%s", bean.ClusterID.String)
+	}
+	return links
 }
 
 // MentionEngagement contains nullable observed engagement values.
@@ -144,10 +218,36 @@ type MentionDocument struct {
 	Engagement MentionEngagement `json:"engagement"`
 }
 
+func toMentionDocument(mention *db.Mention) *MentionDocument {
+	return &MentionDocument{
+		URL:        mention.URL,
+		Platform:   mention.Platform,
+		Forum:      nullStringPtr(mention.Forum),
+		ObservedAt: mention.ObservedAt,
+		Engagement: MentionEngagement{
+			Likes:    nullInt64Ptr(mention.Likes),
+			Comments: nullInt64Ptr(mention.Comments),
+			Audience: nullInt64Ptr(mention.Subscribers),
+		},
+	}
+}
+
+func toMentionDocuments(mentions []db.Mention) []MentionDocument {
+	return datautils.Transform(mentions, func(mention *db.Mention) MentionDocument {
+		return *toMentionDocument(mention)
+	})
+}
+
 // TagDocument is the normalized item returned by B14-B18.
 type TagDocument struct {
 	Value string `json:"value"`
 	Type  string `json:"type,omitempty"`
+}
+
+func toTagDocuments(tags []string, TAG_TYPE string) []TagDocument {
+	return datautils.Transform(tags, func(tag *string) TagDocument {
+		return TagDocument{Value: *tag, Type: TAG_TYPE}
+	})
 }
 
 // ArticleCollectionResponse names the Article collection schema for Swagger.
@@ -217,207 +317,38 @@ func concatArrays(arrays ...[]string) []string {
 	return result
 }
 
-func toSourceDocument(source *db.Source) *SourceDocument {
-	doc := &SourceDocument{
-		ID:         source.ID,
-		BaseURL:    source.BaseURL,
-		DomainName: source.DomainName,
-	}
-	if source.SiteName.Valid {
-		doc.SiteName = &source.SiteName.String
-	}
-	if source.Description.Valid {
-		doc.Description = &source.Description.String
-	}
-	if source.Favicon.Valid {
-		doc.Favicon = &source.Favicon.String
-	}
-	if source.RSSFeed.Valid {
-		doc.RSSFeed = &source.RSSFeed.String
-	}
-	return doc
+// StoryArticlePreviewDocument is a compact Article preview for Story top_articles.
+type StoryArticlePreviewDocument struct {
+	ID          uuid.UUID      `json:"id" swaggertype:"string" format:"uuid"`
+	URL         string         `json:"url"`
+	Title       string         `json:"title"`
+	PublishedAt time.Time      `json:"published_at" swaggertype:"string" format:"date-time"`
+	Source      SourceDocument `json:"source"`
 }
 
-func toSourceDocuments(sources []db.Source) []SourceDocument {
-	return datautils.Transform(sources, func(source *db.Source) SourceDocument {
-		return *toSourceDocument(source)
-	})
-
-}
-
-func toTagDocuments(tags []string, TAG_TYPE string) []TagDocument {
-	return datautils.Transform(tags, func(tag *string) TagDocument {
-		return TagDocument{Value: *tag, Type: TAG_TYPE}
-	})
-}
-
-func emptyStrings(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
-}
-
-func storyArticlesPath(story_id string) string {
-	return "/stories/" + story_id + "/articles"
-}
-
-func toCompactSource(bean *db.Bean) CompactSource {
-	return CompactSource{
-		ID:     bean.SourceID,
-		Domain: bean.Source,
-		Name:   nullStringPtr(bean.SiteName),
-		URL:    bean.BaseURL.String,
-	}
-}
-
-func toStoryArticlePreview(bean *db.Bean) StoryArticlePreview {
-	title := ""
-	if bean.Title.Valid {
-		title = bean.Title.String
-	}
-	return StoryArticlePreview{
+func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
+	return StoryArticlePreviewDocument{
 		ID:          bean.ID,
 		URL:         bean.URL,
-		Title:       title,
+		Title:       bean.Title.String,
 		PublishedAt: bean.Created,
-		Source:      toCompactSource(bean),
+		Source:      *toArticleSource(bean),
 	}
 }
 
-func toStoryItem(story *db.Story) StoryItem {
-	previews := datautils.Transform(story.TopArticles, func(bean *db.Bean) StoryArticlePreview {
-		return toStoryArticlePreview(bean)
-	})
-	if previews == nil {
-		previews = []StoryArticlePreview{}
-	}
-	return StoryItem{
-		ID:               story.ID,
-		Title:            story.Title,
-		FirstPublishedAt: story.FirstPublishedAt,
-		LastPublishedAt:  story.LastPublishedAt,
-		ArticleCount:     story.ArticleCount,
-		SourceCount:      story.SourceCount,
-		Categories:       emptyStrings(story.Categories),
-		Regions:          emptyStrings(story.Regions),
-		Entities:         emptyStrings(story.Entities),
-		Tags:             emptyStrings(story.Tags),
-		TopArticles:      previews,
-	}
-}
-
-func toStoryItems(stories []db.Story) []StoryItem {
-	return datautils.Transform(stories, func(story *db.Story) StoryItem {
-		return toStoryItem(story)
-	})
-}
-
-func toStoryDetailItem(story *db.Story) StoryDetailItem {
-	return StoryDetailItem{
-		StoryItem: toStoryItem(story),
-		Links:     StoryLinks{Articles: storyArticlesPath(story.ID)},
-	}
-}
-
-func toMentionDocument(mention *db.Mention) *MentionDocument {
-	return &MentionDocument{
-		URL:        mention.URL,
-		Platform:   mention.Platform,
-		Forum:      nullStringPtr(mention.Forum),
-		ObservedAt: mention.ObservedAt,
-		Engagement: MentionEngagement{
-			Likes:    nullInt64Ptr(mention.Likes),
-			Comments: nullInt64Ptr(mention.Comments),
-			Audience: nullInt64Ptr(mention.Subscribers),
-		},
-	}
-}
-
-func toMentionDocuments(mentions []db.Mention) []MentionDocument {
-	return datautils.Transform(mentions, func(mention *db.Mention) MentionDocument {
-		return *toMentionDocument(mention)
-	})
-}
-
-func toArticleDetailItem(bean *db.Bean, full_content bool) ArticleDetailItem {
-	id := bean.ID.String()
-	return ArticleDetailItem{
-		ArticleDocument: *toArticleDocument(bean),
-		Links: ArticleLinks{
-			Similar:  "/articles/" + id + "/similar",
-			Mentions: "/articles/" + id + "/mentions",
-		},
-		includeContent: full_content,
-	}
-}
-
-// ArticleLinks contains sub-resource links for B02 Article detail.
-type ArticleLinks struct {
-	Similar  string `json:"similar,omitempty"`
-	Mentions string `json:"mentions,omitempty"`
-	Story    string `json:"story,omitempty"`
-}
-
-// ArticleDetailItem wraps an ArticleDocument with detail-only links.
-type ArticleDetailItem struct {
-	ArticleDocument
-	Links          ArticleLinks `json:"links"`
-	includeContent bool         `json:"-"`
-}
-
-func (item ArticleDetailItem) MarshalJSON() ([]byte, error) {
-	raw, err := json.Marshal(item.ArticleDocument)
-	if err != nil {
-		return nil, err
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, err
-	}
-	if item.includeContent {
-		payload["content"] = item.Content
-	}
-	payload["links"] = item.Links
-	return json.Marshal(payload)
-}
-
-// ArticleDetailItemResponse names the Article detail schema for Swagger.
-type ArticleDetailItemResponse struct {
-	Data ArticleDetailItem `json:"data" binding:"required"`
-}
-
-// CompactSource is the nested source object on Story top_articles.
-// Keys are always present; missing display metadata is null.
-type CompactSource struct {
-	ID     uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
-	Domain string    `json:"domain"`
-	Name   *string   `json:"name"`
-	URL    string    `json:"url"`
-}
-
-// StoryArticlePreview is a compact Article preview for Story top_articles.
-type StoryArticlePreview struct {
-	ID          uuid.UUID     `json:"id" swaggertype:"string" format:"uuid"`
-	URL         string        `json:"url"`
-	Title       string        `json:"title"`
-	PublishedAt time.Time     `json:"published_at" swaggertype:"string" format:"date-time"`
-	Source      CompactSource `json:"source"`
-}
-
-// StoryItem is the canonical Story payload for B09 and B10.
-type StoryItem struct {
-	ID               string                `json:"id"`
-	Title            string                `json:"title"`
-	FirstPublishedAt time.Time             `json:"first_published_at" swaggertype:"string" format:"date-time"`
-	LastPublishedAt  time.Time             `json:"last_published_at" swaggertype:"string" format:"date-time"`
-	ArticleCount     int                   `json:"article_count"`
-	SourceCount      int                   `json:"source_count"`
-	Categories       []string              `json:"categories"`
-	Regions          []string              `json:"regions"`
-	Entities         []string              `json:"entities"`
-	Tags             []string              `json:"tags"`
-	TopArticles      []StoryArticlePreview `json:"top_articles"`
+// StoryDocument is the canonical Story payload for B09 and B10.
+type StoryDocument struct {
+	ID               string                        `json:"id"`
+	Title            string                        `json:"title"`
+	FirstPublishedAt time.Time                     `json:"first_published_at" swaggertype:"string" format:"date-time"`
+	LastPublishedAt  time.Time                     `json:"last_published_at" swaggertype:"string" format:"date-time"`
+	ArticleCount     int                           `json:"article_count"`
+	SourceCount      int                           `json:"source_count"`
+	Categories       []string                      `json:"categories"`
+	Regions          []string                      `json:"regions"`
+	Entities         []string                      `json:"entities"`
+	Tags             []string                      `json:"tags"`
+	TopArticles      []StoryArticlePreviewDocument `json:"top_articles"`
 }
 
 // StoryLinks contains sub-resource links for B10 Story detail.
@@ -425,23 +356,57 @@ type StoryLinks struct {
 	Articles string `json:"articles"`
 }
 
-// StoryDetailItem wraps a StoryItem with detail-only links.
-type StoryDetailItem struct {
-	StoryItem
+func toStoryDocument(story *db.Cluster) StoryDocument {
+	previews := datautils.Transform(story.TopArticles, func(bean *db.Bean) StoryArticlePreviewDocument {
+		return toStoryArticlePreview(bean)
+	})
+	if previews == nil {
+		previews = []StoryArticlePreviewDocument{}
+	}
+	return StoryDocument{
+		ID:               story.ID,
+		Title:            story.Title,
+		FirstPublishedAt: story.FirstCreated,
+		LastPublishedAt:  story.LastCreated,
+		ArticleCount:     story.BeanCount,
+		SourceCount:      story.SourceCount,
+		Categories:       story.Categories,
+		Regions:          story.Regions,
+		Entities:         story.Entities,
+		Tags:             story.Tags,
+		TopArticles:      previews,
+	}
+}
+
+func toStoryDocuments(stories []db.Cluster) []StoryDocument {
+	return datautils.Transform(stories, func(story *db.Cluster) StoryDocument {
+		return toStoryDocument(story)
+	})
+}
+
+// StoryDetail wraps a StoryItem with detail-only links.
+type StoryDetail struct {
+	StoryDocument
 	Links StoryLinks `json:"links"`
+}
+
+func toStoryDetail(story *db.Cluster) StoryDetail {
+	return StoryDetail{
+		StoryDocument: toStoryDocument(story),
+		Links:         StoryLinks{Articles: fmt.Sprintf("/stories/%s/articles", story.ID)},
+	}
 }
 
 // StoryDetailResponse names the Story detail schema for Swagger.
 type StoryDetailResponse struct {
-	Data StoryDetailItem `json:"data" binding:"required"`
-	Meta ResponseMeta    `json:"meta" binding:"required"`
+	Data StoryDetail `json:"data" binding:"required"`
 }
 
 // StoryCollectionResponse names the Story collection schema for Swagger.
 type StoryCollectionResponse struct {
-	Pagination Pagination   `json:"pagination" binding:"required"`
-	Meta       ResponseMeta `json:"meta" binding:"required"`
-	Data       []StoryItem  `json:"data" binding:"required"`
+	Pagination Pagination      `json:"pagination" binding:"required"`
+	Meta       ResponseMeta    `json:"meta" binding:"required"`
+	Data       []StoryDocument `json:"data" binding:"required"`
 }
 
 // StoryArticleMeta contains freshness metadata for B11 Story article collections.

@@ -89,6 +89,12 @@ const (
 	SOURCE_COLUMNS_ALL  = SOURCE_COLUMNS_BASE + ", description, favicon, rss_feed"
 )
 
+const (
+	SORT_RECENT   = "created"
+	SORT_TRENDING = "trend_score"
+	SORT_RELEVANT = "relevance"
+)
+
 type trendData struct {
 	Likes       sql.NullInt64   `db:"likes"`
 	Comments    sql.NullInt64   `db:"comments"`
@@ -194,34 +200,33 @@ type Filters struct {
 	Regions           []string
 	FullContent       bool
 	Embedding         []float32
-	Distance          *float64
+	Distance          float64
 	ClusterID         string
+	MinBeanCount      int
 }
 
-// Story is a derived group of related articles sharing a cluster_id.
-type Story struct {
-	ID               string          `db:"id"`
-	Title            string          `db:"title"`
-	FirstPublishedAt time.Time       `db:"first_published_at"`
-	LastPublishedAt  time.Time       `db:"last_published_at"`
-	ArticleCount     int             `db:"article_count"`
-	SourceCount      int             `db:"source_count"`
-	Categories       []string        `db:"categories"`
-	Regions          []string        `db:"regions"`
-	Entities         []string        `db:"entities"`
-	Tags             []string        `db:"tags"`
-	Distance         sql.NullFloat64 `db:"distance"`
-	TopArticles      []Bean          `db:"-"`
+type clusterBase struct {
+	ID          string          `db:"id"`
+	LastCreated time.Time       `db:"last_created"`
+	Distance    sql.NullFloat64 `db:"distance"`
 }
 
-func (s *Story) IsZero() bool {
+// Cluster is a derived group of related articles sharing a cluster_id.
+type Cluster struct {
+	clusterBase
+	Title        string    `db:"title"`
+	FirstCreated time.Time `db:"first_created"`
+	BeanCount    int       `db:"bean_count"`
+	SourceCount  int       `db:"source_count"`
+	Categories   []string  `db:"categories"`
+	Regions      []string  `db:"regions"`
+	Entities     []string  `db:"entities"`
+	Tags         []string  `db:"tags"`
+	TopArticles  []Bean    `db:"-"`
+}
+
+func (s *Cluster) IsZero() bool {
 	return s.ID == ""
-}
-
-type storyPageRow struct {
-	ID              string          `db:"id"`
-	LastPublishedAt time.Time       `db:"last_published_at"`
-	Distance        sql.NullFloat64 `db:"distance"`
 }
 
 // DEPRECATED - ONLY APPLICABLE TO DUCKDB

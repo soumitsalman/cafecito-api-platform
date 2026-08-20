@@ -20,6 +20,7 @@ const (
 const _SQL_HNSW_SETTINGS = `
 SET hnsw.iterative_scan = strict_order;
 SET hnsw.ef_search = 100;
+SET hnsw.max_scan_tuples = 10000;
 `
 
 func NewConnection(ctx context.Context, connString string) (*pgxpool.Pool, error) {

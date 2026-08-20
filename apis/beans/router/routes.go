@@ -21,130 +21,6 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-/* Legacy route constants retained for reference; excluded from the target Beans route proposal.
-const (
-	MIN_WINDOW          = 1
-	DEFAULT_WINDOW      = 7 // DAYS
-	DEFAULT_ACCURACY    = 0.5
-	DEFAULT_LIMIT       = 16
-	MAX_LIMIT           = 128
-	FAVICON_PATH        = "./images/beans.png"
-)
-*/
-
-// const (
-// 	DEFAULT_CONCURRENCY = 512
-// )
-
-/* Legacy cache, search, and trend constants retained for reference; excluded from the target Beans route proposal.
-const (
-	_CACHE_SIZE = 1000
-	_CACHE_TTL  = 30 * time.Minute
-)
-
-const (
-	_EMBEDDER_ERROR     = "Embedder just died. Retry in a bit."
-	_DB_ERROR           = "DB just died. Retry in a bit."
-	_NEEDS_SEARCH_PARAM = "At least one search parameter is required (q, tags, categories, regions, entities)."
-)
-
-const (
-	_BEAN_TREND_FIELDS = "likes, comments, shares, related, trend_score"
-)
-*/
-
-/* Legacy route parameter types and URL propagation binding retained for reference; excluded from the target Beans route proposal.
-// PaginationInput holds shared list-endpoint pagination query params.
-// form default=16 and max=128 must stay in sync with DEFAULT_LIMIT and MAX_LIMIT.
-type PaginationInput struct {
-	Limit  int `form:"limit,default=16" binding:"min=1,max=128"`
-	Offset int `form:"offset" binding:"min=0"`
-}
-
-func (p PaginationInput) ToDB() db.Pagination {
-	return db.Pagination{Limit: p.Limit, Offset: p.Offset}
-}
-
-func normalizePagination(p *PaginationInput) error {
-	if p.Limit == 0 {
-		p.Limit = DEFAULT_LIMIT
-	}
-	if p.Limit > MAX_LIMIT {
-		return fmt.Errorf("limit must be <= %d", MAX_LIMIT)
-	}
-	if p.Offset < 0 {
-		return fmt.Errorf("offset must be >= 0")
-	}
-	return nil
-}
-
-// TagsInput describes pagination for tag discovery endpoints (/tags/*).
-type TagsInput struct {
-	PaginationInput
-}
-
-// PublishersInput describes query parameters for getPublishers (/sources).
-type PublishersInput struct {
-	// Sources: Publisher source IDs to resolve (CSV). Required for meaningful results.
-	Sources []string `form:"sources" collection_format:"csv"`
-	PaginationInput
-}
-
-// ArticlesInput describes shared query parameters for article list and search endpoints.
-type ArticlesInput struct {
-	// URLs: Optional list of article URLs to fetch directly (CSV).
-	URLs []string `form:"urls" collection_format:"csv"`
-	// Q: Free-text semantic/vector search query (max 512 chars).
-	Q string `form:"q" binding:"max=512"`
-	// Acc: Similarity accuracy threshold (0.0-1.0). Higher => stricter match.
-	// Used to compute vector distance (distance = 1 - Acc).
-	Acc float64 `form:"acc,default=0.5" binding:"min=0,max=1"`
-	// ContentType: Optional public content type filter; accepted values are blog, contract, earnings_report, enforcement_action, financial_report, lawsuit, news, official_statement, podcast, post, press_release, research_paper, site, technical_documentation, or whitepaper.
-	ContentType string `form:"content_type" binding:"omitempty,oneof=blog contract earnings_report enforcement_action financial_report lawsuit news official_statement podcast post press_release research_paper site technical_documentation whitepaper"`
-	// Categories: Filter results to one or more categories/topics (CSV).
-	Categories []string `form:"categories" collection_format:"csv"`
-	// Regions: Filter results to one or more geographic regions (CSV).
-	Regions []string `form:"regions" collection_format:"csv"`
-	// Entities: Filter results to one or more named entities (CSV).
-	Entities []string `form:"entities" collection_format:"csv"`
-	// Tags: Tag/keyword filters (CSV). Combined into a full-text query for tag matching.
-	Tags []string `form:"tags" collection_format:"csv"`
-	// Sources: Publisher/source IDs to include (CSV).
-	Sources []string `form:"sources" collection_format:"csv"`
-	// From: Start date for published/updated filtering (format YYYY-MM-DD).
-	From time.Time `form:"from" time_format:"2006-01-02" swaggertype:"string" format:"date"`
-	// FullContent: If true, include full article content in results (larger payload).
-	FullContent bool `form:"full_content,default=false"`
-	// PaginationInput: Embeds common pagination params (Limit, Offset).
-	PaginationInput
-}
-
-type PropagationInput struct {
-	// URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1–128 items).
-	URLs []string `form:"urls" json:"urls" collection_format:"csv" binding:"required,min=1,dive,url"`
-}
-
-func bindPropagationInput(c *gin.Context) (PropagationInput, error) {
-	var input PropagationInput
-	switch c.Request.Method {
-	case http.MethodGet:
-		if err := c.ShouldBindQuery(&input); err != nil {
-			return PropagationInput{}, err
-		}
-	case http.MethodPost:
-		if err := c.ShouldBindJSON(&input); err != nil {
-			return PropagationInput{}, err
-		}
-	default:
-		return PropagationInput{}, fmt.Errorf("method not allowed")
-	}
-	if len(input.URLs) > MAX_LIMIT {
-		return PropagationInput{}, fmt.Errorf("urls must contain at most %d items", MAX_LIMIT)
-	}
-	return input, nil
-}
-*/
-
 const (
 	MIN_WINDOW              = 1
 	DEFAULT_WINDOW          = 7 // DAYS
@@ -216,58 +92,18 @@ func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*
 	filters, _ := p.articleFeedParams.createFilters(c, r)
 	filters.IDs = p.IDs
 	filters.URLs = p.URLs
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = p.To
 	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
 		return nil, err
-	}
-	return filters, nil
-}
-
-func (p *headlinesParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
-		return nil, err
-	}
-	return filters, nil
-}
-
-func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.FullContent = false
-	if !p.From.IsZero() {
-		filters.CreatedFrom = p.From
-	}
-	if !p.To.IsZero() {
-		filters.CreatedTo = p.To
-	}
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
-		return nil, err
-	}
-	return filters, nil
-}
-
-func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.ClusterID = p.StoryID
-	if !p.From.IsZero() {
-		filters.CreatedFrom = p.From
-	}
-	if !p.To.IsZero() {
-		filters.CreatedTo = p.To
 	}
 	return filters, nil
 }
 
 func (p *similarArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
-	filters, err := p.articleFilterParams.createFilters(c, r)
-	if err != nil {
-		return nil, err
-	}
-	if !p.From.IsZero() {
-		filters.CreatedFrom = p.From
-	}
-	if !p.To.IsZero() {
-		filters.CreatedTo = p.To
-	}
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = p.To
 	return filters, nil
 }
 
@@ -280,6 +116,26 @@ func (p *articleMentionsParams) createFilters() db.MentionFilters {
 	}
 }
 
+func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.MinBeanCount = p.MinArticleCount
+	filters.FullContent = false
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = p.To
+	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+		return nil, err
+	}
+	return filters, nil
+}
+
+func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.ClusterID = p.StoryID
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = p.To
+	return filters, nil
+}
+
 func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	q := strings.TrimSpace(p.Q)
 	if q != "" {
@@ -289,7 +145,7 @@ func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configurati
 		}
 		if p.ScoreThreshold > 0 {
 			distance := (1 - p.ScoreThreshold) * 2
-			filters.Distance = &distance
+			filters.Distance = distance
 		}
 	}
 	return nil
@@ -316,13 +172,6 @@ func writeCollection[T any](c *gin.Context, items []T, limit int, next_cursor *d
 // writeDetail writes a typed detail envelope as JSON, or compact text when requested.
 func writeDetail[T any](c *gin.Context, item T) {
 	c.JSON(http.StatusOK, DetailResponse[T]{Data: item})
-}
-
-func writeStoryDetail(c *gin.Context, item StoryDetailItem) {
-	c.JSON(http.StatusOK, StoryDetailResponse{
-		Data: item,
-		Meta: ResponseMeta{AsOf: time.Now().UTC()},
-	})
 }
 
 func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next_cursor *db.Cursor, story_id string) {
@@ -355,16 +204,6 @@ func writeError(c *gin.Context, err error) {
 		}
 	}
 	c.AbortWithStatusJSON(status, ErrorResponse{Error: err})
-}
-
-// writeScaffoldNotImplemented writes a 501 Not Implemented response for scaffold routes.
-func writeScaffoldNotImplemented(c *gin.Context, route string) {
-	writeError(c, utils.NewAPIError("not_implemented", route+" is not yet implemented"))
-}
-
-// writeScaffoldInvalidRequest writes a 400 Bad Request response from a binding error.
-func writeScaffoldInvalidRequest(c *gin.Context, err error) {
-	writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error()))
 }
 
 // health godoc
@@ -462,16 +301,16 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 		return
 	}
 
-	if params.From.IsZero() {
-		filters.CreatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
-	} else {
-		filters.CreatedFrom = params.From
-	}
-	if !params.To.IsZero() {
-		filters.CreatedTo = params.To
-	}
+	// if params.From.IsZero() {
+	// 	filters.CreatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
+	// } else {
+	// 	filters.CreatedFrom = params.From
+	// }
+	// if !params.To.IsZero() {
+	// 	filters.CreatedTo = params.To
+	// }
 
-	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
 		shared.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
@@ -517,14 +356,14 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 		return
 	}
 
-	if params.From.IsZero() {
-		filters.UpdatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
-	} else {
-		filters.UpdatedFrom = params.From
-	}
-	if !params.To.IsZero() {
-		filters.UpdatedTo = params.To
-	}
+	// if params.From.IsZero() {
+	// 	filters.UpdatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
+	// } else {
+	// 	filters.UpdatedFrom = params.From
+	// }
+	// if !params.To.IsZero() {
+	// 	filters.UpdatedTo = params.To
+	// }
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
@@ -536,8 +375,8 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 }
 
 // getTopHeadlinesArticles is the B04 GET /articles/top-headlines target scaffold.
-// Primary difference between this and getTrendingArticles and getTopHeadlines is the window of time.
-// getTopHeadlines is always fixed within the last 24 hours. The returned article must be created and received social media traction in the last 24 hours.
+// Primary difference between this and getTrendingArticles and getTopHeadlines is the window of time and content type.
+// getTopHeadlines is always fixed within the last 24 hours and `news` content type. The returned news are created and trending in the last 24 hours.
 // The result excludes content unless explicitly requested.
 // getTopHeadlines godoc
 // @Summary List Top Headlines
@@ -558,9 +397,9 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Failure 429 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @ID getTopHeadlines
-// @Router /articles/top-headlines [get]
+// @Router /top-headlines [get]
 func (r *Configuration) getTopHeadlines(c *gin.Context) {
-	var params headlinesParams
+	var params articleFeedParams
 	if err := params.shouldBind(c); err != nil {
 		writeError(c, err)
 		return
@@ -578,6 +417,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 
 	filters.CreatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
 	filters.UpdatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
+	filters.Kind = "news"
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
 	if err != nil {
@@ -625,7 +465,7 @@ func (r *Configuration) getArticle(c *gin.Context) {
 		}
 		return
 	}
-	writeDetail(c, toArticleDetailItem(&bean, params.FullContent))
+	writeDetail(c, *toArticleDetail(&bean))
 }
 
 // getSimilarArticles godoc
@@ -723,112 +563,6 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 		return
 	}
 	writeCollection(c, toMentionDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
-}
-
-func (r *Configuration) getStories(c *gin.Context) {
-	var params storySearchParams
-	if err := params.shouldBind(c); err != nil {
-		writeError(c, err)
-		return
-	}
-	page_req, err := params.createPageRequest(c, r)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	filters, err := params.createFilters(c, r)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-
-	page_out, err := r.DB.QueryStories(c.Request.Context(), *filters, *page_req, params.MinArticleCount)
-	if err != nil {
-		shared.LogError(err, "[ERROR] QueryStories")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeCollection(c, toStoryItems(page_out.Items), page_req.Limit, page_out.NextCursor)
-}
-
-func (r *Configuration) dispatchStory(c *gin.Context) {
-	raw := strings.TrimSpace(strings.TrimPrefix(c.Param("story_id"), "/"))
-	if raw == "" {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required"))
-		return
-	}
-	if strings.HasSuffix(raw, "/articles") {
-		candidate := strings.TrimSuffix(raw, "/articles")
-		exists, err := r.DB.StoryExists(c.Request.Context(), raw)
-		if err != nil {
-			shared.LogError(err, "[ERROR] StoryExists")
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-			return
-		}
-		if !exists && candidate != "" {
-			c.Params = gin.Params{{Key: "story_id", Value: candidate}}
-			r.getStoryArticles(c)
-			return
-		}
-	}
-	c.Params = gin.Params{{Key: "story_id", Value: raw}}
-	r.getStory(c)
-}
-
-func (r *Configuration) getStory(c *gin.Context) {
-	var params storyPathParams
-	if err := params.shouldBind(c); err != nil {
-		writeError(c, err)
-		return
-	}
-	story, err := r.DB.GetStory(c.Request.Context(), params.StoryID)
-	if err != nil {
-		shared.LogError(err, "[ERROR] GetStory")
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
-		return
-	}
-	writeStoryDetail(c, toStoryDetailItem(&story))
-}
-
-func (r *Configuration) getStoryArticles(c *gin.Context) {
-	var params storyArticleParams
-	if err := params.shouldBind(c); err != nil {
-		writeError(c, err)
-		return
-	}
-	exists, err := r.DB.StoryExists(c.Request.Context(), params.StoryID)
-	if err != nil {
-		shared.LogError(err, "[ERROR] StoryExists")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	if !exists {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
-		return
-	}
-
-	page_req, err := params.createPageRequest(c, r)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	filters, err := params.createFilters(c, r)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-
-	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
-	if err != nil {
-		shared.LogError(err, "[ERROR] QueryBeans")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.StoryID)
 }
 
 // getSources godoc
@@ -1026,6 +760,111 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 	writeCollection(c, toTagDocuments(page_out.Items, response_tag_type), page.Limit, page_out.NextCursor)
 }
 
+func (r *Configuration) getStories(c *gin.Context) {
+	var params storySearchParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryStories(c.Request.Context(), *filters, *page_req)
+	if err != nil {
+		shared.LogError(err, "[ERROR] QueryStories")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toStoryDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+}
+
+func (r *Configuration) dispatchStory(c *gin.Context) {
+	raw := strings.TrimSpace(strings.TrimPrefix(c.Param("story_id"), "/"))
+	if raw == "" {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required"))
+		return
+	}
+	if strings.HasSuffix(raw, "/articles") {
+		candidate := strings.TrimSuffix(raw, "/articles")
+		exists, err := r.DB.StoryExists(c.Request.Context(), raw)
+		if err != nil {
+			shared.LogError(err, "[ERROR] StoryExists")
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+			return
+		}
+		if !exists && candidate != "" {
+			c.Params = gin.Params{{Key: "story_id", Value: candidate}}
+			r.getStoryArticles(c)
+			return
+		}
+	}
+	c.Params = gin.Params{{Key: "story_id", Value: raw}}
+	r.getStory(c)
+}
+
+func (r *Configuration) getStory(c *gin.Context) {
+	var params storyPathParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	story, err := r.DB.GetStory(c.Request.Context(), params.StoryID)
+	if err != nil {
+		shared.LogError(err, "[ERROR] GetStory")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeDetail(c, toStoryDetail(&story))
+}
+
+func (r *Configuration) getStoryArticles(c *gin.Context) {
+	var params storyArticleParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	exists, err := r.DB.StoryExists(c.Request.Context(), params.StoryID)
+	if err != nil {
+		shared.LogError(err, "[ERROR] StoryExists")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	if !exists {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	if err != nil {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.StoryID)
+}
+
 func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
 	config := &Configuration{
 		DB:       db,
@@ -1078,7 +917,7 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	protected.GET("/articles/:id", config.getArticle)
 
 	// HEADLINES routes
-	protected.GET("/articles/top-headlines", config.getTopHeadlines)
+	protected.GET("/top-headlines", config.getTopHeadlines)
 
 	// STORIES routes. Wildcard captures URL-like story IDs (slashes); trailing /articles is membership.
 	protected.GET("/stories", config.getStories)

@@ -180,10 +180,10 @@ Research Doc: [QUERY_PARAM_NAMES.md](QUERY_PARAM_NAMES.md)
 | Fuzzy label filter | tags only | `tags` performs tolerant matching over normalized category, region, and entity labels. It does not promise fuzzy matching over Article titles or bodies. |
 | Semantic score threshold | score_threshold | Perigon vector search exposes scoreThreshold; Beans uses snake_case and explicit minimum-score semantics. |
 | Article detail | GET /articles/{id} | TheNewsAPI UUID lookup and other known-ID or exact-link retrieval routes. |
-| Feeds | /articles/latest, /articles/top-headlines, and /articles/trending | NewsData.io/Currents latest plus GNews, NewsAPI.org, and TheNewsAPI headline/top feeds. |
+| Feeds | /articles/latest, /top-headlines, and /articles/trending | NewsData.io/Currents latest plus GNews, NewsAPI.org, and TheNewsAPI headline/top feeds. |
 | Story routes | /stories, /stories/{story_id}, /stories/{story_id}/articles | GDELT Story collection/detail/articles and Perigon Story collection plus clusterId membership. |
 | Similar Articles | GET /articles/{id}/similar | Article-subresource form of TheNewsAPI similar-by-UUID. |
-| Content type | content_type=news or blog | NewsAPI.ai's native data-type selection, narrowed to Beans data. |
+| Content type | content_type=news,blog,... | NewsAPI.ai's native data-type selection, narrowed to Beans data. |
 | Publication range | from and to as YYYY-MM-DD | Perigon, finlight, GNews, and NewsAPI.org use from/to-style ranges. |
 | Source filters | sources, exclude_sources, domains, and exclude_domains | Source/domain include and exclude patterns used by Perigon, TheNewsAPI, finlight, and NewsAPI.org. |
 | Author filter | authors | World News and Currents explicitly support author filtering. |
@@ -397,7 +397,7 @@ The Article data item uses one canonical field set across B01, B03, B04, B05, an
 |---|---|---|
 | B01 — `/articles/search` | Canonical Article object | Collection envelope; `content` follows the `full_content` projection rule. |
 | B03 — `/articles/latest` | Canonical Article object | Collection envelope; recent-publication ordering; no `trend` object. |
-| B04 — `/articles/top-headlines` | Canonical Article object | Collection envelope; server-defined headline ordering; no `trend` object. |
+| B04 — `/top-headlines` | Canonical Article object | Collection envelope; server-defined headline ordering; no `trend` object. |
 | B05 — `/articles/trending` | Canonical Article object plus `trend` | Collection envelope; trend-score ordering; `meta.as_of` identifies the changing observation time. |
 | B02 — `/articles/{id}` | One canonical Article object | Detail envelope; may add `links.similar`, `links.mentions`, and optional `links.story`; no `pagination` or `meta.as_of`. |
 
@@ -462,7 +462,7 @@ only the documented `links` object, and applies the same `full_content` rule.
 ### 3.6 Story payload
 
 A Story is a persistent grouping of related Articles. It is a news-coverage
-resource, not an Espresso Event. Its identity remains stable as Articles enter
+resource. Its identity remains stable as Articles enter
 or leave the group.
 
 The market comparison leads to the following contract:
@@ -608,7 +608,7 @@ Gateway paths add /beans. Backend routes omit that prefix.
 | B01 | GET /articles/search | Searches News and Blog Articles. | World News /search-news; GNews /search; NewsAPI.ai getArticles; NewsAPI.org /everything; Currents /search. | Existing + Renovation |
 | B02 | GET /articles/{id} | Retrieves one Article by UUID. | TheNewsAPI /news/uuid/{uuid}; World News /retrieve-news; NewsAPI.ai getArticle. | Current-data + Renovation |
 | B03 | GET /articles/latest | Returns recently published Articles. | NewsData.io /latest; Currents /latest-news. | Existing + Renovation |
-| B04 | GET /articles/top-headlines | Returns current headline Articles from a fixed recent window. | GNews and NewsAPI.org /top-headlines; TheNewsAPI /news/headlines. | Existing + Renovation |
+| B04 | GET /top-headlines | Returns current headline Articles from a fixed recent window. | GNews and NewsAPI.org /top-headlines; TheNewsAPI /news/headlines. | Existing + Renovation |
 | B05 | GET /articles/trending | Returns Articles ranked by measured attention. | Closest to World News /top-news and TheNewsAPI /news/top; trend metrics are a Beans extension. | Existing + Renovation |
 | B06 | GET /articles/{id}/similar | Returns known related publisher coverage. | TheNewsAPI /news/similar/{uuid}. | Current-data + Renovation |
 | B07 | GET /articles/{id}/mentions | Returns observed social or forum links to an Article. | Beans extension. | Current-data + Renovation |
@@ -680,7 +680,7 @@ the previous seven UTC dates and orders results by published_at descending, then
 Article UUID. q narrows the candidate set but does not replace the feed's
 recent-first ordering. score_threshold is accepted only when q is present.
 
-#### B04 — GET /articles/top-headlines
+#### B04 — GET /top-headlines
 
 Accepts the B01 filters except ids, urls, from, and to. Its previous-24-hour
 publication window is fixed. q and score_threshold narrow the candidate set but
@@ -840,7 +840,6 @@ payload from Section 3.6 and adds a link to the paginated membership route:
 | Top-level field | Rule |
 |---|---|
 | data | Required canonical Story object plus the detail-only `links` object. |
-| meta | Required object containing exactly `as_of`. |
 
 B10 has no collection page metadata because it returns one Story. Its
 `data.links` object contains exactly `articles`; it does not contain
@@ -876,9 +875,6 @@ similar-Article, mention, or Source links.
     "links": {
       "articles": "/stories/330e5a9f-ee65-4781-b8ad-409a8bb33ab4/articles"
     }
-  },
-  "meta": {
-    "as_of": "2026-08-17T15:00:00Z"
   }
 }
 ~~~
