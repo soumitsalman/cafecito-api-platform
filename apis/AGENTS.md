@@ -163,17 +163,18 @@ $$;
 -- CONTENT TABLES
 CREATE TABLE IF NOT EXISTS beans (
     -- CORE FIELDS
-    id UUID,
-    url VARCHAR NOT NULL PRIMARY KEY,
-    kind VARCHAR,
-    title VARCHAR,
+    id UUID PRIMARY KEY,
+    url VARCHAR NOT NULL,
+    kind VARCHAR,    
     author VARCHAR,
-    source VARCHAR,
+    source_id UUID, -- this refers to the publishers.id if present in publishers table
+    base_url VARCHAR,
     image_url VARCHAR,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     collected TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- TEXT HEAVY FIELDS
+    title VARCHAR,
     summary TEXT,
     content TEXT,
     restricted_content BOOLEAN,
@@ -194,8 +195,8 @@ CREATE TABLE IF NOT EXISTS beans (
 );
 
 CREATE TABLE IF NOT EXISTS publishers (
-    id UUID,
-    source VARCHAR NOT NULL PRIMARY KEY,
+    id UUID PRIMARY KEY,
+    domain_name VARCHAR NOT NULL,
     base_url VARCHAR NOT NULL,
     site_name VARCHAR,
     description TEXT,
@@ -205,10 +206,10 @@ CREATE TABLE IF NOT EXISTS publishers (
 );
 
 CREATE TABLE IF NOT EXISTS chatters (
-    chatter_url VARCHAR NOT NULL,
-    -- this is a foreign key to beans.url but not enforced due to insertion sequence
+    chatter_url VARCHAR NOT NULL,    
     url VARCHAR NOT NULL,
-    source VARCHAR,
+    bean_id UUID NOT NULL, -- this refers to an item in beans table
+    platform VARCHAR, -- ex: reddit, hackernews, ycombinator, linkedin
     forum VARCHAR,
     collected TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     likes INTEGER DEFAULT 0,
@@ -218,137 +219,147 @@ CREATE TABLE IF NOT EXISTS chatters (
 );
 
 CREATE TABLE IF NOT EXISTS related_beans (
-    url VARCHAR NOT NULL,
-    related_url VARCHAR NOT NULL,
-    collected TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (url, related_url)
+  bean_id uuid NOT NULL,
+  related_bean_id uuid NOT NULL,
+  collected timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (bean_id, related_bean_id)
 );
 
 
+CREATE OR REPLACE VIEW beans_sources_view AS
+SELECT
+    b.*,
+    p.domain_name, p.site_name, p.description, p.favicon, p.rss_feed
+FROM beans b
+LEFT JOIN publishers p ON b.source_id = p.id;
+
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS trend_aggregates AS
-WITH
-    max_chatters AS (
-        SELECT
-            chatter_url,
-            MAX(likes) as likes,
-            MAX(comments) as comments
+WITH RECURSIVE
+    -- per chatter_url, the peak-engagement row at the earliest time it hit that peak;
+    -- lexicographic ranking (comments, then likes) keeps the chatter even when
+    -- the likes and comments maxima occur on different rows
+    best_chatters AS (
+        SELECT DISTINCT ON (chatter_url)
+            chatter_url, bean_id, likes, comments, subscribers, collected
         FROM chatters
-        GROUP BY chatter_url
-    ),
-    first_seen_max_chatters AS (
-        SELECT
-            fs.chatter_url,
-            MIN(fs.collected) as collected
-        FROM chatters fs
-        LEFT JOIN max_chatters mx ON fs.chatter_url = mx.chatter_url
-        WHERE fs.likes = mx.likes AND fs.comments = mx.comments
-        GROUP BY fs.chatter_url
+        ORDER BY chatter_url, comments DESC, likes DESC, collected ASC
     ),
     chatter_stats AS (
         SELECT
-            url,
-            DATE(MAX(collected)) as updated,
-            SUM(likes) as likes,
-            SUM(comments) as comments,
-            SUM(subscribers) as subscribers,
-            COUNT(chatter_url) as shares
-        FROM (
-            SELECT ch.* FROM chatters ch
-            LEFT JOIN first_seen_max_chatters fs ON fs.chatter_url = ch.chatter_url
-            WHERE fs.collected = ch.collected
-        )
-        GROUP BY url
+            bean_id,
+            DATE(MAX(collected)) AS first_collected,
+            SUM(likes) AS likes,
+            SUM(comments) AS comments,
+            SUM(subscribers) AS subscribers,
+            COUNT(chatter_url) AS mentions
+        FROM best_chatters
+        GROUP BY bean_id
     ),
     related_stats AS (
-        SELECT url, COUNT(*) AS related
-        FROM related_beans
-        GROUP BY url
+        SELECT
+            bean_id,
+            COUNT(DISTINCT rel) AS related,
+            DATE(MIN(collected)) AS first_collected
+        FROM (
+            SELECT bean_id, related_bean_id AS rel, collected FROM related_beans
+            UNION ALL
+            SELECT related_bean_id, bean_id, collected FROM related_beans
+        ) edges
+        WHERE bean_id <> rel
+        GROUP BY bean_id
     ),
-    related_freq AS (
-        SELECT related_url AS cand, COUNT(*)::int AS cnt
-        FROM related_beans
-        GROUP BY related_url
-    ),
+    -- relations are logically bidirectional but stored unidirectionally;
+    -- include both directions (plus self) so every bean gets a cluster_id
     cluster_candidates AS (
-        SELECT url AS bean_url, url AS cand FROM related_beans
-        UNION
-        SELECT url, related_url FROM related_beans
+        SELECT bean_id, bean_id AS cand, collected FROM related_beans
+        UNION ALL
+        SELECT bean_id, related_bean_id, collected FROM related_beans
+        UNION ALL
+        SELECT related_bean_id, bean_id, collected FROM related_beans
+        UNION ALL
+        SELECT related_bean_id, related_bean_id, collected FROM related_beans
     ),
+    -- earliest appearance of each candidate anywhere in related_beans;
+    -- frozen once set (new rows always carry a later collected)
+    first_seen_related AS (
+        SELECT cand, MIN(collected) AS first_seen
+        FROM cluster_candidates
+        GROUP BY cand
+    ),
+    -- winner comes from the bean's earliest (immutable) relation batch,
+    -- preferring the earliest-seen candidate (the cluster seed), so the
+    -- pointer is stable across refreshes and late joiners inherit the seed
     cluster_ids AS (
-        SELECT DISTINCT ON (cc.bean_url)
-            cc.bean_url AS url,
+        SELECT DISTINCT ON (cc.bean_id)
+            cc.bean_id,
             cc.cand AS cluster_id
         FROM cluster_candidates cc
-        LEFT JOIN related_freq rf ON rf.cand = cc.cand
-        ORDER BY cc.bean_url, COALESCE(rf.cnt, 0) DESC, cc.cand
+        JOIN first_seen_related fs ON fs.cand = cc.cand
+        ORDER BY cc.bean_id, cc.collected ASC, fs.first_seen ASC, cc.cand ASC
+    ),
+    -- chase each bean's pointer to its root (union-find): pointers strictly
+    -- decrease by (first_seen, uuid) so chains are acyclic and end at a
+    -- self-pointing seed; frozen pointers make the root equally stable
+    cluster_walk AS (
+        SELECT bean_id, cluster_id, 1 AS depth
+        FROM cluster_ids
+        UNION ALL
+        SELECT w.bean_id, c.cluster_id, w.depth + 1
+        FROM cluster_walk w
+        JOIN cluster_ids c ON c.bean_id = w.cluster_id
+        WHERE c.cluster_id <> w.cluster_id
+          AND w.depth < 32    -- safety cap; chains are provably finite
+    ),
+    cluster_roots AS (
+        SELECT DISTINCT ON (bean_id)
+            bean_id,
+            cluster_id
+        FROM cluster_walk
+        ORDER BY bean_id, depth DESC    -- deepest hop = root
     ),
     active AS (
-        SELECT url FROM chatter_stats
+        SELECT bean_id FROM chatter_stats
         UNION
-        SELECT url FROM related_stats
+        SELECT bean_id FROM related_stats
     ),
     trend_stats AS (
         SELECT
-            a.url,
-            COALESCE(cg.likes, 0) as likes,
-            COALESCE(cg.comments, 0) as comments,
-            COALESCE(cg.subscribers, 0) as subscribers,
-            COALESCE(cg.shares, 0) as shares,
-            COALESCE(rg.related, 0) as related,
-            GREATEST(DATE(b.created), COALESCE(cg.updated, DATE(b.created))) as updated,
-            ci.cluster_id
+            a.bean_id as id,
+            COALESCE(cs.likes, 0) AS likes,
+            COALESCE(cs.comments, 0) AS comments,
+            COALESCE(cs.subscribers, 0) AS subscribers,
+            COALESCE(cs.mentions, 0) AS mentions,
+            COALESCE(rs.related, 0) AS related,
+            GREATEST(rs.first_collected, cs.first_collected) AS observed,
+            cr.cluster_id
         FROM active a
-        INNER JOIN beans b ON b.url = a.url
-        LEFT JOIN chatter_stats cg ON a.url = cg.url
-        LEFT JOIN related_stats rg ON a.url = rg.url
-        LEFT JOIN cluster_ids ci ON ci.url = a.url
+        LEFT JOIN chatter_stats cs ON a.bean_id = cs.bean_id
+        LEFT JOIN related_stats rs ON a.bean_id = rs.bean_id
+        LEFT JOIN cluster_roots cr ON a.bean_id = cr.bean_id
     )
 SELECT
     *,
-    ((100*related + 50*comments + 10*shares + likes) / (CURRENT_DATE + 2 - updated))::float AS trend_score
+    ((100*related + 50*comments + 10*mentions + likes) / (CURRENT_DATE + 2 - observed))::float AS trend_score
 FROM trend_stats
-WHERE GREATEST(likes, comments, shares, related) > 0;
+WHERE GREATEST(likes, comments, mentions, related) > 0;
 
 
-CREATE VIEW IF NOT EXISTS beans_sources_view AS
+CREATE OR REPLACE VIEW latest_beans_view AS
 SELECT
     b.*,
-    p.id AS source_id, p.base_url, p.site_name, p.description, p.favicon, p.rss_feed
-FROM beans b
-LEFT JOIN publishers p ON b.source = p.source;
-
--- PRIMARY DIFF: between latest vs trending
--- trending requires some chatter or related items. Hence INNER JOIN trend_aggregates
--- latest does not require chatter or related items. Hence LEFT JOIN trend_aggregates
-CREATE VIEW IF NOT EXISTS latest_beans_view AS
-SELECT
-    b.*,
-    tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
+    tr.observed, tr.comments, tr.mentions, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
 FROM beans_sources_view b
-LEFT JOIN trend_aggregates tr ON b.url = tr.url;
+LEFT JOIN trend_aggregates tr ON b.id = tr.id;
 
 
-CREATE VIEW IF NOT EXISTS trending_beans_view AS
+CREATE OR REPLACE VIEW trending_beans_view AS
 SELECT
     b.*,
-    tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
+    tr.observed, tr.comments, tr.mentions, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id
 FROM beans_sources_view b
-INNER JOIN trend_aggregates tr ON b.url = tr.url;
+INNER JOIN trend_aggregates tr ON b.id = tr.id;
 
-
-CREATE VIEW IF NOT EXISTS aggregated_beans_view AS
-WITH related_groups AS (
-    SELECT url, ARRAY_AGG(related_url) AS related_urls
-    FROM related_beans
-    GROUP BY url
-)
-SELECT
-    b.*,
-    tr.updated, tr.comments, tr.shares, tr.likes, tr.subscribers, tr.related, tr.trend_score, tr.cluster_id,
-    rel.related_urls
-FROM beans_sources_view b
-LEFT JOIN trend_aggregates tr ON b.url = tr.url
-LEFT JOIN related_groups rel ON b.url = rel.url;
 
 -- INDEXES --
 -- beans
@@ -376,22 +387,17 @@ CREATE INDEX IF NOT EXISTS idx_related_beans_related_url ON related_beans(relate
 CREATE INDEX IF NOT EXISTS idx_related_beans_collected ON related_beans(collected DESC);
 CREATE INDEX IF NOT EXISTS idx_chatters_chatter_url ON chatters(chatter_url);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_trend_agg_url ON trend_aggregates(url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trend_aggregates_id ON trend_aggregates (id);
 ```
-
-## Renovation Plan
-Read the files in [design/](apis/design) for V1 and future renovation plan
 
 ## Documentation dependency map
 
-Swagger annotations, gateway OpenAPI, and portal pages are separate artifacts. Do not assume that generating Swagger updates the public gateway contract or portal documentation.
-
-- Treat route behavior, request/response types, and Swagger annotations in `apis/<service>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`.
-  - Espresso: from `apis/espresso/`, run `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal` after changing `router/routes.go` docstrings or referenced router types.
-  - Beans: use the documented `swag` command in `apis/beans/README.md` after its router annotation changes.
-- For any public Espresso behavior change, then manually update `../config/espresso.oas.json`. It is the gateway contract under `/espresso`, powers `/api/espresso` via `../docs/zudoku.config.tsx`, and supplies the `/espresso/mcp` server plus its exported `operationId` tools. Keep public paths, parameters, schemas, descriptions, errors, and MCP tool mappings in sync with the backend.
-- Reflect that behavior in the relevant portal pages: `../docs/pages/products/espresso/overview.mdx`, `../docs/pages/products/espresso/workflows.mdx`, and `../docs/pages/products/espresso/migration.mdx`; `../docs/pages/guides/mcp-ai-agents.mdx` for MCP changes; and `../docs/pages/guides/api-conventions.mdx` or `../docs/pages/start/first-api-call.mdx` for shared or quickstart behavior. Update `../docs/zudoku.config.tsx` only when API mounting, navigation, redirects, or page structure changes.
-- Apply the same generated-Swagger → `../config/beans.oas.json` → `../docs/pages/products/beans/overview.mdx` review for Beans.
+Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately
+For any update in public routes, params and responses
+1. Update Swagger annotations in `apis/<product>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`. Always include request, response and error type definiton for each route.
+2. Update api gateway definitions `../config/<product>.oas.json`'
+3. Update developer portal docs under `../docs/pages` e.g. ', `../docs/pages/products/<product>/`, and their effect on shared documents like `../docs/pages/start`, `../docs/pages/guides`. Always include sample params and responses
+4. Update corresponding Bruno definitions in `<product>/tests/bruno/`
 
 ### Public documentation boundary
 
@@ -404,3 +410,6 @@ Never expose:
 - private implementation and operations: Go package/type/handler names, internal identifiers, backend environment variables and headers, gateway rewrites or policies, infrastructure/vendor topology, credentials, or rate-limit/quota implementation.
 
 Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements are public concepts. Describe them without exposing their storage or implementation.
+
+## Renovation Plan
+Read the files in [design/](apis/design) for V1 and future renovation plan

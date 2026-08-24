@@ -36,7 +36,7 @@ Omit `content_type` to include all stored types. Provider labels such as `pr` ar
 | News or blog item | **Article** | Search a collection, preserve `data[].id`, then retrieve detail when citation or full content is needed. |
 | Publisher record | **Source** | Resolve metadata with Source search and reuse the UUID in Article filters. |
 | Topic or label | Article filter | Use `categories`, `entities`, `regions`, `sentiments`, `tags`, `authors`, or Source filters according to the route. |
-| Story or cluster | Deferred Beans capability | Do not depend on Stories until persistent Story UUID and membership behavior is published. |
+| Related coverage group | Story | Use a stable Story UUID with GET /beans/stories/{id} and GET /beans/stories/{id}/articles. |
 | Social or forum discussion | **Mention** | Use the Article mentions route for external observations tied to a known Article. |
 
 ## Route migration
@@ -49,6 +49,7 @@ Omit `content_type` to include all stored types. Provider labels such as `pr` ar
 | Find related coverage after selecting an Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/similar` |
 | Check external discussion for a selected Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/mentions` |
 | Find a publisher, then filter its Articles | `GET /beans/sources?q=...` -> `GET /beans/articles/search?sources={source_id}` |
+| Serve a related-coverage group | `GET /beans/stories` -> `GET /beans/stories/{story_id}` -> `GET /beans/stories/{story_id}/articles` |
 
 Do not fetch detail for every search result. Collection items are intended to help an agent select relevant Article IDs; detail and follow-up routes are targeted calls.
 
@@ -86,7 +87,7 @@ Beans collections use one stable JSON envelope:
 - `pagination.num_results` counts records in the current page, not total matches.
 - Send a non-null `pagination.next_cursor` unchanged as the next request `cursor`.
 - An empty collection is a successful HTTP 200 response with `data: []`.
-- Detail routes return `{ "data": { ... } }`; a missing Article or Source returns HTTP 404.
+- Detail routes return `{ "data": { ... } }`; a missing Article, Source, or Story returns HTTP 404.
 - Do not construct an `offset` or `page` parameter. Beans V1 uses cursor pagination.
 - Error responses use the standard error envelope with HTTP 400, 401, 404, 429, or 500 as applicable.
 
@@ -94,11 +95,11 @@ Beans collections use one stable JSON envelope:
 
 1. Classify each old request as Article search, recency, headline attention, trend ranking, Source lookup, related reading, or external mention lookup.
 2. Change collection parsing to read `data`, `pagination`, and `meta`.
-3. Store Article and Source UUIDs as opaque identifiers.
+3. Store Article, Source, and Story UUIDs as opaque identifiers.
 4. Replace offset or page construction with pass-through use of `pagination.next_cursor`.
 5. Accept every stored type listed above; do not translate stored kinds or provider `pr` labels into Beans values.
 6. Treat `from` and `to` as route-specific date bounds in `YYYY-MM-DD` form.
-7. Fetch detail, similar, or mentions only after a collection call selects an Article.
+7. Fetch Article detail, similar Articles, or mentions only after a collection call selects an Article; fetch Story detail and member Articles only after a Story collection selects a Story UUID.
 8. Keep Espresso Events, Signals, and evidence workflows on the Espresso product.
 
 ## Next steps

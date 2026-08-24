@@ -43,31 +43,27 @@ type ErrorResponse struct {
 type SourceDocument struct {
 	ID          uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
 	BaseURL     string    `json:"url"`
-	DomainName  string    `json:"domain"`
+	DomainName  *string   `json:"domain"`
 	SiteName    *string   `json:"name"`
 	Description *string   `json:"description,omitempty"`
 	Favicon     *string   `json:"favicon_url,omitempty"`
 	RSSFeed     *string   `json:"rss_feed_url,omitempty"`
 }
 
+func toSourceDocumentProperities(bean *db.SourceProperties) *SourceDocument {
+	return &SourceDocument{
+		BaseURL:     bean.BaseURL,
+		DomainName:  nullStringPtr(bean.DomainName),
+		SiteName:    nullStringPtr(bean.SiteName),
+		Description: nullStringPtr(bean.Description),
+		Favicon:     nullStringPtr(bean.Favicon),
+		RSSFeed:     nullStringPtr(bean.RSSFeed),
+	}
+}
+
 func toSourceDocument(source *db.Source) *SourceDocument {
-	doc := &SourceDocument{
-		ID:         source.ID,
-		BaseURL:    source.BaseURL,
-		DomainName: source.DomainName,
-	}
-	if source.SiteName.Valid {
-		doc.SiteName = &source.SiteName.String
-	}
-	if source.Description.Valid {
-		doc.Description = &source.Description.String
-	}
-	if source.Favicon.Valid {
-		doc.Favicon = &source.Favicon.String
-	}
-	if source.RSSFeed.Valid {
-		doc.RSSFeed = &source.RSSFeed.String
-	}
+	doc := toSourceDocumentProperities(&source.SourceProperties)
+	doc.ID = source.ID
 	return doc
 }
 
@@ -82,32 +78,31 @@ func toSourceDocuments(sources []db.Source) []SourceDocument {
 type Trend struct {
 	Likes       *int64   `json:"likes,omitempty"`
 	Comments    *int64   `json:"comments,omitempty"`
-	Shares      *int64   `json:"mentions,omitempty"`
-	Subscribers *int64   `json:"audience,omitempty"`
+	Mentions    *int64   `json:"mentions,omitempty"`
+	Subscribers *int64   `json:"audiences,omitempty"`
 	Related     *int64   `json:"related,omitempty"`
 	TrendScore  *float64 `json:"trend_score,omitempty"`
 }
 
 // ArticleDocument is the normalized public Article payload.
 type ArticleDocument struct {
-	ID         uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
-	URL        string    `json:"url"`
-	Kind       string    `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
-	Created    time.Time `json:"published_at" swaggertype:"string" format:"date-time"`
-	Author     *string   `json:"author"`
-	ImageURL   *string   `json:"image_url"`
-	Title      *string   `json:"title"`
-	Summary    *string   `json:"summary"`
-	Content    *string   `json:"content,omitempty"`
-	Categories []string  `json:"categories"`
-	Regions    []string  `json:"regions"`
-	Entities   []string  `json:"entities"`
-	Sentiments []string  `json:"sentiments"`
-	Tags       []string  `json:"tags"`
-	// StoryID    *uuid.UUID     `json:"story_id" swaggertype:"string" format:"uuid"` // TODO: enable this later
-	StoryID *string         `json:"story_id"`
-	Source  *SourceDocument `json:"source"`
-	Trend   *Trend          `json:"trend,omitempty"`
+	ID         uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
+	URL        string          `json:"url"`
+	Kind       string          `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
+	Created    time.Time       `json:"published_at" swaggertype:"string" format:"date-time"`
+	Author     *string         `json:"author"`
+	ImageURL   *string         `json:"image_url"`
+	Title      *string         `json:"title"`
+	Summary    *string         `json:"summary"`
+	Content    *string         `json:"content,omitempty"`
+	Categories []string        `json:"categories"`
+	Regions    []string        `json:"regions"`
+	Entities   []string        `json:"entities"`
+	Sentiments []string        `json:"sentiments"`
+	Tags       []string        `json:"tags"`
+	StoryID    uuid.UUID       `json:"story_id,omitzero" swaggertype:"string" format:"uuid"`
+	Source     *SourceDocument `json:"source"`
+	Trend      *Trend          `json:"trend,omitempty"`
 }
 
 func toArticleDocument(bean *db.Bean) *ArticleDocument {
@@ -126,7 +121,7 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 		Title:      nullStringPtr(bean.Title),
 		Summary:    nullStringPtr(bean.Summary),
 		Content:    nullStringPtr(bean.Content),
-		StoryID:    nullStringPtr(bean.ClusterID),
+		StoryID:    bean.ClusterID,
 		Trend:      nullArticleTrendPtr(bean),
 		Source:     nullArticleSourcePtr(bean),
 	}
@@ -134,26 +129,20 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 }
 
 func nullArticleSourcePtr(bean *db.Bean) *SourceDocument {
-	if bean.SourceID != uuid.Nil {
-		return &SourceDocument{
-			ID:          bean.SourceID,
-			BaseURL:     bean.BaseURL.String,
-			DomainName:  bean.Source,
-			SiteName:    nullStringPtr(bean.SiteName),
-			Description: nullStringPtr(bean.Description),
-			Favicon:     nullStringPtr(bean.Favicon),
-			RSSFeed:     nullStringPtr(bean.RSSFeed),
-		}
+	if !bean.SourceProperties.IsZero() {
+		doc := toSourceDocumentProperities(&bean.SourceProperties)
+		doc.ID = bean.SourceID
+		return doc
 	}
 	return nil
 }
 
 func nullArticleTrendPtr(bean *db.Bean) *Trend {
-	if bean.Likes.Valid || bean.Comments.Valid || bean.Shares.Valid || bean.Subscribers.Valid || bean.Related.Valid {
+	if bean.Likes.Valid || bean.Comments.Valid || bean.Mentions.Valid || bean.Subscribers.Valid || bean.Related.Valid {
 		return &Trend{
 			Likes:       nullInt64Ptr(bean.Likes),
 			Comments:    nullInt64Ptr(bean.Comments),
-			Shares:      nullInt64Ptr(bean.Shares),
+			Mentions:    nullInt64Ptr(bean.Mentions),
 			Subscribers: nullInt64Ptr(bean.Subscribers),
 			Related:     nullInt64Ptr(bean.Related),
 			TrendScore:  nullFloat64Ptr(bean.TrendScore),
@@ -192,8 +181,8 @@ func toArticleLinks(bean *db.Bean) *ArticleLinks {
 		Similar:  fmt.Sprintf("/articles/%s/similar", bean.ID),
 		Mentions: fmt.Sprintf("/articles/%s/mentions", bean.ID),
 	}
-	if bean.ClusterID.Valid {
-		links.Story = fmt.Sprintf("/stories/%s", bean.ClusterID.String)
+	if bean.ClusterID != uuid.Nil {
+		links.Story = fmt.Sprintf("/stories/%s", bean.ClusterID)
 	}
 	return links
 }
@@ -210,16 +199,16 @@ type MentionDocument struct {
 	URL        string            `json:"url"`
 	Platform   string            `json:"platform"`
 	Forum      *string           `json:"forum"`
-	ObservedAt time.Time         `json:"observed_at" swaggertype:"string" format:"date-time"`
+	Observed   time.Time         `json:"observed_at" swaggertype:"string" format:"date-time"`
 	Engagement MentionEngagement `json:"engagement"`
 }
 
 func toMentionDocument(mention *db.Mention) *MentionDocument {
 	return &MentionDocument{
-		URL:        mention.URL,
-		Platform:   mention.Platform,
-		Forum:      nullStringPtr(mention.Forum),
-		ObservedAt: mention.ObservedAt,
+		URL:      mention.URL,
+		Platform: mention.Platform,
+		Forum:    nullStringPtr(mention.Forum),
+		Observed: mention.Observed,
 		Engagement: MentionEngagement{
 			Likes:    nullInt64Ptr(mention.Likes),
 			Comments: nullInt64Ptr(mention.Comments),
@@ -334,7 +323,7 @@ func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
 
 // StoryDocument is the canonical Story payload for B09 and B10.
 type StoryDocument struct {
-	ID               string                        `json:"id"`
+	ID               uuid.UUID                     `json:"id"`
 	Title            string                        `json:"title"`
 	FirstPublishedAt time.Time                     `json:"first_published_at" swaggertype:"string" format:"date-time"`
 	LastPublishedAt  time.Time                     `json:"last_published_at" swaggertype:"string" format:"date-time"`
@@ -407,7 +396,7 @@ type StoryCollectionResponse struct {
 
 // StoryArticleMeta contains freshness metadata for B11 Story article collections.
 type StoryArticleMeta struct {
-	StoryID string    `json:"story_id"`
+	StoryID uuid.UUID `json:"story_id"`
 	AsOf    time.Time `json:"as_of"`
 }
 

@@ -74,7 +74,7 @@ func TestQueryBeans(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		Categories:  []string{test_categories[0]},
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
@@ -91,7 +91,7 @@ func TestQueryBeansUnfilteredBrowse(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	assert.NotEmpty(t, page.Items)
 }
@@ -100,7 +100,7 @@ func TestQueryBeansByKindAndDateRange(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		Kind:        "news",
 		CreatedFrom: testSearchFrom(),
 		CreatedTo:   testSearchTo(),
@@ -116,7 +116,7 @@ func TestQueryBeansByIDs(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	seed, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	seed, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 2}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestQueryBeansByIDs(t *testing.T) {
 		ids = append(ids, bean.ID)
 	}
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{IDs: ids}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{IDs: ids}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	require.Len(t, page.Items, len(ids))
 	got := map[uuid.UUID]bool{}
@@ -143,7 +143,7 @@ func TestQueryBeansEnrichmentFilters(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		Regions:     []string{test_regions[2]},
 		Entities:    []string{test_entities[0]},
 		Tags:        []string{test_tags[0]},
@@ -158,7 +158,7 @@ func TestQueryTrendingBeans(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
@@ -175,7 +175,7 @@ func TestVectorSearchBeans(t *testing.T) {
 	defer pg_sack.Close()
 
 	distance := 0.4
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		Embedding:   test_query_embedding,
 		Distance:    distance,
 		CreatedFrom: testSearchFrom(),
@@ -194,7 +194,7 @@ func TestVectorSearchLatestBeans(t *testing.T) {
 	defer pg_sack.Close()
 
 	distance := 0.4
-	page, err := pg_sack.QueryLatestBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryLatestBeans(test_ctx, db.BeanFilters{
 		Embedding: test_query_embedding,
 		Distance:  distance,
 	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
@@ -208,7 +208,7 @@ func TestVectorSearchTrendingBeans(t *testing.T) {
 	defer pg_sack.Close()
 
 	distance := 0.4
-	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		Embedding: test_query_embedding,
 		Distance:  distance,
 	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITH_TREND)
@@ -221,7 +221,7 @@ func TestGetBean(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	list, err := pg_sack.QueryBeans(test_ctx, db.Filters{
+	list, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 1}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestCursorPaginationBeans(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	filters := db.Filters{CreatedFrom: time.Now().UTC().AddDate(0, 0, -30)}
+	filters := db.BeanFilters{CreatedFrom: time.Now().UTC().AddDate(0, 0, -30)}
 	first, err := pg_sack.QueryBeans(test_ctx, filters, db.PageRequest{Limit: 2}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	require.NotEmpty(t, first.Items)
@@ -272,7 +272,7 @@ func TestQuerySources(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QuerySources(test_ctx, "", nil, db.PageRequest{Limit: 5}, db.SOURCE_COLUMNS_ALL)
+	page, err := pg_sack.QuerySources(test_ctx, db.SourceFilters{}, db.PageRequest{Limit: 5}, db.SOURCE_COLUMNS_ALL)
 	require.NoError(t, err)
 	require.NotEmpty(t, page.Items)
 	for _, source := range page.Items {
@@ -281,7 +281,7 @@ func TestQuerySources(t *testing.T) {
 	}
 	pp.Println("SOURCES", page.Items)
 
-	filtered, err := pg_sack.QuerySources(test_ctx, test_source_query, test_domains, db.PageRequest{Limit: 5}, db.SOURCE_COLUMNS_ALL)
+	filtered, err := pg_sack.QuerySources(test_ctx, db.SourceFilters{Q: test_source_query, Domains: test_domains}, db.PageRequest{Limit: 5}, db.SOURCE_COLUMNS_ALL)
 	require.NoError(t, err)
 	pp.Println("SOURCES_FILTERED", filtered.Items)
 }
@@ -290,7 +290,7 @@ func TestGetSource(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	list, err := pg_sack.QuerySources(test_ctx, "", nil, db.PageRequest{Limit: 1}, db.SOURCE_COLUMNS_ALL)
+	list, err := pg_sack.QuerySources(test_ctx, db.SourceFilters{}, db.PageRequest{Limit: 1}, db.SOURCE_COLUMNS_ALL)
 	require.NoError(t, err)
 	require.NotEmpty(t, list.Items)
 	want := list.Items[0]
@@ -342,7 +342,7 @@ func TestQuerySimilarBeans(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 20}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestQuerySimilarBeans(t *testing.T) {
 
 	var page db.Page[db.Bean]
 	for _, bean := range seed.Items {
-		page, err = pg_sack.QuerySimilarBeans(test_ctx, bean.ID, db.Filters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+		page, err = pg_sack.QuerySimilarBeans(test_ctx, bean.ID, db.BeanFilters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 		require.NoError(t, err)
 		if len(page.Items) > 0 {
 			break
@@ -370,7 +370,7 @@ func TestQuerySimilarBeansNotFound(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QuerySimilarBeans(test_ctx, uuid.New(), db.Filters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page, err := pg_sack.QuerySimilarBeans(test_ctx, uuid.New(), db.BeanFilters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	assert.ErrorIs(t, err, db.ErrNonExistentID)
 	assert.Empty(t, page.Items)
 }
@@ -379,7 +379,7 @@ func TestQuerySimilarBeansCursor(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 20}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
@@ -387,7 +387,7 @@ func TestQuerySimilarBeansCursor(t *testing.T) {
 	var first db.Page[db.Bean]
 	var seed_id uuid.UUID
 	for _, bean := range seed.Items {
-		first, err = pg_sack.QuerySimilarBeans(test_ctx, bean.ID, db.Filters{}, db.PageRequest{Limit: 2}, db.BEAN_COLUMNS_WITHOUT_TREND)
+		first, err = pg_sack.QuerySimilarBeans(test_ctx, bean.ID, db.BeanFilters{}, db.PageRequest{Limit: 2}, db.BEAN_COLUMNS_WITHOUT_TREND)
 		require.NoError(t, err)
 		if first.NextCursor != nil {
 			seed_id = bean.ID
@@ -398,7 +398,7 @@ func TestQuerySimilarBeansCursor(t *testing.T) {
 		t.Skip("not enough related articles for a second page")
 	}
 
-	second, err := pg_sack.QuerySimilarBeans(test_ctx, seed_id, db.Filters{}, db.PageRequest{Limit: 2, Cursor: first.NextCursor}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	second, err := pg_sack.QuerySimilarBeans(test_ctx, seed_id, db.BeanFilters{}, db.PageRequest{Limit: 2, Cursor: first.NextCursor}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	require.NotEmpty(t, second.Items)
 	assert.NotEqual(t, first.Items[0].ID, second.Items[0].ID)
@@ -408,7 +408,7 @@ func TestQueryMentions(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 20}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
@@ -428,7 +428,7 @@ func TestQueryMentions(t *testing.T) {
 	for _, mention := range page.Items {
 		assert.NotEmpty(t, mention.URL)
 		assert.NotEmpty(t, mention.Platform)
-		assert.False(t, mention.ObservedAt.IsZero())
+		assert.False(t, mention.Observed.IsZero())
 	}
 	pp.Println("MENTIONS", page.Items)
 }
@@ -446,7 +446,7 @@ func TestQueryMentionsCursor(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.Filters{
+	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 20}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
@@ -471,12 +471,12 @@ func TestQueryMentionsCursor(t *testing.T) {
 	assert.NotEqual(t, first.Items[0].URL, second.Items[0].URL)
 }
 
-func TestQueryStories(t *testing.T) {
+func TestQueryClusters(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	page, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom:  testSearchFrom(),
+	page, err := pg_sack.QueryClusters(test_ctx, db.ClusterFilters{
+		BeanFilters:  db.BeanFilters{CreatedFrom: testSearchFrom()},
 		MinBeanCount: 2,
 	}, db.PageRequest{Limit: 5})
 	require.NoError(t, err)
@@ -495,75 +495,78 @@ func TestQueryStories(t *testing.T) {
 	pp.Println("STORIES", page.Items)
 }
 
-func TestGetStory(t *testing.T) {
+func TestGetCluster(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	list, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom:  testSearchFrom(),
+	list, err := pg_sack.QueryClusters(test_ctx, db.ClusterFilters{
+		BeanFilters:  db.BeanFilters{CreatedFrom: testSearchFrom()},
 		MinBeanCount: 2,
 	}, db.PageRequest{Limit: 1})
 	require.NoError(t, err)
 	require.NotEmpty(t, list.Items)
 	want := list.Items[0]
 
-	story, err := pg_sack.GetStory(test_ctx, want.ID)
+	cluster, err := pg_sack.GetCluster(test_ctx, want.ID)
 	require.NoError(t, err)
-	assert.False(t, story.IsZero())
-	assert.Equal(t, want.ID, story.ID)
-	assert.GreaterOrEqual(t, story.BeanCount, 2)
-	assert.NotEmpty(t, story.TopArticles)
-	pp.Println("STORY", story)
+	assert.False(t, cluster.IsZero())
+	assert.Equal(t, want.ID, cluster.ID)
+	assert.GreaterOrEqual(t, cluster.BeanCount, 2)
+	assert.NotEmpty(t, cluster.TopArticles)
+	pp.Println("CLUSTER", cluster)
 }
 
-func TestGetStoryNotFound(t *testing.T) {
+func TestGetClusterNotFound(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	story, err := pg_sack.GetStory(test_ctx, "story-does-not-exist")
+	cluster, err := pg_sack.GetCluster(test_ctx, uuid.UUID{})
 	assert.ErrorIs(t, err, db.ErrNonExistentID)
-	assert.True(t, story.IsZero())
+	assert.True(t, cluster.IsZero())
 }
 
 func TestQueryStoryArticles(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	list, err := pg_sack.QueryStories(test_ctx, db.Filters{
-		CreatedFrom:  testSearchFrom(),
+	list, err := pg_sack.QueryClusters(test_ctx, db.ClusterFilters{
+		BeanFilters:  db.BeanFilters{CreatedFrom: testSearchFrom()},
 		MinBeanCount: 2,
 	}, db.PageRequest{Limit: 1})
 	require.NoError(t, err)
 	require.NotEmpty(t, list.Items)
-	story_id := list.Items[0].ID
+	cluster_id := list.Items[0].ID
 
-	exists, err := pg_sack.StoryExists(test_ctx, story_id)
+	exists, err := pg_sack.ClusterExists(test_ctx, cluster_id)
 	require.NoError(t, err)
 	assert.True(t, exists)
 
-	page, err := pg_sack.QueryBeans(test_ctx, db.Filters{ClusterID: story_id}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{ClusterID: cluster_id}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	require.NotEmpty(t, page.Items)
 	for _, bean := range page.Items {
-		assert.True(t, bean.ClusterID.Valid)
-		assert.Equal(t, story_id, bean.ClusterID.String)
+		assert.NotEqual(t, bean.ClusterID, uuid.Nil)
+		assert.Equal(t, cluster_id, bean.ClusterID)
 	}
-	pp.Println("STORY_ARTICLES", page.Items)
+	pp.Println("CLUSTER_ARTICLES", page.Items)
 }
 
-func TestQueryStoriesCursor(t *testing.T) {
+func TestQueryClustersCursor(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	filters := db.Filters{CreatedFrom: testSearchFrom(), MinBeanCount: 2}
-	first, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2})
+	filters := db.ClusterFilters{
+		BeanFilters:  db.BeanFilters{CreatedFrom: testSearchFrom()},
+		MinBeanCount: 2,
+	}
+	first, err := pg_sack.QueryClusters(test_ctx, filters, db.PageRequest{Limit: 2})
 	require.NoError(t, err)
 	require.NotEmpty(t, first.Items)
 	if first.NextCursor == nil {
-		t.Skip("not enough stories for a second page")
+		t.Skip("not enough clusters for a second page")
 	}
 
-	second, err := pg_sack.QueryStories(test_ctx, filters, db.PageRequest{Limit: 2, Cursor: first.NextCursor})
+	second, err := pg_sack.QueryClusters(test_ctx, filters, db.PageRequest{Limit: 2, Cursor: first.NextCursor})
 	require.NoError(t, err)
 	require.NotEmpty(t, second.Items)
 	assert.NotEqual(t, first.Items[0].ID, second.Items[0].ID)

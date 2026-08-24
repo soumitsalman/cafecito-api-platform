@@ -1,0 +1,25 @@
+opencollection: 1.0.0
+
+info:
+  name: Beans API
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+docs:
+  content: Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, stable UUID-identified Stories, similar publisher reading, external Article mentions, and normalized filter discovery. Use GET /stories to select a Story UUID, then GET /stories/{id} or GET /stories/{id}/articles for the selected Story.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

@@ -19,15 +19,187 @@
     "paths": {
         "/articles/latest": {
             "get": {
-                "description": "Answers: What Articles were published most recently within the requested filters?\nReturns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].\nUse when: publication recency matters more than full-corpus relevance.\nDo not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.\nSearch/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.\nTime: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.\nSort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.\nNext step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.",
+                "description": "Returns Articles ordered newest first. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "List Latest Articles",
+                "summary": "List latest Articles",
                 "operationId": "getLatestArticles",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -36,25 +208,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -64,7 +236,7 @@
         },
         "/articles/search": {
             "get": {
-                "description": "Answers: Which publisher Articles match this topic, identity, Source, label, or publication-date query?\nReturns: A cursor-paginated collection where each data item is one publisher Article identified by UUID. Empty results are HTTP 200 with data: [].\nUse when: broad Article retrieval, semantic topic search, exact Article IDs or URLs, or combined Article filters are needed.\nDo not use when: newest-only, headline-only, or attention-ranked results are needed; use latest, top-headlines, or trending.\nSearch/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.\nTime: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD form.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100. offset and page are not supported.\nMissing fields: Article enrichment, Source metadata, story_id, content, and trend may be null or omitted. Content requires full_content=true and source availability.\nNext step: use GET /articles/{id} for one selected Article, then follow its similar or mentions link.",
+                "description": "Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.",
                 "produces": [
                     "application/json"
                 ],
@@ -73,6 +245,212 @@
                 ],
                 "summary": "Search Articles",
                 "operationId": "searchArticles",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional relevance query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Optional relevance threshold used with q.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact Article UUIDs (CSV).",
+                        "name": "ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact Article URLs (CSV).",
+                        "name": "urls",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower timestamp bound.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper timestamp bound.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -81,25 +459,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -109,15 +487,187 @@
         },
         "/articles/trending": {
             "get": {
-                "description": "Answers: Which Articles are receiving the most observed attention within the requested window?\nReturns: A cursor-paginated collection of Articles ordered by attention, with nullable trend metrics when available. Empty results are HTTP 200 with data: [].\nUse when: an agent needs what is gaining attention now rather than only what was published most recently.\nDo not use when: chronological monitoring or a fixed headline window is needed; use latest or top-headlines.\nSearch/filter behavior: accepts q with optional score_threshold and the shared Article filters; filters narrow candidates before attention ordering.\nTime: from and to are inclusive UTC dates applied to observed trend activity; omitted from defaults to the most recent 7 days.\nSort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: trend and each metric can be absent or null; zero is not fabricated when unavailable.\nNext step: use GET /articles/{id} for detail or GET /articles/{id}/similar for related reading.",
+                "description": "Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "List Trending Articles",
+                "summary": "List trending Articles",
                 "operationId": "getTrendingArticles",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -126,25 +676,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -154,7 +704,7 @@
         },
         "/articles/{id}": {
             "get": {
-                "description": "Answers: What did this specific publisher Article say?\nReturns: One Article detail record inside data, identified by the Article UUID, with links for similar Articles and observed external mentions.\nUse when: an agent already has an Article UUID and needs citable metadata, Source context, or optional full content.\nDo not use when: the Article UUID is unknown; use search or a feed first.\nSearch/filter behavior: the path UUID is exact; full_content=true requests the available body without changing identity.\nTime: published_at is the publisher publication timestamp; this route has no time window.\nSort/pagination: one detail record; no cursor or ordering applies.\nMissing fields: title, summary, author, image, Source metadata, story_id, and content may be null or omitted.\nNext step: follow links.similar for ranked related reading or links.mentions for external observations.",
+                "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
                 "produces": [
                     "application/json"
                 ],
@@ -163,6 +713,23 @@
                 ],
                 "summary": "Get an Article",
                 "operationId": "getArticle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -171,31 +738,31 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Article not found",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -205,15 +772,74 @@
         },
         "/articles/{id}/mentions": {
             "get": {
-                "description": "Answers: Where was this Article URL observed on external social or forum platforms?\nReturns: A cursor-paginated collection of external mention observations; a mention is not another publisher Article.\nUse when: external attention or discussion observations are needed for a known Article.\nDo not use when: publisher republication coverage or related reading is needed.\nSearch/filter behavior: the path UUID is exact; optional platforms and forums filters select mention metadata.\nTime: from and to are inclusive UTC observation-date bounds in YYYY-MM-DD.\nSort/pagination: observed-time order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: forum and engagement metrics may be null; empty results are HTTP 200 with data: [].\nNext step: use GET /articles/{id} to return to the Article citation or GET /articles/trending for aggregate attention ranking.",
+                "description": "Returns external platform or forum observations for an Article UUID, ordered by observation time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "List Article Mentions",
+                "summary": "List Article mentions",
                 "operationId": "getArticleMentions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Mention platforms (CSV).",
+                        "name": "platforms",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Mention forums (CSV).",
+                        "name": "forums",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower observation timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper observation timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -222,31 +848,31 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Article not found",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -256,15 +882,194 @@
         },
         "/articles/{id}/similar": {
             "get": {
-                "description": "Answers: Which other publisher Articles are useful related reading for this Article?\nReturns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.\nUse when: an agent has selected an Article and wants comparable coverage or related context.\nDo not use when: all Articles in a durable Story or external mentions are needed.\nSearch/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.\nTime: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.\nSort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: Article enrichment, Source metadata, and content may be null or omitted.\nNext step: use GET /articles/{id} on a selected result for detail and optional full content.",
+                "description": "Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Find Similar Articles",
+                "summary": "List related Articles",
                 "operationId": "getSimilarArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower timestamp bound.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper timestamp bound.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -273,31 +1078,31 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Article not found",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -307,15 +1112,39 @@
         },
         "/categories": {
             "get": {
-                "description": "Answers: Which normalized category labels can I use as Article filters?\nReturns: A cursor-paginated collection of category labels used by Article records.\nUse when: an agent has an unknown category spelling and needs discovery before Article filtering.\nDo not use when: a known normalized label is already available; query Articles directly.\nSearch/filter behavior: q performs case-insensitive discovery matching; returned values are normalized labels.\nTime: no time filter applies.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: the collection may be empty; this route does not define a taxonomy hierarchy.\nNext step: carry a returned value into the categories Article filter.",
+                "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "List Category Labels",
+                "summary": "List category labels",
                 "operationId": "listCategories",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -324,19 +1153,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -346,15 +1181,39 @@
         },
         "/entities": {
             "get": {
-                "description": "Answers: Which normalized entity labels can I use as Article filters?\nReturns: A cursor-paginated collection of extracted entity labels. Values are labels, not canonical entity profiles or IDs.\nUse when: an agent has an unknown entity spelling and needs discovery before Article filtering.\nDo not use when: a known normalized label is already available; query Articles directly.\nSearch/filter behavior: q performs case-insensitive discovery matching.\nTime: no time filter applies.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: the collection may be empty; no entity type or confidence is promised.\nNext step: carry a returned value into the entities Article filter.",
+                "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "List Entity Labels",
+                "summary": "List entity labels",
                 "operationId": "listEntities",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -363,19 +1222,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -409,15 +1274,39 @@
         },
         "/regions": {
             "get": {
-                "description": "Answers: Which normalized extracted region labels can I use as Article filters?\nReturns: A cursor-paginated collection of region labels, not country codes, coordinates, or radius-search objects.\nUse when: an agent has an unknown region spelling and needs discovery before Article filtering.\nDo not use when: a known normalized label is already available; query Articles directly.\nSearch/filter behavior: q performs case-insensitive discovery matching.\nTime: no time filter applies.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: the collection may be empty; structured geography is not promised.\nNext step: carry a returned value into the regions Article filter.",
+                "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "List Region Labels",
+                "summary": "List region labels",
                 "operationId": "listRegions",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -426,19 +1315,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -448,15 +1343,39 @@
         },
         "/sentiments": {
             "get": {
-                "description": "Answers: Which categorical sentiment labels can I use as Article filters?\nReturns: A cursor-paginated collection of sentiment labels observed on Articles.\nUse when: an agent has an unknown sentiment spelling and needs discovery before Article filtering.\nDo not use when: a known label is already available; query Articles directly.\nSearch/filter behavior: q performs case-insensitive discovery matching; sentiments are categorical labels, not calibrated numeric scores.\nTime: no time filter applies.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: the collection may be empty; no confidence or numeric sentiment score is returned.\nNext step: carry a returned value into the sentiments Article filter.",
+                "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "List Sentiment Labels",
+                "summary": "List sentiment labels",
                 "operationId": "listSentiments",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -465,19 +1384,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -487,7 +1412,7 @@
         },
         "/sources": {
             "get": {
-                "description": "Answers: Which publisher Sources match this metadata query?\nReturns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.\nUse when: an agent needs Source metadata for citations or a Source UUID for Article filtering.\nDo not use when: Article content or publication search is needed; use GET /articles/search or a feed.\nSearch/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.\nTime: no time filter applies; Source metadata is current as returned.\nSort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.\nNext step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.",
+                "description": "Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.",
                 "produces": [
                     "application/json"
                 ],
@@ -496,6 +1421,40 @@
                 ],
                 "summary": "List Sources",
                 "operationId": "listSources",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional Source prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -504,25 +1463,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -532,7 +1491,7 @@
         },
         "/sources/{id}": {
             "get": {
-                "description": "Answers: What publisher metadata belongs to this Source UUID?\nReturns: One Source detail record inside data. Optional display metadata is returned only when available.\nUse when: an agent needs to enrich an Article citation or inspect a known publisher.\nDo not use when: the agent needs Articles from this Source; use GET /articles/search with sources.\nSearch/filter behavior: the path UUID is exact; no collection filters apply.\nTime: no time filter applies.\nSort/pagination: one detail record; no cursor or ordering applies.\nMissing fields: name, description, favicon_url, and rss_feed_url may be null.\nNext step: use the Source UUID in Article search filters.",
+                "description": "Returns one publisher Source selected by UUID.",
                 "produces": [
                     "application/json"
                 ],
@@ -541,6 +1500,16 @@
                 ],
                 "summary": "Get a Source",
                 "operationId": "getSource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Source UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -549,31 +1518,554 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Source not found",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories": {
+            "get": {
+                "description": "Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "List Stories",
+                "operationId": "listStories",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional Story relevance query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Optional Story relevance threshold; requires q.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 2,
+                        "type": "integer",
+                        "default": 2,
+                        "description": "Minimum Story Article count. Default 2.",
+                        "name": "min_article_count",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower publication timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper publication timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story collection envelope",
+                        "schema": {
+                            "$ref": "#/definitions/router.StoryCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories/{id}": {
+            "get": {
+                "description": "Returns one Story selected by its stable UUID, including a link to its paginated member Articles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "Get a Story",
+                "operationId": "getStory",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Story UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story detail envelope",
+                        "schema": {
+                            "$ref": "#/definitions/router.StoryDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Story not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories/{id}/articles": {
+            "get": {
+                "description": "Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "List Story Articles",
+                "operationId": "listStoryArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Story UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "post",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Stored Article type.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower publication timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper publication timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story Article collection envelope",
+                        "schema": {
+                            "$ref": "#/definitions/router.StoryArticleCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Story not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Request limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -583,15 +2075,164 @@
         },
         "/top-headlines": {
             "get": {
-                "description": "Answers: Which Articles are attracting headline-level attention in the fixed recent window?\nReturns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].\nUse when: a breaking-news or daily-headline feed is needed without choosing a custom time range.\nDo not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.\nSearch/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.\nTime: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.\nSort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.\nMissing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.\nNext step: use GET /articles/{id} when a headline needs citable detail or full content.",
+                "description": "Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "List Top Headlines",
+                "summary": "List top headlines",
                 "operationId": "getTopHeadlines",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -600,25 +2241,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -721,8 +2362,8 @@
                     "$ref": "#/definitions/router.SourceDocument"
                 },
                 "story_id": {
-                    "description": "StoryID    *uuid.UUID     `json:\"story_id\" swaggertype:\"string\" format:\"uuid\"` // TODO: enable this later",
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid"
                 },
                 "summary": {
                     "type": "string"
@@ -823,8 +2464,8 @@
                     "$ref": "#/definitions/router.SourceDocument"
                 },
                 "story_id": {
-                    "description": "StoryID    *uuid.UUID     `json:\"story_id\" swaggertype:\"string\" format:\"uuid\"` // TODO: enable this later",
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid"
                 },
                 "summary": {
                     "type": "string"
@@ -1006,6 +2647,215 @@
                     "type": "string"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryArticleCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.ArticleDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.StoryArticleMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.StoryArticleMeta": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "story_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryArticlePreviewDocument": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "source": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.StoryDetail": {
+            "type": "object",
+            "properties": {
+                "article_count": {
+                    "type": "integer"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "first_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "links": {
+                    "$ref": "#/definitions/router.StoryLinks"
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "top_articles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryArticlePreviewDocument"
+                    }
+                }
+            }
+        },
+        "router.StoryDetailResponse": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.StoryDetail"
+                }
+            }
+        },
+        "router.StoryDocument": {
+            "type": "object",
+            "properties": {
+                "article_count": {
+                    "type": "integer"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "first_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "top_articles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryArticlePreviewDocument"
+                    }
+                }
+            }
+        },
+        "router.StoryLinks": {
+            "type": "object",
+            "properties": {
+                "articles": {
                     "type": "string"
                 }
             }

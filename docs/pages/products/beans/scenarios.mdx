@@ -337,5 +337,42 @@ curl -s --get "$BASE_URL/beans/articles/latest" \
 2. Return API `data` items without inventing Article, Source, trend, or mention fields.
 3. Keep selected Article and Source UUIDs as opaque values for follow-up calls.
 4. Preserve separate collection cursors and freshness metadata.
-5. Treat empty `data: []` as a successful result and HTTP 404 as a missing Article or Source.
+5. Treat empty `data: []` as a successful result and HTTP 404 as a missing Article, Source, or Story.
 6. Use [Beans migration](/products/beans/migration) for provider parameter mapping and the [Beans API reference](/api/beans) for request and response schemas.
+
+
+## Scenario 6: Resolve a Story, then serve its member Articles
+
+**Use when:** A news request needs a related-coverage group and the publisher Articles that belong to it.
+
+**Call sequence:** 3 calls
+
+1. `GET /beans/stories` selects a stable Story UUID.
+2. `GET /beans/stories/{id}` returns Story detail.
+3. `GET /beans/stories/{id}/articles` returns the first member-Article page. The detail and member calls can run in parallel after selection.
+
+~~~js
+const storyPage = await beansGet("/beans/stories", {
+  q: "technology",
+  min_article_count: 2,
+  limit: 1,
+});
+const storyId = storyPage.data.at(0)?.id;
+
+const payload = storyId
+  ? await Promise.all([
+      beansGet("/beans/stories/" + storyId),
+      beansGet("/beans/stories/" + storyId + "/articles", {
+        content_type: "news",
+        limit: 20,
+      }),
+    ]).then(([story, articles]) => ({
+      story: story.data,
+      articles: articles.data,
+      nextCursor: articles.pagination.next_cursor,
+      asOf: articles.meta.as_of,
+    }))
+  : { story: null, articles: [], nextCursor: null, asOf: storyPage.meta.as_of };
+~~~
+
+The detail response carries the same stable UUID and a service-relative `links.articles` path. For a gateway request, call `GET /beans` followed by that path. The member-Article envelope repeats the requested Story UUID in `meta.story_id`; Article `story_id` is present for members assigned to a Story.

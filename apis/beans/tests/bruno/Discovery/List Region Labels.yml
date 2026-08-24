@@ -1,0 +1,112 @@
+info:
+  name: List Region Labels
+  type: http
+  seq: 3
+  tags:
+    - Discovery
+
+http:
+  method: GET
+  url: "{{baseUrl}}/regions"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/regions"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "type": "",
+                "value": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/regions"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/regions"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/regions"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+
+docs: |-
+  Answers: Which normalized extracted region labels can I use as Article filters?
+  Returns: A cursor-paginated collection of region labels, not country codes, coordinates, or radius-search objects.
+  Use when: an agent has an unknown region spelling and needs discovery before Article filtering.
+  Do not use when: a known normalized label is already available; query Articles directly.
+  Search/filter behavior: q performs case-insensitive discovery matching.
+  Time: no time filter applies.
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
+  Missing fields: the collection may be empty; structured geography is not promised.
+  Next step: carry a returned value into the regions Article filter.

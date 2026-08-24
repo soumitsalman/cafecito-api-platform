@@ -30,6 +30,9 @@ Use Espresso when the question is about structured Events, Signals, impact, fore
 | Monitor fixed headlines | GET /beans/articles/top-headlines | Recent attention-ranked Articles | GNews and NewsAPI.org top-headlines |
 | Monitor attention | GET /beans/articles/trending | Trend-ranked Articles with nullable metrics | World News top-news, TheNewsAPI top-news |
 | Find related reading | GET /beans/articles/{id}/similar | Similar Articles, not guaranteed Story members | TheNewsAPI similar-by-UUID |
+| Browse related coverage | GET /beans/stories | UUID-identified Stories | Beans Story collection |
+| Inspect a Story | GET /beans/stories/{id} | Story detail and member-Article link | Beans Story detail |
+| List a Story's Articles | GET /beans/stories/{id}/articles | Paginated member Articles | Beans Story members |
 | Inspect external observations | GET /beans/articles/{id}/mentions | Social/forum mention observations | Beans extension |
 | Resolve publisher metadata | GET /beans/sources or /beans/sources/{id} | Source records keyed by UUID | NewsAPI.org sources, provider source catalogs |
 | Discover filter values | GET /beans/categories, /beans/entities, /beans/regions, /beans/sentiments | Normalized filter labels | Provider-specific catalogs |
@@ -97,7 +100,6 @@ Collection routes return an envelope:
       "content_type": "news",
       "title": "Article headline",
       "summary": "Article summary",
-      "content": null,
       "author": null,
       "image_url": null,
       "published_at": "2026-08-17T12:00:00Z",
@@ -107,7 +109,7 @@ Collection routes return an envelope:
         "name": "Publisher",
         "url": "https://publisher.example"
       },
-      "story_id": null,
+      "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
       "categories": ["technology"],
       "regions": ["united_states"],
       "entities": ["example_company"],
@@ -118,7 +120,7 @@ Collection routes return an envelope:
 }
 ~~~
 
-Detail routes return { "data": { ... } }. Article content is omitted unless full_content=true; when requested but unavailable, content is null. Missing enrichment and Source display fields remain null or omitted according to the route schema. Trend metrics are nullable; Beans does not fabricate zero values.
+Detail routes return { "data": { ... } }. Article content is omitted unless full_content=true; when requested but unavailable, content is null. story_id is a stable Story UUID when an Article belongs to a Story and is otherwise omitted. Missing enrichment and Source display fields remain null or omitted according to the route schema. Trend metrics are nullable; Beans does not fabricate zero values.
 
 Errors use HTTP status plus { "error": { "code": "...", "message": "..." } }. Successful responses do not repeat a status field.
 
@@ -136,8 +138,75 @@ Use these tools in this order when the question is about publisher material:
 
 The MCP server is https://api.cafecito.tech/beans/mcp. The same API key is used for REST and MCP. Pass cursor tokens unchanged.
 
-## Planned, gated capabilities
+## Stories
 
-Stories require persistent public Story UUIDs and persisted membership before publication. Count routes require bounded filters, approved query plans, and response tests. These capabilities remain in the design proposal and are intentionally absent from the live route list until their gates are met.
+Stories have stable UUID identifiers. Start with GET /beans/stories, then pass data[].id to GET /beans/stories/{id} or GET /beans/stories/{id}/articles. Story discovery accepts q, score_threshold with q, Article filters, min_article_count, date bounds, and cursor pagination. Member-Article requests accept Article filters, full_content, date bounds, and cursor pagination.
+
+links.articles in a Story detail response is the service-relative member path. For the public gateway, call GET /beans followed by that value.
+
+~~~bash
+curl -s "https://api.cafecito.tech/beans/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49" -H "Authorization: Bearer YOUR_API_KEY"
+curl -s --get "https://api.cafecito.tech/beans/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49/articles" -H "Authorization: Bearer YOUR_API_KEY" --data-urlencode "content_type=news" --data-urlencode "limit=20"
+~~~
+
+Story detail response:
+
+~~~json
+{
+  "data": {
+    "id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+    "title": "Example Story",
+    "first_published_at": "2026-08-20T10:00:00Z",
+    "last_published_at": "2026-08-24T10:00:00Z",
+    "article_count": 4,
+    "source_count": 3,
+    "categories": ["technology"],
+    "regions": [],
+    "entities": [],
+    "tags": ["technology"],
+    "top_articles": [],
+    "links": {
+      "articles": "/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49/articles"
+    }
+  }
+}
+~~~
+
+Member-Article response:
+
+~~~json
+{
+  "pagination": {
+    "limit": 20,
+    "num_results": 1,
+    "next_cursor": null
+  },
+  "meta": {
+    "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+    "as_of": "2026-08-24T00:00:00Z"
+  },
+  "data": [
+    {
+      "id": "e4270d59-2fd8-4a2f-90ce-b1a669bedb75",
+      "url": "https://publisher.example/article",
+      "content_type": "news",
+      "published_at": "2026-08-24T10:00:00Z",
+      "author": null,
+      "image_url": null,
+      "title": "Article headline",
+      "summary": "Article summary",
+      "categories": ["technology"],
+      "regions": [],
+      "entities": [],
+      "sentiments": [],
+      "tags": ["technology"],
+      "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+      "source": null
+    }
+  ]
+}
+~~~
+
+Count routes remain unpublished.
 
 See the [Beans migration guide](/products/beans/migration) for provider comparisons and the [API reference](/api/beans) for exact schemas.

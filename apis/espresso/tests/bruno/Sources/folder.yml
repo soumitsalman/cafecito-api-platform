@@ -1,0 +1,6 @@
+info:
+  name: Sources
+  type: folder
+
+request:
+  auth: inherit

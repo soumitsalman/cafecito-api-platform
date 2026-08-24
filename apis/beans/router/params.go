@@ -26,6 +26,13 @@ type itemIDParams struct {
 	ID uuid.UUID `uri:"id,parser=encoding.TextUnmarshaler" binding:"required" swaggertype:"string" format:"uuid"`
 }
 
+func (params *itemIDParams) shouldBind(c *gin.Context) error {
+	if err := c.ShouldBindUri(params); err != nil {
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
+	}
+	return nil
+}
+
 // articleFilterParams contains the non-query, non-identity Article filters
 // shared by B01, B03, B04, B05, and B06 target requests.
 type articleFilterParams struct {
@@ -143,16 +150,16 @@ func (params *articleMentionsParams) shouldBind(c *gin.Context) error {
 	return nil
 }
 
-// sourceListParams is the B12 GET /sources target request. The current route
+// sourceSearchParams is the B12 GET /sources target request. The current route
 // getSources in routes.go binds this target request.
-type sourceListParams struct {
+type sourceSearchParams struct {
 	Q       string      `form:"q" binding:"max=512"`
 	IDs     []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	Domains []string    `form:"domains" collection_format:"csv" binding:"max=100"`
 	paginationParams
 }
 
-func (params *sourceListParams) shouldBind(c *gin.Context) error {
+func (params *sourceSearchParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindQuery(params); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
@@ -186,22 +193,22 @@ func (params *tagListParams) shouldBind(c *gin.Context) error {
 	return nil
 }
 
-// storyPathParams binds the B10/B11 path story_id parameter.
-// Story IDs are opaque strings (currently a derived cluster key; later a URL).
-type storyPathParams struct {
-	StoryID string `uri:"story_id" binding:"required"`
-}
+// // storyPathParams binds the B10/B11 path story_id parameter.
+// // Story IDs are opaque strings (currently a derived cluster key; later a URL).
+// type storyPathParams struct {
+// 	StoryID string `uri:"story_id" binding:"required"`
+// }
 
-func (params *storyPathParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(params); err != nil {
-		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
-	}
-	params.StoryID = strings.TrimSpace(params.StoryID)
-	if params.StoryID == "" {
-		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required")
-	}
-	return nil
-}
+// func (params *storyPathParams) shouldBind(c *gin.Context) error {
+// 	if err := c.ShouldBindUri(params); err != nil {
+// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
+// 	}
+// 	params.StoryID = strings.TrimSpace(params.StoryID)
+// 	if params.StoryID == "" {
+// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required")
+// 	}
+// 	return nil
+// }
 
 // storySearchParams is the B09 GET /stories target request.
 type storySearchParams struct {
@@ -225,7 +232,7 @@ func (params *storySearchParams) shouldBind(c *gin.Context) error {
 
 // storyArticleParams is the B11 GET /stories/{story_id}/articles target request.
 type storyArticleParams struct {
-	storyPathParams
+	itemIDParams
 	articleFilterParams
 	From time.Time `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	To   time.Time `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
@@ -233,7 +240,7 @@ type storyArticleParams struct {
 }
 
 func (params *storyArticleParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(&params.storyPathParams); err != nil {
+	if err := c.ShouldBindUri(&params.itemIDParams); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	if err := c.ShouldBindQuery(params); err != nil {

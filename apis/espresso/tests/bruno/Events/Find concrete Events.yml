@@ -1,0 +1,721 @@
+info:
+  name: Find concrete Events
+  type: http
+  seq: 1
+  tags:
+    - Events
+
+http:
+  method: GET
+  url: "{{baseUrl}}/events"
+  params:
+    - name: q
+      value: ""
+      type: query
+      description: Optional natural-language semantic query. Max 1024 characters.
+      disabled: true
+    - name: score_threshold
+      value: "0.5"
+      type: query
+      description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+    - name: from
+      value: ""
+      type: query
+      description: Inclusive created_at lower bound (YYYY-MM-DD).
+      disabled: true
+    - name: to
+      value: ""
+      type: query
+      description: Inclusive created_at upper bound (YYYY-MM-DD).
+      disabled: true
+    - name: ids
+      value: ""
+      type: query
+      description: Restrict to Event UUIDs (CSV).
+      disabled: true
+    - name: event_types
+      value: ""
+      type: query
+      description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+      disabled: true
+    - name: categories
+      value: ""
+      type: query
+      description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+      disabled: true
+    - name: entities
+      value: ""
+      type: query
+      description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+      disabled: true
+    - name: impact_levels
+      value: ""
+      type: query
+      description: Exact impact-level names (CSV), for example high,medium.
+      disabled: true
+    - name: companies
+      value: ""
+      type: query
+      description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+      disabled: true
+    - name: people
+      value: ""
+      type: query
+      description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+      disabled: true
+    - name: products
+      value: ""
+      type: query
+      description: Exact product names in snake_case (CSV), for example windows,geforce.
+      disabled: true
+    - name: regions
+      value: ""
+      type: query
+      description: Exact region names in snake_case (CSV), for example north_america,europe.
+      disabled: true
+    - name: source_ids
+      value: ""
+      type: query
+      description: Restrict to direct Event source UUIDs (CSV).
+      disabled: true
+    - name: tags
+      value: ""
+      type: query
+      description: Fuzzy text match against persisted tag labels (CSV).
+      disabled: true
+    - name: response_type
+      value: json
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+    - name: response_type
+      value: yaml
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: response_type
+      value: toon
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: limit
+      value: "20"
+      type: query
+      description: Maximum records per page. Default 20, max 100.
+    - name: cursor
+      value: ""
+      type: query
+      description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Event collection envelope
+    request:
+      url: "{{baseUrl}}/events"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Event UUIDs (CSV).
+          disabled: true
+        - name: event_types
+          value: ""
+          type: query
+          description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+          disabled: true
+        - name: categories
+          value: ""
+          type: query
+          description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+          disabled: true
+        - name: entities
+          value: ""
+          type: query
+          description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: companies
+          value: ""
+          type: query
+          description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: people
+          value: ""
+          type: query
+          description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+          disabled: true
+        - name: products
+          value: ""
+          type: query
+          description: Exact product names in snake_case (CSV), for example windows,geforce.
+          disabled: true
+        - name: regions
+          value: ""
+          type: query
+          description: Exact region names in snake_case (CSV), for example north_america,europe.
+          disabled: true
+        - name: source_ids
+          value: ""
+          type: query
+          description: Restrict to direct Event source UUIDs (CSV).
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {}
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "cursor": "",
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Invalid query parameters, malformed UUID, or malformed cursor token
+    request:
+      url: "{{baseUrl}}/events"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Event UUIDs (CSV).
+          disabled: true
+        - name: event_types
+          value: ""
+          type: query
+          description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+          disabled: true
+        - name: categories
+          value: ""
+          type: query
+          description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+          disabled: true
+        - name: entities
+          value: ""
+          type: query
+          description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: companies
+          value: ""
+          type: query
+          description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: people
+          value: ""
+          type: query
+          description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+          disabled: true
+        - name: products
+          value: ""
+          type: query
+          description: Exact product names in snake_case (CSV), for example windows,geforce.
+          disabled: true
+        - name: regions
+          value: ""
+          type: query
+          description: Exact region names in snake_case (CSV), for example north_america,europe.
+          disabled: true
+        - name: source_ids
+          value: ""
+          type: query
+          description: Restrict to direct Event source UUIDs (CSV).
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Missing or invalid API key
+    request:
+      url: "{{baseUrl}}/events"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Event UUIDs (CSV).
+          disabled: true
+        - name: event_types
+          value: ""
+          type: query
+          description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+          disabled: true
+        - name: categories
+          value: ""
+          type: query
+          description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+          disabled: true
+        - name: entities
+          value: ""
+          type: query
+          description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: companies
+          value: ""
+          type: query
+          description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: people
+          value: ""
+          type: query
+          description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+          disabled: true
+        - name: products
+          value: ""
+          type: query
+          description: Exact product names in snake_case (CSV), for example windows,geforce.
+          disabled: true
+        - name: regions
+          value: ""
+          type: query
+          description: Exact region names in snake_case (CSV), for example north_america,europe.
+          disabled: true
+        - name: source_ids
+          value: ""
+          type: query
+          description: Restrict to direct Event source UUIDs (CSV).
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Concurrency limit exceeded; retry shortly
+    request:
+      url: "{{baseUrl}}/events"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Event UUIDs (CSV).
+          disabled: true
+        - name: event_types
+          value: ""
+          type: query
+          description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+          disabled: true
+        - name: categories
+          value: ""
+          type: query
+          description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+          disabled: true
+        - name: entities
+          value: ""
+          type: query
+          description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: companies
+          value: ""
+          type: query
+          description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: people
+          value: ""
+          type: query
+          description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+          disabled: true
+        - name: products
+          value: ""
+          type: query
+          description: Exact product names in snake_case (CSV), for example windows,geforce.
+          disabled: true
+        - name: regions
+          value: ""
+          type: query
+          description: Exact region names in snake_case (CSV), for example north_america,europe.
+          disabled: true
+        - name: source_ids
+          value: ""
+          type: query
+          description: Restrict to direct Event source UUIDs (CSV).
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Database or embedder unavailable; retry
+    request:
+      url: "{{baseUrl}}/events"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Event UUIDs (CSV).
+          disabled: true
+        - name: event_types
+          value: ""
+          type: query
+          description: Exact Event type names in snake_case (CSV), for example policy_change,market_entry.
+          disabled: true
+        - name: categories
+          value: ""
+          type: query
+          description: Exact category names in snake_case (CSV), for example regulation,technology. This is separate from event_types.
+          disabled: true
+        - name: entities
+          value: ""
+          type: query
+          description: Exact entity names in snake_case, matched against company or people names (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: companies
+          value: ""
+          type: query
+          description: Exact company names in snake_case (CSV), for example microsoft,nvidia.
+          disabled: true
+        - name: people
+          value: ""
+          type: query
+          description: Exact person names in snake_case (CSV), for example sam_altman,elon_musk.
+          disabled: true
+        - name: products
+          value: ""
+          type: query
+          description: Exact product names in snake_case (CSV), for example windows,geforce.
+          disabled: true
+        - name: regions
+          value: ""
+          type: query
+          description: Exact region names in snake_case (CSV), for example north_america,europe.
+          disabled: true
+        - name: source_ids
+          value: ""
+          type: query
+          description: Restrict to direct Event source UUIDs (CSV).
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Use when the user asks what happened to a company, person, product, region, or topic. Returns concrete Event records, not article bodies and not synthesized conclusions.
+  Carry a selected `data[].id` into Event detail, evidence, or related-Signals routes. Use `tags` for fuzzy concepts; use structured filters for exact normalized values. `categories` is not an alias for `event_types`.
+  Search Signals instead when the user asks for meaning, implication, or outlook. `from` and `to` bound record `created_at`, not occurrence or publication time.

@@ -67,8 +67,7 @@ definitions:
       source:
         $ref: '#/definitions/router.SourceDocument'
       story_id:
-        description: 'StoryID    *uuid.UUID     `json:"story_id" swaggertype:"string"
-          format:"uuid"` // TODO: enable this later'
+        format: uuid
         type: string
       summary:
         type: string
@@ -141,8 +140,7 @@ definitions:
       source:
         $ref: '#/definitions/router.SourceDocument'
       story_id:
-        description: 'StoryID    *uuid.UUID     `json:"story_id" swaggertype:"string"
-          format:"uuid"` // TODO: enable this later'
+        format: uuid
         type: string
       summary:
         type: string
@@ -266,6 +264,146 @@ definitions:
       url:
         type: string
     type: object
+  router.StoryArticleCollectionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/router.ArticleDocument'
+        type: array
+      meta:
+        $ref: '#/definitions/router.StoryArticleMeta'
+      pagination:
+        $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
+    type: object
+  router.StoryArticleMeta:
+    properties:
+      as_of:
+        type: string
+      story_id:
+        type: string
+    type: object
+  router.StoryArticlePreviewDocument:
+    properties:
+      id:
+        format: uuid
+        type: string
+      published_at:
+        format: date-time
+        type: string
+      source:
+        $ref: '#/definitions/router.SourceDocument'
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  router.StoryCollectionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/router.StoryDocument'
+        type: array
+      meta:
+        $ref: '#/definitions/router.ResponseMeta'
+      pagination:
+        $ref: '#/definitions/router.Pagination'
+    required:
+    - data
+    - meta
+    - pagination
+    type: object
+  router.StoryDetail:
+    properties:
+      article_count:
+        type: integer
+      categories:
+        items:
+          type: string
+        type: array
+      entities:
+        items:
+          type: string
+        type: array
+      first_published_at:
+        format: date-time
+        type: string
+      id:
+        type: string
+      last_published_at:
+        format: date-time
+        type: string
+      links:
+        $ref: '#/definitions/router.StoryLinks'
+      regions:
+        items:
+          type: string
+        type: array
+      source_count:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      top_articles:
+        items:
+          $ref: '#/definitions/router.StoryArticlePreviewDocument'
+        type: array
+    type: object
+  router.StoryDetailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/router.StoryDetail'
+    required:
+    - data
+    type: object
+  router.StoryDocument:
+    properties:
+      article_count:
+        type: integer
+      categories:
+        items:
+          type: string
+        type: array
+      entities:
+        items:
+          type: string
+        type: array
+      first_published_at:
+        format: date-time
+        type: string
+      id:
+        type: string
+      last_published_at:
+        format: date-time
+        type: string
+      regions:
+        items:
+          type: string
+        type: array
+      source_count:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      top_articles:
+        items:
+          $ref: '#/definitions/router.StoryArticlePreviewDocument'
+        type: array
+    type: object
+  router.StoryLinks:
+    properties:
+      articles:
+        type: string
+    type: object
   router.TagCollectionResponse:
     properties:
       data:
@@ -318,17 +456,21 @@ info:
 paths:
   /articles/{id}:
     get:
-      description: |-
-        Answers: What did this specific publisher Article say?
-        Returns: One Article detail record inside data, identified by the Article UUID, with links for similar Articles and observed external mentions.
-        Use when: an agent already has an Article UUID and needs citable metadata, Source context, or optional full content.
-        Do not use when: the Article UUID is unknown; use search or a feed first.
-        Search/filter behavior: the path UUID is exact; full_content=true requests the available body without changing identity.
-        Time: published_at is the publisher publication timestamp; this route has no time window.
-        Sort/pagination: one detail record; no cursor or ordering applies.
-        Missing fields: title, summary, author, image, Source metadata, story_id, and content may be null or omitted.
-        Next step: follow links.similar for ranked related reading or links.mentions for external observations.
+      description: Returns one Article selected by UUID. Set full_content=true to
+        request content when available.
       operationId: getArticle
+      parameters:
+      - description: Article UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
       produces:
       - application/json
       responses:
@@ -337,23 +479,23 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleDetailResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: Not Found
+          description: Article not found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
       summary: Get an Article
@@ -361,17 +503,52 @@ paths:
       - Articles
   /articles/{id}/mentions:
     get:
-      description: |-
-        Answers: Where was this Article URL observed on external social or forum platforms?
-        Returns: A cursor-paginated collection of external mention observations; a mention is not another publisher Article.
-        Use when: external attention or discussion observations are needed for a known Article.
-        Do not use when: publisher republication coverage or related reading is needed.
-        Search/filter behavior: the path UUID is exact; optional platforms and forums filters select mention metadata.
-        Time: from and to are inclusive UTC observation-date bounds in YYYY-MM-DD.
-        Sort/pagination: observed-time order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: forum and engagement metrics may be null; empty results are HTTP 200 with data: [].
-        Next step: use GET /articles/{id} to return to the Article citation or GET /articles/trending for aggregate attention ranking.
+      description: Returns external platform or forum observations for an Article
+        UUID, ordered by observation time.
       operationId: getArticleMentions
+      parameters:
+      - description: Article UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - collectionFormat: csv
+        description: Mention platforms (CSV).
+        in: query
+        items:
+          type: string
+        name: platforms
+        type: array
+      - collectionFormat: csv
+        description: Mention forums (CSV).
+        in: query
+        items:
+          type: string
+        name: forums
+        type: array
+      - description: UTC lower observation timestamp.
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: UTC upper observation timestamp.
+        format: date
+        in: query
+        name: to
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -380,41 +557,164 @@ paths:
           schema:
             $ref: '#/definitions/router.MentionCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: Not Found
+          description: Article not found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Article Mentions
+      summary: List Article mentions
       tags:
       - Articles
   /articles/{id}/similar:
     get:
-      description: |-
-        Answers: Which other publisher Articles are useful related reading for this Article?
-        Returns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.
-        Use when: an agent has selected an Article and wants comparable coverage or related context.
-        Do not use when: all Articles in a durable Story or external mentions are needed.
-        Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
-        Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.
-        Sort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: Article enrichment, Source metadata, and content may be null or omitted.
-        Next step: use GET /articles/{id} on a selected result for detail and optional full content.
+      description: Returns related Articles for an Article UUID, ordered newest first.
+        It is not a relevance-ranked search route.
       operationId: getSimilarArticles
+      parameters:
+      - description: Article UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - description: UTC lower timestamp bound.
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: UTC upper timestamp bound.
+        format: date
+        in: query
+        name: to
+        type: string
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -423,41 +723,159 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: Not Found
+          description: Article not found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: Find Similar Articles
+      summary: List related Articles
       tags:
       - Articles
   /articles/latest:
     get:
-      description: |-
-        Answers: What Articles were published most recently within the requested filters?
-        Returns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].
-        Use when: publication recency matters more than full-corpus relevance.
-        Do not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.
-        Search/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.
-        Time: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.
-        Sort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.
-        Next step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.
+      description: Returns Articles ordered newest first. Date bounds are not accepted.
       operationId: getLatestArticles
+      parameters:
+      - description: Optional relevance query. Requires score_threshold greater than
+          zero.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Required when q is supplied.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -466,37 +884,179 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Latest Articles
+      summary: List latest Articles
       tags:
       - Articles
   /articles/search:
     get:
-      description: |-
-        Answers: Which publisher Articles match this topic, identity, Source, label, or publication-date query?
-        Returns: A cursor-paginated collection where each data item is one publisher Article identified by UUID. Empty results are HTTP 200 with data: [].
-        Use when: broad Article retrieval, semantic topic search, exact Article IDs or URLs, or combined Article filters are needed.
-        Do not use when: newest-only, headline-only, or attention-ranked results are needed; use latest, top-headlines, or trending.
-        Search/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.
-        Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD form.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100. offset and page are not supported.
-        Missing fields: Article enrichment, Source metadata, story_id, content, and trend may be null or omitted. Content requires full_content=true and source availability.
-        Next step: use GET /articles/{id} for one selected Article, then follow its similar or mentions link.
+      description: Returns Articles matching an optional relevance query, exact Article
+        IDs or URLs, and filters. Without q, results are newest first.
       operationId: searchArticles
+      parameters:
+      - description: Optional relevance query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Optional relevance threshold used with q.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - collectionFormat: csv
+        description: Exact Article UUIDs (CSV).
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
+      - collectionFormat: csv
+        description: Exact Article URLs (CSV).
+        in: query
+        items:
+          type: string
+        name: urls
+        type: array
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - description: UTC lower timestamp bound.
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: UTC upper timestamp bound.
+        format: date
+        in: query
+        name: to
+        type: string
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -505,19 +1065,19 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
       summary: Search Articles
@@ -525,17 +1085,136 @@ paths:
       - Articles
   /articles/trending:
     get:
-      description: |-
-        Answers: Which Articles are receiving the most observed attention within the requested window?
-        Returns: A cursor-paginated collection of Articles ordered by attention, with nullable trend metrics when available. Empty results are HTTP 200 with data: [].
-        Use when: an agent needs what is gaining attention now rather than only what was published most recently.
-        Do not use when: chronological monitoring or a fixed headline window is needed; use latest or top-headlines.
-        Search/filter behavior: accepts q with optional score_threshold and the shared Article filters; filters narrow candidates before attention ordering.
-        Time: from and to are inclusive UTC dates applied to observed trend activity; omitted from defaults to the most recent 7 days.
-        Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: trend and each metric can be absent or null; zero is not fabricated when unavailable.
-        Next step: use GET /articles/{id} for detail or GET /articles/{id}/similar for related reading.
+      description: Returns attention-ranked Articles with trend metrics when available.
+        Date bounds are not accepted.
       operationId: getTrendingArticles
+      parameters:
+      - description: Optional relevance query. Requires score_threshold greater than
+          zero.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Required when q is supplied.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -544,37 +1223,46 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Trending Articles
+      summary: List trending Articles
       tags:
       - Articles
   /categories:
     get:
-      description: |-
-        Answers: Which normalized category labels can I use as Article filters?
-        Returns: A cursor-paginated collection of category labels used by Article records.
-        Use when: an agent has an unknown category spelling and needs discovery before Article filtering.
-        Do not use when: a known normalized label is already available; query Articles directly.
-        Search/filter behavior: q performs case-insensitive discovery matching; returned values are normalized labels.
-        Time: no time filter applies.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: the collection may be empty; this route does not define a taxonomy hierarchy.
-        Next step: carry a returned value into the categories Article filter.
+      description: Lists values accepted by the corresponding Article filter.
       operationId: listCategories
+      parameters:
+      - description: Optional case-insensitive prefix query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -583,33 +1271,46 @@ paths:
           schema:
             $ref: '#/definitions/router.TagCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Category Labels
+      summary: List category labels
       tags:
       - Discovery
   /entities:
     get:
-      description: |-
-        Answers: Which normalized entity labels can I use as Article filters?
-        Returns: A cursor-paginated collection of extracted entity labels. Values are labels, not canonical entity profiles or IDs.
-        Use when: an agent has an unknown entity spelling and needs discovery before Article filtering.
-        Do not use when: a known normalized label is already available; query Articles directly.
-        Search/filter behavior: q performs case-insensitive discovery matching.
-        Time: no time filter applies.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: the collection may be empty; no entity type or confidence is promised.
-        Next step: carry a returned value into the entities Article filter.
+      description: Lists values accepted by the corresponding Article filter.
       operationId: listEntities
+      parameters:
+      - description: Optional case-insensitive prefix query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -618,18 +1319,22 @@ paths:
           schema:
             $ref: '#/definitions/router.TagCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Entity Labels
+      summary: List entity labels
       tags:
       - Discovery
   /health:
@@ -651,17 +1356,26 @@ paths:
       - Health
   /regions:
     get:
-      description: |-
-        Answers: Which normalized extracted region labels can I use as Article filters?
-        Returns: A cursor-paginated collection of region labels, not country codes, coordinates, or radius-search objects.
-        Use when: an agent has an unknown region spelling and needs discovery before Article filtering.
-        Do not use when: a known normalized label is already available; query Articles directly.
-        Search/filter behavior: q performs case-insensitive discovery matching.
-        Time: no time filter applies.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: the collection may be empty; structured geography is not promised.
-        Next step: carry a returned value into the regions Article filter.
+      description: Lists values accepted by the corresponding Article filter.
       operationId: listRegions
+      parameters:
+      - description: Optional case-insensitive prefix query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -670,33 +1384,46 @@ paths:
           schema:
             $ref: '#/definitions/router.TagCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Region Labels
+      summary: List region labels
       tags:
       - Discovery
   /sentiments:
     get:
-      description: |-
-        Answers: Which categorical sentiment labels can I use as Article filters?
-        Returns: A cursor-paginated collection of sentiment labels observed on Articles.
-        Use when: an agent has an unknown sentiment spelling and needs discovery before Article filtering.
-        Do not use when: a known label is already available; query Articles directly.
-        Search/filter behavior: q performs case-insensitive discovery matching; sentiments are categorical labels, not calibrated numeric scores.
-        Time: no time filter applies.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: the collection may be empty; no confidence or numeric sentiment score is returned.
-        Next step: carry a returned value into the sentiments Article filter.
+      description: Lists values accepted by the corresponding Article filter.
       operationId: listSentiments
+      parameters:
+      - description: Optional case-insensitive prefix query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -705,33 +1432,54 @@ paths:
           schema:
             $ref: '#/definitions/router.TagCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Sentiment Labels
+      summary: List sentiment labels
       tags:
       - Discovery
   /sources:
     get:
-      description: |-
-        Answers: Which publisher Sources match this metadata query?
-        Returns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.
-        Use when: an agent needs Source metadata for citations or a Source UUID for Article filtering.
-        Do not use when: Article content or publication search is needed; use GET /articles/search or a feed.
-        Search/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.
-        Time: no time filter applies; Source metadata is current as returned.
-        Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.
-        Next step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.
+      description: Returns publisher Sources. q matches the beginning of Source metadata;
+        domains narrows results.
       operationId: listSources
+      parameters:
+      - description: Optional Source prefix query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - collectionFormat: csv
+        description: Source domains (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -740,19 +1488,19 @@ paths:
           schema:
             $ref: '#/definitions/router.SourceCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
       summary: List Sources
@@ -760,17 +1508,15 @@ paths:
       - Sources
   /sources/{id}:
     get:
-      description: |-
-        Answers: What publisher metadata belongs to this Source UUID?
-        Returns: One Source detail record inside data. Optional display metadata is returned only when available.
-        Use when: an agent needs to enrich an Article citation or inspect a known publisher.
-        Do not use when: the agent needs Articles from this Source; use GET /articles/search with sources.
-        Search/filter behavior: the path UUID is exact; no collection filters apply.
-        Time: no time filter applies.
-        Sort/pagination: one detail record; no cursor or ordering applies.
-        Missing fields: name, description, favicon_url, and rss_feed_url may be null.
-        Next step: use the Source UUID in Article search filters.
+      description: Returns one publisher Source selected by UUID.
       operationId: getSource
+      parameters:
+      - description: Source UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -779,41 +1525,516 @@ paths:
           schema:
             $ref: '#/definitions/router.SourceDetailResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: Not Found
+          description: Source not found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
       summary: Get a Source
       tags:
       - Sources
+  /stories:
+    get:
+      description: Returns Stories identified by stable UUIDs. Use Story filters to
+        narrow coverage; a Story collection does not include every member Article.
+      operationId: listStories
+      parameters:
+      - description: Optional Story relevance query.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Optional Story relevance threshold; requires q.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: 2
+        description: Minimum Story Article count. Default 2.
+        in: query
+        minimum: 2
+        name: min_article_count
+        type: integer
+      - description: UTC lower publication timestamp.
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: UTC upper publication timestamp.
+        format: date
+        in: query
+        name: to
+        type: string
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Story collection envelope
+          schema:
+            $ref: '#/definitions/router.StoryCollectionResponse'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "401":
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: List Stories
+      tags:
+      - Stories
+  /stories/{id}:
+    get:
+      description: Returns one Story selected by its stable UUID, including a link
+        to its paginated member Articles.
+      operationId: getStory
+      parameters:
+      - description: Story UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Story detail envelope
+          schema:
+            $ref: '#/definitions/router.StoryDetailResponse'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "401":
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "404":
+          description: Story not found
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: Get a Story
+      tags:
+      - Stories
+  /stories/{id}/articles:
+    get:
+      description: Returns the member Articles for one stable Story UUID. Article
+        filters narrow the returned members.
+      operationId: listStoryArticles
+      parameters:
+      - description: Story UUID.
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stored Article type.
+        enum:
+        - blog
+        - contract
+        - earnings_report
+        - enforcement_action
+        - financial_report
+        - lawsuit
+        - news
+        - official_statement
+        - podcast
+        - post
+        - press_release
+        - research_paper
+        - site
+        - technical_documentation
+        - whitepaper
+        in: query
+        name: content_type
+        type: string
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - description: UTC lower publication timestamp.
+        format: date
+        in: query
+        name: from
+        type: string
+      - description: UTC upper publication timestamp.
+        format: date
+        in: query
+        name: to
+        type: string
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Story Article collection envelope
+          schema:
+            $ref: '#/definitions/router.StoryArticleCollectionResponse'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "401":
+          description: Missing or invalid API key
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "404":
+          description: Story not found
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "429":
+          description: Request limit reached
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: List Story Articles
+      tags:
+      - Stories
   /top-headlines:
     get:
-      description: |-
-        Answers: Which Articles are attracting headline-level attention in the fixed recent window?
-        Returns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].
-        Use when: a breaking-news or daily-headline feed is needed without choosing a custom time range.
-        Do not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.
-        Search/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.
-        Time: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.
-        Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-        Missing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.
-        Next step: use GET /articles/{id} when a headline needs citable detail or full content.
+      description: Returns news Articles from the recent 24-hour window, ordered by
+        attention. content_type and date bounds are not accepted.
       operationId: getTopHeadlines
+      parameters:
+      - description: Optional relevance query. Requires score_threshold greater than
+          zero.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Required when q is supplied.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -822,22 +2043,22 @@ paths:
           schema:
             $ref: '#/definitions/router.ArticleCollectionResponse'
         "400":
-          description: Bad Request
+          description: Invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "429":
-          description: Too Many Requests
+          description: Request limit reached
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: List Top Headlines
+      summary: List top headlines
       tags:
       - Articles
 schemes:

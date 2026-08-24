@@ -1,0 +1,166 @@
+info:
+  name: List Latest Articles
+  type: http
+  seq: 1
+  tags:
+    - Articles
+
+http:
+  method: GET
+  url: "{{baseUrl}}/articles/latest?tags=startups&domains=substack"
+  params:
+    - name: tags
+      value: startups
+      type: query
+    - name: domains
+      value: substack
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/articles/latest"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "author": "",
+                "categories": [],
+                "content": "",
+                "content_type": "blog",
+                "entities": [],
+                "id": "",
+                "image_url": "",
+                "published_at": "",
+                "regions": [],
+                "sentiments": [],
+                "source": {
+                  "description": "",
+                  "domain": "",
+                  "favicon_url": "",
+                  "id": "",
+                  "name": "",
+                  "rss_feed_url": "",
+                  "url": ""
+                },
+                "story_id": "",
+                "summary": "",
+                "tags": [],
+                "title": "",
+                "trend": {
+                  "audience": 0,
+                  "comments": 0,
+                  "likes": 0,
+                  "mentions": 0,
+                  "related": 0,
+                  "trend_score": 0
+                },
+                "url": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/articles/latest"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/articles/latest"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/articles/latest"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/articles/latest"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+
+docs: |-
+  Answers: What Articles were published most recently within the requested filters?
+  Returns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].
+  Use when: publication recency matters more than full-corpus relevance.
+  Do not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.
+  Search/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.
+  Time: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.
+  Sort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
+  Missing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.
+  Next step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.

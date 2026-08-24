@@ -27,7 +27,7 @@ const (
 	ROUTE_SEARCH     = "/articles/search"
 	ROUTE_LATEST     = "/articles/latest"
 	ROUTE_TRENDING   = "/articles/trending"
-	ROUTE_HEADLINES  = "/headlines"
+	ROUTE_HEADLINES  = "/top-headlines"
 	ROUTE_ARTICLES   = "/articles"
 	ROUTE_COUNT      = "/articles/count"
 	ROUTE_SOURCES    = "/sources"
@@ -133,6 +133,7 @@ func assertExpectedPagination(t *testing.T, body []byte, expected_limit int) []m
 	env := parseCollection(t, body)
 	require.NotNil(t, env.Data)
 	require.Equal(t, float64(expected_limit), env.Pagination["limit"])
+	assert.Len(t, env.Pagination, 2)
 	require.Contains(t, env.Pagination, "next_cursor")
 	assert.NotContains(t, env.Pagination, "page")
 	assert.NotContains(t, env.Pagination, "offset")
@@ -212,6 +213,12 @@ func assertStringArrayField(t *testing.T, item map[string]any, field string) {
 	require.NotNil(t, values, "%s must be [] rather than null", field)
 }
 
+func assertExpectedSourceSummary(t *testing.T, source map[string]any) {
+	t.Helper()
+	assertExpectedSource(t, source)
+	require.Len(t, source, 4)
+}
+
 func assertExpectedSource(t *testing.T, source map[string]any) {
 	t.Helper()
 	require.Contains(t, source, "id")
@@ -238,12 +245,18 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 	assert.Contains(t, item, "content_type")
 	content_type, ok := item["content_type"].(string)
 	require.True(t, ok, "article has invalid content_type")
-	assert.Contains(t, []string{"blog", "contract", "earnings_report", "enforcement_action", "financial_report", "lawsuit", "news", "official_statement", "podcast", "post", "press_release", "research_paper", "site", "technical_documentation", "whitepaper"}, content_type)
+	assert.Contains(t, []string{"blog", "news"}, content_type)
 	assert.NotEmpty(t, item["title"])
 	assert.Contains(t, item, "summary")
 	assert.Contains(t, item, "author")
 	assert.Contains(t, item, "image_url")
-	assert.Contains(t, item, "story_id")
+	require.Contains(t, item, "story_id")
+	if item["story_id"] != nil {
+		storyID, ok := item["story_id"].(string)
+		require.True(t, ok, "article story_id must be a UUID or null")
+		_, err := uuid.Parse(storyID)
+		require.NoError(t, err, "article has invalid story_id: %q", storyID)
+	}
 
 	published_at, ok := item["published_at"].(string)
 	require.True(t, ok, "article is missing published_at")
@@ -259,6 +272,13 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 
 	for _, field := range []string{"categories", "regions", "entities", "sentiments", "tags"} {
 		assertStringArrayField(t, item, field)
+		for _, raw := range item[field].([]any) {
+			value, ok := raw.(string)
+			require.True(t, ok, "%s values must be strings", field)
+			assert.Equal(t, strings.ToLower(value), value)
+			assert.NotContains(t, value, " ")
+			assert.NotContains(t, value, "-")
+		}
 	}
 }
 
@@ -267,7 +287,7 @@ func assertExpectedTrend(t *testing.T, item map[string]any) {
 	trend, ok := item["trend"].(map[string]any)
 	require.True(t, ok, "trending article is missing nested trend")
 	for _, field := range []string{
-		"likes", "comments", "mentions", "audience", "related",
+		"likes", "comments", "mentions", "audiences", "related", "trend_score",
 	} {
 		require.Contains(t, trend, field)
 		if trend[field] != nil {
@@ -276,6 +296,7 @@ func assertExpectedTrend(t *testing.T, item map[string]any) {
 		}
 	}
 	assert.NotContains(t, trend, "score")
+	assert.NotContains(t, trend, "audience")
 }
 
 func assertExpectedStory(t *testing.T, story map[string]any) {
@@ -340,6 +361,7 @@ func assertExpectedTag(t *testing.T, item map[string]any) {
 	value, ok := item["value"].(string)
 	require.True(t, ok, "discovery item is missing string value")
 	assert.NotEmpty(t, value)
+	require.Len(t, item, 1)
 }
 
 func skipIfEmbedderUnavailable(t *testing.T, status int, body []byte) {
@@ -460,7 +482,7 @@ func TestRouterGetSources(t *testing.T) {
 	sources := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, sources)
 	for _, source := range sources {
-		assertExpectedSource(t, source)
+		assertExpectedSourceSummary(t, source)
 	}
 
 	first_id, ok := sources[0]["id"].(string)
@@ -488,6 +510,37 @@ func TestRouterGetSourcesByQueryAndDomain(t *testing.T) {
 	requireStatus(t, http.StatusOK, status, body)
 	assertNoCollectionMeta(t, body)
 	assertExpectedPagination(t, body, 5)
+}
+
+func TestRouterSourcesFilterByIDs(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
+	requireStatus(t, http.StatusOK, status, body)
+	sources := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, sources)
+	sourceID, ok := sources[0]["id"].(string)
+	require.True(t, ok)
+
+	params.Set("ids", sourceID)
+	status, body = routerGET(t, srv.URL, ROUTE_SOURCES, params)
+	printResponse(t, "SOURCES_BY_IDS", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
+	matched := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, matched)
+	for _, source := range matched {
+		assertExpectedSourceSummary(t, source)
+		assert.Equal(t, sourceID, source["id"])
+	}
+
+	params.Set("ids", uuid.New().String())
+	status, body = routerGET(t, srv.URL, ROUTE_SOURCES, params)
+	printResponse(t, "SOURCES_BY_MISSING_IDS", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertNoCollectionMeta(t, body)
+	assert.Empty(t, assertExpectedPagination(t, body, 5))
 }
 
 func TestRouterSourceNotFound(t *testing.T) {
@@ -601,13 +654,31 @@ func TestRouterVectorSearchArticles(t *testing.T) {
 
 func TestRouterScoreThresholdRequiresQ(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("score_threshold", "0.6")
-	params.Set("limit", "5")
-	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
-	printResponse(t, "SCORE_THRESHOLD_WITHOUT_Q", body)
-	requireStatus(t, http.StatusBadRequest, status, body)
-	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+	for _, path := range []string{ROUTE_SEARCH, ROUTE_LATEST, ROUTE_HEADLINES, ROUTE_TRENDING, ROUTE_STORIES} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("score_threshold", "0.6")
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			printResponse(t, path+"_SCORE_THRESHOLD_WITHOUT_Q", body)
+			requireStatus(t, http.StatusBadRequest, status, body)
+			assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+		})
+	}
+}
+
+func TestRouterQueryMayOmitScoreThreshold(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for _, path := range []string{ROUTE_SEARCH, ROUTE_LATEST, ROUTE_HEADLINES, ROUTE_TRENDING, ROUTE_STORIES} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("q", TEST_VECTOR_QUERY)
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			skipIfEmbedderUnavailable(t, status, body)
+			requireStatus(t, http.StatusOK, status, body)
+		})
+	}
 }
 
 func TestRouterRejectsRFC3339DateParams(t *testing.T) {
@@ -678,12 +749,12 @@ func TestRouterGetHeadlines(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_HEADLINES, params)
 	printResponse(t, "HEADLINES", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertMetaAsOf(t, body)
+	assertNoCollectionMeta(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
-		assertExpectedTrend(t, item)
+		assert.NotContains(t, item, "trend")
 	}
 }
 
@@ -698,6 +769,55 @@ func TestRouterLatestAndTrendingRejectExactIdentityFilters(t *testing.T) {
 			params.Set("limit", "5")
 			status, body := routerGET(t, srv.URL, path, params)
 			printResponse(t, path+"_IDENTITY_FILTERS", body)
+			requireStatus(t, http.StatusBadRequest, status, body)
+			assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+		})
+	}
+}
+
+func TestRouterFeedsRejectDisallowedDateBounds(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for _, path := range []string{ROUTE_LATEST, ROUTE_HEADLINES} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("from", testSearchFrom().Format("2006-01-02"))
+			params.Set("to", testSearchTo().Format("2006-01-02"))
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			printResponse(t, path+"_DATE_BOUNDS", body)
+			requireStatus(t, http.StatusBadRequest, status, body)
+			assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+		})
+	}
+}
+
+func TestRouterTrendingHonorsObservationWindow(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	params := url.Values{}
+	params.Set("from", "2000-01-01")
+	params.Set("to", "2000-01-02")
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_TRENDING, params)
+	printResponse(t, "TRENDING_OLD_WINDOW", body)
+	requireStatus(t, http.StatusOK, status, body)
+	assertMetaAsOf(t, body)
+	assert.Empty(t, assertExpectedPagination(t, body, 5))
+}
+
+func TestRouterSearchRejectsUnsupportedParameters(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for key, value := range map[string]string{
+		"content_type": "post",
+		"offset":       "5",
+		"page":         "2",
+		"sort":         "published_at",
+	} {
+		t.Run(key, func(t *testing.T) {
+			params := url.Values{}
+			params.Set(key, value)
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+			printResponse(t, "SEARCH_UNSUPPORTED_"+key, body)
 			requireStatus(t, http.StatusBadRequest, status, body)
 			assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 		})
@@ -819,7 +939,7 @@ func TestRouterStories(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_STORIES+"/"+story_id, nil)
 	printResponse(t, "STORY_DETAIL", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertDetailMetaAsOf(t, body)
+	assertNoDetailMeta(t, body)
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, story_id, detail["id"])
 	detail_story := make(map[string]any, len(detail)-1)
@@ -900,11 +1020,11 @@ func TestRouterArticlesCountRequiresDateBounds(t *testing.T) {
 func TestRouterCursorPagination(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
-	params.Set("limit", "2")
+	params.Set("limit", "5")
 	params.Set("from", time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02"))
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	requireStatus(t, http.StatusOK, status, body)
-	first := assertExpectedPagination(t, body, 2)
+	first := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, first)
 
 	cursor := nextCursorFromBody(t, body)
@@ -915,7 +1035,7 @@ func TestRouterCursorPagination(t *testing.T) {
 	params.Set("cursor", cursor)
 	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	requireStatus(t, http.StatusOK, status, body)
-	second := assertExpectedPagination(t, body, 2)
+	second := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, second)
 	assert.NotEqual(t, first[0]["id"], second[0]["id"])
 }
@@ -958,14 +1078,14 @@ func TestRouterEmptyCollection(t *testing.T) {
 func TestRouterFullContentProjection(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
-	params.Set("limit", "1")
+	params.Set("limit", "5")
 	params.Set("from", testSearchFrom().Format("2006-01-02"))
 
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "WITHOUT_FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
 	assertNoCollectionMeta(t, body)
-	without_content := assertExpectedPagination(t, body, 1)
+	without_content := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, without_content)
 	assert.NotContains(t, without_content[0], "content")
 
@@ -974,7 +1094,7 @@ func TestRouterFullContentProjection(t *testing.T) {
 	printResponse(t, "FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
 	assertNoCollectionMeta(t, body)
-	with_content := assertExpectedPagination(t, body, 1)
+	with_content := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, with_content)
 	assert.Equal(t, without_content[0]["id"], with_content[0]["id"])
 	if content, present := with_content[0]["content"]; present && content != nil {

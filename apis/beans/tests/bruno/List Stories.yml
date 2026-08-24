@@ -1,0 +1,20 @@
+info:
+  name: List Stories
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{baseUrl}}/stories?q=topic+startup+fund+raising+and+IPO"
+  params:
+    - name: q
+      value: topic+startup+fund+raising+and+IPO
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

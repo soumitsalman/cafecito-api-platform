@@ -1,0 +1,20 @@
+info:
+  name: Get a Story by UUID
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{baseUrl}}/stories/:id"
+  params:
+    - name: id
+      value: 0325c4ec-8881-5597-b8dd-a8a6eae19c49
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

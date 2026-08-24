@@ -1,0 +1,6 @@
+info:
+  name: Articles
+  type: folder
+
+request:
+  auth: inherit

@@ -4,8 +4,8 @@ import "fmt"
 
 const (
 	API_ERROR_INVALID_REQUEST = "invalid_request"
-	API_ERROR_DB_ERROR        = "db_unavailable"
-	API_ERROR_EMBEDDING_ERROR = "embedder_unavailable"
+	API_ERROR_DB_ERROR        = "db_error"
+	API_ERROR_EMBEDDING_ERROR = "embedder_error"
 	API_ERROR_ENCODING_ERROR  = "encoding_error"
 	API_ERROR_INVALID_DATA    = "invalid_data"
 	API_ERROR_NOT_FOUND       = "not_found"

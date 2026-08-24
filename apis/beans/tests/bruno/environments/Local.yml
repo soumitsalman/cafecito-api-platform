@@ -1,0 +1,7 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+    description: ""
+  - secret: true
+    name: apiKey

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -61,13 +62,13 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 }
 
 // toDBFilters converts router-level article filter params to db-level Filters.
-func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
-	filters := db.Filters{
-		Kind:              p.ContentType,
+func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters := db.BeanFilters{
+		Kind:              strings.ToLower(p.ContentType),
 		Sources:           p.Sources,
 		ExcludeSources:    p.ExcludeSources,
-		Domains:           p.Domains,
-		ExcludeDomains:    p.ExcludeDomains,
+		Domains:           utils.NormalizeTexts(p.Domains),
+		ExcludeDomains:    utils.NormalizeTexts(p.ExcludeDomains),
 		Authors:           p.Authors,
 		Tags:              utils.NormalizeTags(p.Tags),
 		Categories:        utils.NormalizeTags(p.Categories),
@@ -80,7 +81,7 @@ func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*
 	return &filters, nil
 }
 
-func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFilterParams.createFilters(c, r)
 	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
 		return nil, err
@@ -88,55 +89,62 @@ func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db
 	return filters, nil
 }
 
-func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFeedParams.createFilters(c, r)
 	filters.IDs = p.IDs
 	filters.URLs = p.URLs
 	filters.CreatedFrom = p.From
-	filters.CreatedTo = p.To
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
 	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
 	return filters, nil
 }
 
-func (p *similarArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+func (p *similarArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFilterParams.createFilters(c, r)
 	filters.CreatedFrom = p.From
-	filters.CreatedTo = p.To
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
 	return filters, nil
 }
 
-func (p *articleMentionsParams) createFilters() db.MentionFilters {
-	return db.MentionFilters{
-		Platforms:    p.Platforms,
-		Forums:       p.Forums,
+func (p *articleMentionsParams) createFilters(c *gin.Context, r *Configuration) (*db.MentionFilters, error) {
+	return &db.MentionFilters{
+		Platforms:    utils.NormalizeTexts(p.Platforms),
+		Forums:       utils.NormalizeTexts(p.Forums),
 		ObservedFrom: p.From,
-		ObservedTo:   p.To,
-	}
+		ObservedTo:   utils.NormalizeEndOfDay(p.To),
+	}, nil
 }
 
-func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+func (p *sourceSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.SourceFilters, error) {
+	return &db.SourceFilters{
+		Q:       utils.NormalizeText(p.Q),
+		Domains: utils.NormalizeTexts(p.Domains),
+		IDs:     p.IDs,
+	}, nil
+}
+
+func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.ClusterFilters, error) {
 	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.MinBeanCount = p.MinArticleCount
 	filters.FullContent = false
 	filters.CreatedFrom = p.From
-	filters.CreatedTo = p.To
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
 	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
-	return filters, nil
+	return &db.ClusterFilters{BeanFilters: *filters, MinBeanCount: p.MinArticleCount}, nil
 }
 
-func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.Filters, error) {
+func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.ClusterID = p.StoryID
+	filters.ClusterID = p.ID
 	filters.CreatedFrom = p.From
-	filters.CreatedTo = p.To
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
 	return filters, nil
 }
 
-func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
+func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
 	q := strings.TrimSpace(p.Q)
 	if q != "" {
 		filters.Embedding = config.Embedder.EmbedQuery(c, q)
@@ -174,7 +182,7 @@ func writeDetail[T any](c *gin.Context, item T) {
 	c.JSON(http.StatusOK, DetailResponse[T]{Data: item})
 }
 
-func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next_cursor *db.Cursor, story_id string) {
+func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next_cursor *db.Cursor, story_id uuid.UUID) {
 	if items == nil {
 		items = []ArticleDocument{}
 	}
@@ -220,22 +228,35 @@ func (r *Configuration) health(c *gin.Context) {
 
 // searchArticles godoc
 // @Summary Search Articles
-// @Description Answers: Which publisher Articles match this topic, identity, Source, label, or publication-date query?
-// @Description Returns: A cursor-paginated collection where each data item is one publisher Article identified by UUID. Empty results are HTTP 200 with data: [].
-// @Description Use when: broad Article retrieval, semantic topic search, exact Article IDs or URLs, or combined Article filters are needed.
-// @Description Do not use when: newest-only, headline-only, or attention-ranked results are needed; use latest, top-headlines, or trending.
-// @Description Search/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.
-// @Description Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD form.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100. offset and page are not supported.
-// @Description Missing fields: Article enrichment, Source metadata, story_id, content, and trend may be null or omitted. Content requires full_content=true and source availability.
-// @Description Next step: use GET /articles/{id} for one selected Article, then follow its similar or mentions link.
+// @Description Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.
 // @Tags Articles
 // @Produce json
+// @Param q query string false "Optional relevance query." maxlength(512)
+// @Param score_threshold query number false "Optional relevance threshold used with q." minimum(0) maximum(1)
+// @Param ids query []string false "Exact Article UUIDs (CSV)." collectionFormat(csv)
+// @Param urls query []string false "Exact Article URLs (CSV)." collectionFormat(csv)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower timestamp bound." format(date)
+// @Param to query string false "UTC upper timestamp bound." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID searchArticles
 // @Router /articles/search [get]
 func (r *Configuration) searchArticles(c *gin.Context) {
@@ -265,23 +286,32 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 }
 
 // getLatestArticles godoc
-// @Summary List Latest Articles
-// @Description Answers: What Articles were published most recently within the requested filters?
-// @Description Returns: A cursor-paginated collection of publisher Articles ordered newest first. Empty results are HTTP 200 with data: [].
-// @Description Use when: publication recency matters more than full-corpus relevance.
-// @Description Do not use when: semantic archive search, headline attention, or trend ranking is needed; use search, top-headlines, or trending.
-// @Description Search/filter behavior: accepts q, score_threshold with q, Article filters, and full_content. Include values use OR within a field; different fields combine with AND.
-// @Description Time: this feed uses a fixed recent seven-day UTC publication window; from and to are not accepted.
-// @Description Sort/pagination: newest published_at first; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: Article enrichment and Source metadata are nullable; content requires full_content=true and availability.
-// @Description Next step: use GET /articles/{id} for detail or GET /articles/trending when attention matters more than recency.
+// @Summary List latest Articles
+// @Description Returns Articles ordered newest first. Date bounds are not accepted.
 // @Tags Articles
 // @Produce json
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getLatestArticles
 // @Router /articles/latest [get]
 func (r *Configuration) getLatestArticles(c *gin.Context) {
@@ -320,23 +350,32 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 }
 
 // getTrendingArticles godoc
-// @Summary List Trending Articles
-// @Description Answers: Which Articles are receiving the most observed attention within the requested window?
-// @Description Returns: A cursor-paginated collection of Articles ordered by attention, with nullable trend metrics when available. Empty results are HTTP 200 with data: [].
-// @Description Use when: an agent needs what is gaining attention now rather than only what was published most recently.
-// @Description Do not use when: chronological monitoring or a fixed headline window is needed; use latest or top-headlines.
-// @Description Search/filter behavior: accepts q with optional score_threshold and the shared Article filters; filters narrow candidates before attention ordering.
-// @Description Time: from and to are inclusive UTC dates applied to observed trend activity; omitted from defaults to the most recent 7 days.
-// @Description Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: trend and each metric can be absent or null; zero is not fabricated when unavailable.
-// @Description Next step: use GET /articles/{id} for detail or GET /articles/{id}/similar for related reading.
+// @Summary List trending Articles
+// @Description Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.
 // @Tags Articles
 // @Produce json
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTrendingArticles
 // @Router /articles/trending [get]
 func (r *Configuration) getTrendingArticles(c *gin.Context) {
@@ -379,23 +418,31 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // getTopHeadlines is always fixed within the last 24 hours and `news` content type. The returned news are created and trending in the last 24 hours.
 // The result excludes content unless explicitly requested.
 // getTopHeadlines godoc
-// @Summary List Top Headlines
-// @Description Answers: Which Articles are attracting headline-level attention in the fixed recent window?
-// @Description Returns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].
-// @Description Use when: a breaking-news or daily-headline feed is needed without choosing a custom time range.
-// @Description Do not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.
-// @Description Search/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.
-// @Description Time: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.
-// @Description Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.
-// @Description Next step: use GET /articles/{id} when a headline needs citable detail or full content.
+// @Summary List top headlines
+// @Description Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.
 // @Tags Articles
 // @Produce json
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTopHeadlines
 // @Router /top-headlines [get]
 func (r *Configuration) getTopHeadlines(c *gin.Context) {
@@ -416,7 +463,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 	}
 
 	filters.CreatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
-	filters.UpdatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
+	filters.ObservedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
 	filters.Kind = "news"
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
@@ -430,23 +477,17 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 
 // getArticle godoc
 // @Summary Get an Article
-// @Description Answers: What did this specific publisher Article say?
-// @Description Returns: One Article detail record inside data, identified by the Article UUID, with links for similar Articles and observed external mentions.
-// @Description Use when: an agent already has an Article UUID and needs citable metadata, Source context, or optional full content.
-// @Description Do not use when: the Article UUID is unknown; use search or a feed first.
-// @Description Search/filter behavior: the path UUID is exact; full_content=true requests the available body without changing identity.
-// @Description Time: published_at is the publisher publication timestamp; this route has no time window.
-// @Description Sort/pagination: one detail record; no cursor or ordering applies.
-// @Description Missing fields: title, summary, author, image, Source metadata, story_id, and content may be null or omitted.
-// @Description Next step: follow links.similar for ranked related reading or links.mentions for external observations.
+// @Description Returns one Article selected by UUID. Set full_content=true to request content when available.
 // @Tags Articles
 // @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param full_content query bool false "Include content when available." default(false)
 // @Success 200 {object} ArticleDetailResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getArticle
 // @Router /articles/{id} [get]
 func (r *Configuration) getArticle(c *gin.Context) {
@@ -469,24 +510,34 @@ func (r *Configuration) getArticle(c *gin.Context) {
 }
 
 // getSimilarArticles godoc
-// @Summary Find Similar Articles
-// @Description Answers: Which other publisher Articles are useful related reading for this Article?
-// @Description Returns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.
-// @Description Use when: an agent has selected an Article and wants comparable coverage or related context.
-// @Description Do not use when: all Articles in a durable Story or external mentions are needed.
-// @Description Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
-// @Description Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.
-// @Description Sort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: Article enrichment, Source metadata, and content may be null or omitted.
-// @Description Next step: use GET /articles/{id} on a selected result for detail and optional full content.
+// @Summary List related Articles
+// @Description Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.
 // @Tags Articles
 // @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower timestamp bound." format(date)
+// @Param to query string false "UTC upper timestamp bound." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getSimilarArticles
 // @Router /articles/{id}/similar [get]
 func (r *Configuration) getSimilarArticles(c *gin.Context) {
@@ -520,24 +571,23 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 }
 
 // getArticleMentions godoc
-// @Summary List Article Mentions
-// @Description Answers: Where was this Article URL observed on external social or forum platforms?
-// @Description Returns: A cursor-paginated collection of external mention observations; a mention is not another publisher Article.
-// @Description Use when: external attention or discussion observations are needed for a known Article.
-// @Description Do not use when: publisher republication coverage or related reading is needed.
-// @Description Search/filter behavior: the path UUID is exact; optional platforms and forums filters select mention metadata.
-// @Description Time: from and to are inclusive UTC observation-date bounds in YYYY-MM-DD.
-// @Description Sort/pagination: observed-time order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: forum and engagement metrics may be null; empty results are HTTP 200 with data: [].
-// @Description Next step: use GET /articles/{id} to return to the Article citation or GET /articles/trending for aggregate attention ranking.
+// @Summary List Article mentions
+// @Description Returns external platform or forum observations for an Article UUID, ordered by observation time.
 // @Tags Articles
 // @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param platforms query []string false "Mention platforms (CSV)." collectionFormat(csv)
+// @Param forums query []string false "Mention forums (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower observation timestamp." format(date)
+// @Param to query string false "UTC upper observation timestamp." format(date)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} MentionCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getArticleMentions
 // @Router /articles/{id}/mentions [get]
 func (r *Configuration) getArticleMentions(c *gin.Context) {
@@ -551,8 +601,12 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-
-	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, params.createFilters(), *page_req)
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
 		shared.LogError(err, "[ERROR] QueryMentions")
 		if errors.Is(err, db.ErrNonExistentID) {
@@ -567,37 +621,38 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 
 // getSources godoc
 // @Summary List Sources
-// @Description Answers: Which publisher Sources match this metadata query?
-// @Description Returns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.
-// @Description Use when: an agent needs Source metadata for citations or a Source UUID for Article filtering.
-// @Description Do not use when: Article content or publication search is needed; use GET /articles/search or a feed.
-// @Description Search/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.
-// @Description Time: no time filter applies; Source metadata is current as returned.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.
-// @Description Next step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.
+// @Description Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.
 // @Tags Sources
 // @Produce json
+// @Param q query string false "Optional Source prefix query." maxlength(512)
+// @Param ids query []string false "Source ids (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains (CSV)." collectionFormat(csv)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} SourceCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listSources
 // @Router /sources [get]
 func (r *Configuration) getSources(c *gin.Context) {
-	var params sourceListParams
+	var params sourceSearchParams
 	if err := params.shouldBind(c); err != nil {
 		writeError(c, err)
 		return
 	}
-
 	page_req, err := params.createPageRequest(c, r)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	page_out, err := r.DB.QuerySources(c.Request.Context(), params.Q, params.Domains, *page_req, db.SOURCE_COLUMNS_BASE)
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QuerySources(c.Request.Context(), *filters, *page_req, db.SOURCE_COLUMNS_BASE)
 	if err != nil {
 		shared.LogError(err, "[ERROR] QuerySources")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
@@ -608,23 +663,16 @@ func (r *Configuration) getSources(c *gin.Context) {
 
 // getSource godoc
 // @Summary Get a Source
-// @Description Answers: What publisher metadata belongs to this Source UUID?
-// @Description Returns: One Source detail record inside data. Optional display metadata is returned only when available.
-// @Description Use when: an agent needs to enrich an Article citation or inspect a known publisher.
-// @Description Do not use when: the agent needs Articles from this Source; use GET /articles/search with sources.
-// @Description Search/filter behavior: the path UUID is exact; no collection filters apply.
-// @Description Time: no time filter applies.
-// @Description Sort/pagination: one detail record; no cursor or ordering applies.
-// @Description Missing fields: name, description, favicon_url, and rss_feed_url may be null.
-// @Description Next step: use the Source UUID in Article search filters.
+// @Description Returns one publisher Source selected by UUID.
 // @Tags Sources
 // @Produce json
+// @Param id path string true "Source UUID." format(uuid)
 // @Success 200 {object} SourceDetailResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 429 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Source not found"
 // @ID getSource
 // @Router /sources/{id} [get]
 func (r *Configuration) getSource(c *gin.Context) {
@@ -648,22 +696,18 @@ func (r *Configuration) getSource(c *gin.Context) {
 }
 
 // getEntities godoc
-// @Summary List Entity Labels
-// @Description Answers: Which normalized entity labels can I use as Article filters?
-// @Description Returns: A cursor-paginated collection of extracted entity labels. Values are labels, not canonical entity profiles or IDs.
-// @Description Use when: an agent has an unknown entity spelling and needs discovery before Article filtering.
-// @Description Do not use when: a known normalized label is already available; query Articles directly.
-// @Description Search/filter behavior: q performs case-insensitive discovery matching.
-// @Description Time: no time filter applies.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: the collection may be empty; no entity type or confidence is promised.
-// @Description Next step: carry a returned value into the entities Article filter.
+// @Summary List entity labels
+// @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
 // @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listEntities
 // @Router /entities [get]
 func (r *Configuration) getEntities(c *gin.Context) {
@@ -671,22 +715,18 @@ func (r *Configuration) getEntities(c *gin.Context) {
 }
 
 // getRegions godoc
-// @Summary List Region Labels
-// @Description Answers: Which normalized extracted region labels can I use as Article filters?
-// @Description Returns: A cursor-paginated collection of region labels, not country codes, coordinates, or radius-search objects.
-// @Description Use when: an agent has an unknown region spelling and needs discovery before Article filtering.
-// @Description Do not use when: a known normalized label is already available; query Articles directly.
-// @Description Search/filter behavior: q performs case-insensitive discovery matching.
-// @Description Time: no time filter applies.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: the collection may be empty; structured geography is not promised.
-// @Description Next step: carry a returned value into the regions Article filter.
+// @Summary List region labels
+// @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
 // @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listRegions
 // @Router /regions [get]
 func (r *Configuration) getRegions(c *gin.Context) {
@@ -694,22 +734,18 @@ func (r *Configuration) getRegions(c *gin.Context) {
 }
 
 // getCategories godoc
-// @Summary List Category Labels
-// @Description Answers: Which normalized category labels can I use as Article filters?
-// @Description Returns: A cursor-paginated collection of category labels used by Article records.
-// @Description Use when: an agent has an unknown category spelling and needs discovery before Article filtering.
-// @Description Do not use when: a known normalized label is already available; query Articles directly.
-// @Description Search/filter behavior: q performs case-insensitive discovery matching; returned values are normalized labels.
-// @Description Time: no time filter applies.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: the collection may be empty; this route does not define a taxonomy hierarchy.
-// @Description Next step: carry a returned value into the categories Article filter.
+// @Summary List category labels
+// @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
 // @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listCategories
 // @Router /categories [get]
 func (r *Configuration) getCategories(c *gin.Context) {
@@ -717,22 +753,18 @@ func (r *Configuration) getCategories(c *gin.Context) {
 }
 
 // getSentiments godoc
-// @Summary List Sentiment Labels
-// @Description Answers: Which categorical sentiment labels can I use as Article filters?
-// @Description Returns: A cursor-paginated collection of sentiment labels observed on Articles.
-// @Description Use when: an agent has an unknown sentiment spelling and needs discovery before Article filtering.
-// @Description Do not use when: a known label is already available; query Articles directly.
-// @Description Search/filter behavior: q performs case-insensitive discovery matching; sentiments are categorical labels, not calibrated numeric scores.
-// @Description Time: no time filter applies.
-// @Description Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-// @Description Missing fields: the collection may be empty; no confidence or numeric sentiment score is returned.
-// @Description Next step: carry a returned value into the sentiments Article filter.
+// @Summary List sentiment labels
+// @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
 // @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listSentiments
 // @Router /sentiments [get]
 func (r *Configuration) getSentiments(c *gin.Context) {
@@ -760,6 +792,37 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 	writeCollection(c, toTagDocuments(page_out.Items, response_tag_type), page.Limit, page_out.NextCursor)
 }
 
+// getStories godoc
+// @Summary List Stories
+// @Description Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.
+// @Tags Stories
+// @Produce json
+// @Param q query string false "Optional Story relevance query." maxlength(512)
+// @Param score_threshold query number false "Optional Story relevance threshold; requires q." minimum(0) maximum(1)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param min_article_count query int false "Minimum Story Article count. Default 2." default(2) minimum(2)
+// @Param from query string false "UTC lower publication timestamp." format(date)
+// @Param to query string false "UTC upper publication timestamp." format(date)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} StoryCollectionResponse "Story collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listStories
+// @Router /stories [get]
 func (r *Configuration) getStories(c *gin.Context) {
 	var params storySearchParams
 	if err := params.shouldBind(c); err != nil {
@@ -777,48 +840,62 @@ func (r *Configuration) getStories(c *gin.Context) {
 		return
 	}
 
-	page_out, err := r.DB.QueryStories(c.Request.Context(), *filters, *page_req)
+	page_out, err := r.DB.QueryClusters(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryStories")
+		shared.LogError(err, "[ERROR] QueryClusters")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writeCollection(c, toStoryDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
-func (r *Configuration) dispatchStory(c *gin.Context) {
-	raw := strings.TrimSpace(strings.TrimPrefix(c.Param("story_id"), "/"))
-	if raw == "" {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required"))
-		return
-	}
-	if strings.HasSuffix(raw, "/articles") {
-		candidate := strings.TrimSuffix(raw, "/articles")
-		exists, err := r.DB.StoryExists(c.Request.Context(), raw)
-		if err != nil {
-			shared.LogError(err, "[ERROR] StoryExists")
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-			return
-		}
-		if !exists && candidate != "" {
-			c.Params = gin.Params{{Key: "story_id", Value: candidate}}
-			r.getStoryArticles(c)
-			return
-		}
-	}
-	c.Params = gin.Params{{Key: "story_id", Value: raw}}
-	r.getStory(c)
-}
+// func (r *Configuration) dispatchStory(c *gin.Context) {
+// 	raw := strings.TrimSpace(strings.TrimPrefix(c.Param("story_id"), "/"))
+// 	if raw == "" {
+// 		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required"))
+// 		return
+// 	}
+// 	if strings.HasSuffix(raw, "/articles") {
+// 		candidate := strings.TrimSuffix(raw, "/articles")
+// 		exists, err := r.DB.StoryExists(c.Request.Context(), raw)
+// 		if err != nil {
+// 			shared.LogError(err, "[ERROR] StoryExists")
+// 			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+// 			return
+// 		}
+// 		if !exists && candidate != "" {
+// 			c.Params = gin.Params{{Key: "story_id", Value: candidate}}
+// 			r.getStoryArticles(c)
+// 			return
+// 		}
+// 	}
+// 	c.Params = gin.Params{{Key: "story_id", Value: raw}}
+// 	r.getStory(c)
+// }
 
+// getStory godoc
+// @Summary Get a Story
+// @Description Returns one Story selected by its stable UUID, including a link to its paginated member Articles.
+// @Tags Stories
+// @Produce json
+// @Param id path string true "Story UUID." format(uuid)
+// @Success 200 {object} StoryDetailResponse "Story detail envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Story not found"
+// @ID getStory
+// @Router /stories/{id} [get]
 func (r *Configuration) getStory(c *gin.Context) {
-	var params storyPathParams
+	var params itemIDParams
 	if err := params.shouldBind(c); err != nil {
 		writeError(c, err)
 		return
 	}
-	story, err := r.DB.GetStory(c.Request.Context(), params.StoryID)
+	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
 	if err != nil {
-		shared.LogError(err, "[ERROR] GetStory")
+		shared.LogError(err, "[ERROR] GetCluster")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		} else {
@@ -829,15 +906,46 @@ func (r *Configuration) getStory(c *gin.Context) {
 	writeDetail(c, toStoryDetail(&story))
 }
 
+// getStoryArticles godoc
+// @Summary List Story Articles
+// @Description Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.
+// @Tags Stories
+// @Produce json
+// @Param id path string true "Story UUID." format(uuid)
+// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower publication timestamp." format(date)
+// @Param to query string false "UTC upper publication timestamp." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} StoryArticleCollectionResponse "Story Article collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 429 {object} ErrorResponse "Request limit reached"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Story not found"
+// @ID listStoryArticles
+// @Router /stories/{id}/articles [get]
 func (r *Configuration) getStoryArticles(c *gin.Context) {
 	var params storyArticleParams
 	if err := params.shouldBind(c); err != nil {
 		writeError(c, err)
 		return
 	}
-	exists, err := r.DB.StoryExists(c.Request.Context(), params.StoryID)
+	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
 	if err != nil {
-		shared.LogError(err, "[ERROR] StoryExists")
+		shared.LogError(err, "[ERROR] ClusterExists")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -862,7 +970,7 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.StoryID)
+	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.ID)
 }
 
 func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
@@ -912,16 +1020,17 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	protected.GET("/articles/search", config.searchArticles)
 	protected.GET("/articles/latest", config.getLatestArticles)
 	protected.GET("/articles/trending", config.getTrendingArticles)
+	protected.GET("/articles/:id", config.getArticle)
 	protected.GET("/articles/:id/similar", config.getSimilarArticles)
 	protected.GET("/articles/:id/mentions", config.getArticleMentions)
-	protected.GET("/articles/:id", config.getArticle)
 
 	// HEADLINES routes
 	protected.GET("/top-headlines", config.getTopHeadlines)
 
 	// STORIES routes. Wildcard captures URL-like story IDs (slashes); trailing /articles is membership.
 	protected.GET("/stories", config.getStories)
-	protected.GET("/stories/*story_id", config.dispatchStory)
+	protected.GET("/stories/:id", config.getStory)
+	protected.GET("/stories/:id/articles", config.getStoryArticles)
 
 	return router
 }

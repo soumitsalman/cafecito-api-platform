@@ -1,0 +1,511 @@
+info:
+  name: Find synthesized Signals
+  type: http
+  seq: 1
+  tags:
+    - Signals
+
+http:
+  method: GET
+  url: "{{baseUrl}}/signals"
+  params:
+    - name: q
+      value: ""
+      type: query
+      description: Optional natural-language semantic query. Max 1024 characters.
+      disabled: true
+    - name: score_threshold
+      value: "0.5"
+      type: query
+      description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+    - name: from
+      value: ""
+      type: query
+      description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+      disabled: true
+    - name: to
+      value: ""
+      type: query
+      description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+      disabled: true
+    - name: ids
+      value: ""
+      type: query
+      description: Restrict to Signal UUIDs (CSV).
+      disabled: true
+    - name: impact_levels
+      value: ""
+      type: query
+      description: Exact impact-level names (CSV), for example high,medium.
+      disabled: true
+    - name: impacted_domains
+      value: ""
+      type: query
+      description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+      disabled: true
+    - name: tags
+      value: ""
+      type: query
+      description: Fuzzy text match against persisted Signal tag labels (CSV).
+      disabled: true
+    - name: response_type
+      value: json
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+    - name: response_type
+      value: yaml
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: response_type
+      value: toon
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: limit
+      value: "20"
+      type: query
+      description: Maximum records per page. Default 20, max 100.
+    - name: cursor
+      value: ""
+      type: query
+      description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Signal collection envelope
+    request:
+      url: "{{baseUrl}}/signals"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Signal UUIDs (CSV).
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: impacted_domains
+          value: ""
+          type: query
+          description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted Signal tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {}
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "cursor": "",
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Invalid query parameters, malformed UUID, or malformed cursor token
+    request:
+      url: "{{baseUrl}}/signals"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Signal UUIDs (CSV).
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: impacted_domains
+          value: ""
+          type: query
+          description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted Signal tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Missing or invalid API key
+    request:
+      url: "{{baseUrl}}/signals"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Signal UUIDs (CSV).
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: impacted_domains
+          value: ""
+          type: query
+          description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted Signal tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Concurrency limit exceeded; retry shortly
+    request:
+      url: "{{baseUrl}}/signals"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Signal UUIDs (CSV).
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: impacted_domains
+          value: ""
+          type: query
+          description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted Signal tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Database or embedder unavailable; retry
+    request:
+      url: "{{baseUrl}}/signals"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Optional natural-language semantic query. Max 1024 characters.
+          disabled: true
+        - name: score_threshold
+          value: "0.5"
+          type: query
+          description: Minimum semantic similarity threshold for q. 0.0 is broad and 1.0 is strict. Default 0.5.
+        - name: from
+          value: ""
+          type: query
+          description: Inclusive Signal created_at lower bound (YYYY-MM-DD).
+          disabled: true
+        - name: to
+          value: ""
+          type: query
+          description: Inclusive Signal created_at upper bound (YYYY-MM-DD).
+          disabled: true
+        - name: ids
+          value: ""
+          type: query
+          description: Restrict to Signal UUIDs (CSV).
+          disabled: true
+        - name: impact_levels
+          value: ""
+          type: query
+          description: Exact impact-level names (CSV), for example high,medium.
+          disabled: true
+        - name: impacted_domains
+          value: ""
+          type: query
+          description: Exact impacted-domain names in snake_case (CSV), for example public_health,climate.
+          disabled: true
+        - name: tags
+          value: ""
+          type: query
+          description: Fuzzy text match against persisted Signal tag labels (CSV).
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Use when the user asks what a set of developments means, what impact is expected, or what broader conclusion Espresso has produced. Returns synthesized Signals, not raw observations or article content.
+  Carry a selected `data[].id` into Signal detail, then list supporting Events when the conclusion needs substantiation. Search Events instead when the user needs a concrete development rather than an interpretation.
+  `from` and `to` bound Signal `created_at`; tags are fuzzy text matches, while impact levels and impacted domains are exact normalized values.
