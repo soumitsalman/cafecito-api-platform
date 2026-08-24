@@ -24,13 +24,13 @@ Start with the tool that matches the literal question.
 | Tool | REST path | Answers |
 | --- | --- | --- |
 | searchArticles | GET /beans/articles/search | Which publisher Articles match this topic or filter? |
-| getArticle | GET /beans/articles/{id} | What did this known Article say? |
+| getArticle | `GET /beans/articles/{id}` | What did this known Article say? |
 | getLatestArticles | GET /beans/articles/latest | What was published most recently? |
 | getTopHeadlines | GET /beans/articles/top-headlines | What is attracting attention in the fixed recent window? |
 | getTrendingArticles | GET /beans/articles/trending | Which Articles are gaining attention? |
-| getSimilarArticles | GET /beans/articles/{id}/similar | What related publisher reading exists? |
-| getArticleMentions | GET /beans/articles/{id}/mentions | Where was this Article URL observed externally? |
-| listSources / getSource | GET /beans/sources and /beans/sources/{id} | Which publisher metadata applies? |
+| getSimilarArticles | `GET /beans/articles/{id}/similar` | What related publisher reading exists? |
+| getArticleMentions | `GET /beans/articles/{id}/mentions` | Where was this Article URL observed externally? |
+| listSources / getSource | `GET /beans/sources` and `GET /beans/sources/{id}` | Which publisher metadata applies? |
 | listCategories / listEntities / listRegions / listSentiments | GET /beans/categories, /entities, /regions, /sentiments | Which normalized filter values are accepted? |
 
 Recommended Beans workflow:
@@ -51,11 +51,11 @@ Use Espresso when the user asks what happened, what it means, impact, outlook, o
 | Tool | REST path | Answers |
 | --- | --- | --- |
 | searchEvents | GET /espresso/events | Which concrete developments match? |
-| getEvent | GET /espresso/events/{event_id} | What is this selected Event? |
-| getEventEvidence | GET /espresso/events/{event_id}/evidence | What supports this Event? |
-| getEventSignals | GET /espresso/events/{event_id}/signals | Which Signals are related? |
+| getEvent | `GET /espresso/events/{event_id}` | What is this selected Event? |
+| getEventEvidence | `GET /espresso/events/{event_id}/evidence` | What supports this Event? |
+| getEventSignals | `GET /espresso/events/{event_id}/signals` | Which Signals are related? |
 | searchSignals | GET /espresso/signals | Which conclusions or outlooks match? |
-| getSignal | GET /espresso/signals/{signal_id} | What is this Signal? |
-| getSignalEvents | GET /espresso/signals/{signal_id}/events | Which Events support it? |
+| getSignal | `GET /espresso/signals/{signal_id}` | What is this Signal? |
+| getSignalEvents | `GET /espresso/signals/{signal_id}/events` | Which Events support it? |
 
 Do not use Beans to answer a structured Event or Signal question. Do not use Espresso when the user needs Article URLs, publisher text, or source coverage.

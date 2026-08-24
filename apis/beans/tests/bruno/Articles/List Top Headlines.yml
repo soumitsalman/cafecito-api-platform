@@ -4,19 +4,16 @@ info:
   seq: 7
   tags:
     - Articles
-
 http:
   method: GET
   url: "{{baseUrl}}/top-headlines"
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -146,14 +143,30 @@ examples:
           {
             "error": ""
           }
+docs: >-
+  Answers: Which Articles are attracting headline-level attention in the fixed
+  recent window?
 
-docs: |-
-  Answers: Which Articles are attracting headline-level attention in the fixed recent window?
-  Returns: A cursor-paginated collection from the most recent 24-hour window, ordered by attention. Empty results are HTTP 200 with data: [].
-  Use when: a breaking-news or daily-headline feed is needed without choosing a custom time range.
-  Do not use when: historical bounds, full-corpus search, or a 7-day trend window is needed; use search, latest, or trending.
-  Search/filter behavior: accepts Article filters and q with optional score_threshold; exact ids and urls belong to search.
-  Time: the service applies a fixed recent 24-hour creation and attention window; from and to are not accepted.
-  Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: summary, content, enrichment, Source metadata, and trend metrics may be absent or null.
-  Next step: use GET /articles/{id} when a headline needs citable detail or full content.
+  Returns: A cursor-paginated collection from the most recent 24-hour window,
+  ordered by attention. Empty results are HTTP 200 with data: [].
+
+  Use when: a breaking-news or daily-headline feed is needed without choosing a
+  custom time range.
+
+  Do not use when: historical bounds, full-corpus search, or a 7-day trend
+  window is needed; use search, latest, or trending.
+
+  Search/filter behavior: accepts Article filters and q with optional
+  score_threshold; exact ids and urls belong to search.
+
+  Time: the service applies a fixed recent 24-hour creation and attention
+  window; from and to are not accepted.
+
+  Sort/pagination: attention-ranked order; follow pagination.next_cursor
+  unchanged as cursor. limit defaults to 20 and is capped at 100.
+
+  Missing fields: summary, content, enrichment, Source metadata, and trend
+  metrics may be absent or null.
+
+  Next step: use GET /articles/{id} when a headline needs citable detail or full
+  content.

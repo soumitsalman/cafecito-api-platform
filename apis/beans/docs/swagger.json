@@ -191,7 +191,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -205,6 +206,49 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJzIjoiY3JlYXRlZCIsImlkIjoiM2E0NzllM2MtYTg3ZC01OTFlLWJiNmMtNWM4M2MwM2I2YTQwIiwiYyI6IjIwMjYtMDgtMjRUMDI6MDA6NDNaIn0"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:39.633280927Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                        "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                        "content_type": "news",
+                                        "published_at": "2026-08-24T02:00:43Z",
+                                        "author": "Carrington Malin",
+                                        "image_url": null,
+                                        "title": "UAE AI Programme adds Agentic AI focus",
+                                        "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+                                        "categories": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models"
+                                        ],
+                                        "regions": null,
+                                        "entities": [
+                                            "carrington_malin"
+                                        ],
+                                        "sentiments": [
+                                            "disturbed",
+                                            "anxious"
+                                        ],
+                                        "tags": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models",
+                                            "carrington_malin"
+                                        ],
+                                        "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                        "source": null
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -442,7 +486,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -456,6 +501,49 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTI0VDAyOjAwOjQzWiJ9"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:39.854289295Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                        "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                        "content_type": "news",
+                                        "published_at": "2026-08-24T02:00:43Z",
+                                        "author": "Carrington Malin",
+                                        "image_url": null,
+                                        "title": "UAE AI Programme adds Agentic AI focus",
+                                        "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+                                        "categories": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models"
+                                        ],
+                                        "regions": null,
+                                        "entities": [
+                                            "carrington_malin"
+                                        ],
+                                        "sentiments": [
+                                            "disturbed",
+                                            "anxious"
+                                        ],
+                                        "tags": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models",
+                                            "carrington_malin"
+                                        ],
+                                        "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                        "source": null
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -659,7 +747,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -673,6 +762,59 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJzIjoidHJlbmRfc2NvcmUiLCJpZCI6Ijg2NWQxZWJiLTFkMWYtNWQ5MS05MmMxLWZhYzA1YjNjNGMzOCIsInRzIjoxNDIwNDA2fQ"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:39.843232871Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "865d1ebb-1d1f-5d91-92c1-fac05b3c4c38",
+                                        "url": "https://www.reddit.com/r/PS5/comments/1h4tety/ps5_help_and_questions_megathread_game/",
+                                        "content_type": "post",
+                                        "published_at": "2024-12-02T12:02:22Z",
+                                        "author": "tinselsnips",
+                                        "image_url": null,
+                                        "title": "PS5 Help and Questions Megathread | Game Recommendations, Simple Questions, and Tech Support",
+                                        "summary": null,
+                                        "categories": [
+                                            "Video Games and Game Development",
+                                            "Interactive Entertainment and Streaming"
+                                        ],
+                                        "regions": null,
+                                        "entities": [
+                                            "PlayStation",
+                                            "Google"
+                                        ],
+                                        "sentiments": [
+                                            "frustrated",
+                                            "doubtful"
+                                        ],
+                                        "tags": [
+                                            "Video Games and Game Development",
+                                            "Interactive Entertainment and Streaming",
+                                            "PlayStation",
+                                            "Google"
+                                        ],
+                                        "story_id": "865d1ebb-1d1f-5d91-92c1-fac05b3c4c38",
+                                        "source": null,
+                                        "trend": {
+                                            "likes": 542,
+                                            "comments": 56805,
+                                            "mentions": 2,
+                                            "audiences": 0,
+                                            "related": 0,
+                                            "trend_score": 1420406
+                                        }
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -720,7 +862,8 @@
                         "description": "Article UUID.",
                         "name": "id",
                         "in": "path",
-                        "required": true
+                        "required": true,
+                        "example": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40"
                     },
                     {
                         "type": "boolean",
@@ -735,6 +878,52 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.ArticleDetailResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "data": {
+                                    "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                    "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                    "content_type": "news",
+                                    "published_at": "2026-08-24T02:00:43Z",
+                                    "author": "Carrington Malin",
+                                    "image_url": null,
+                                    "title": "UAE AI Programme adds Agentic AI focus",
+                                    "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+                                    "categories": [
+                                        "artificial_intelligence_and_machine_learning",
+                                        "generative_ai_and_foundation_models"
+                                    ],
+                                    "regions": null,
+                                    "entities": [
+                                        "carrington_malin"
+                                    ],
+                                    "sentiments": [
+                                        "disturbed",
+                                        "anxious"
+                                    ],
+                                    "tags": [
+                                        "artificial_intelligence_and_machine_learning",
+                                        "generative_ai_and_foundation_models",
+                                        "carrington_malin"
+                                    ],
+                                    "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                    "source": null,
+                                    "trend": {
+                                        "likes": 0,
+                                        "comments": 0,
+                                        "mentions": 0,
+                                        "audiences": 0,
+                                        "related": 53,
+                                        "trend_score": 2650
+                                    },
+                                    "links": {
+                                        "similar": "/articles/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/similar",
+                                        "mentions": "/articles/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/mentions",
+                                        "story": "/stories/06860aaa-a43c-585f-9cb3-a6710a93a74a"
+                                    }
+                                }
+                            }
                         }
                     },
                     "400": {
@@ -788,7 +977,8 @@
                         "description": "Article UUID.",
                         "name": "id",
                         "in": "path",
-                        "required": true
+                        "required": true,
+                        "example": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40"
                     },
                     {
                         "type": "array",
@@ -831,7 +1021,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -845,6 +1036,19 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.MentionCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 0,
+                                    "next_cursor": null
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:41.420743188Z"
+                                },
+                                "data": []
+                            }
                         }
                     },
                     "400": {
@@ -1136,7 +1340,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1150,6 +1355,24 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.TagCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiayI6IjNEIFByaW50aW5nIGFuZCBBZGRpdGl2ZSBNYW51ZmFjdHVyaW5nIn0"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:00.095728401Z"
+                                },
+                                "data": [
+                                    {
+                                        "value": "3D Printing and Additive Manufacturing",
+                                        "type": "category"
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -1205,7 +1428,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1219,6 +1443,24 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.TagCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiayI6IjAifQ"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:08.555525205Z"
+                                },
+                                "data": [
+                                    {
+                                        "value": "0",
+                                        "type": "entity"
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -1267,6 +1509,11 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        },
+                        "examples": {
+                            "application/json": {
+                                "status": "alive"
+                            }
                         }
                     }
                 }
@@ -1298,7 +1545,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1367,7 +1615,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1381,6 +1630,24 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.TagCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiayI6ImFjY2VwdGluZyJ9"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:39.584296963Z"
+                                },
+                                "data": [
+                                    {
+                                        "value": "accepting",
+                                        "type": "sentiment"
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -1446,7 +1713,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1460,6 +1728,26 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.SourceCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiayI6IjAuMzAwMDAwMDAwMDAwMDAwMDQuY29tIn0"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:39.611878282Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "52860efa-d345-58c4-8037-a9f3ae8987c0",
+                                        "url": "0.30000000000000004.com",
+                                        "domain": "30000000000000004",
+                                        "name": null
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -1507,7 +1795,8 @@
                         "description": "Source UUID.",
                         "name": "id",
                         "in": "path",
-                        "required": true
+                        "required": true,
+                        "example": "52860efa-d345-58c4-8037-a9f3ae8987c0"
                     }
                 ],
                 "responses": {
@@ -1515,6 +1804,17 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.SourceDetailResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "data": {
+                                    "id": "52860efa-d345-58c4-8037-a9f3ae8987c0",
+                                    "url": "0.30000000000000004.com",
+                                    "domain": "30000000000000004",
+                                    "name": null,
+                                    "favicon_url": "https://0.30000000000000004.com/favicon.ico"
+                                }
+                            }
                         }
                     },
                     "400": {
@@ -1739,7 +2039,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -1753,6 +2054,91 @@
                         "description": "Story collection envelope",
                         "schema": {
                             "$ref": "#/definitions/router.StoryCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6IjA2ODYwYWFhLWE0M2MtNTg1Zi05Y2IzLWE2NzEwYTkzYTc0YSIsImMiOiIyMDI2LTA4LTI0VDAyOjAwOjQzWiJ9"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:41.302877043Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                        "title": "UAE AI Programme adds Agentic AI focus",
+                                        "first_published_at": "2026-06-22T02:00:40Z",
+                                        "last_published_at": "2026-08-24T02:00:43Z",
+                                        "article_count": 12,
+                                        "source_count": 1,
+                                        "categories": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models",
+                                            "ai_ethics_and_governance",
+                                            "robotics_and_autonomous_systems",
+                                            "media_and_journalism"
+                                        ],
+                                        "regions": [
+                                            "egypt",
+                                            "middle_east",
+                                            "africa",
+                                            "japan",
+                                            "riyadh",
+                                            "saudi_arabia",
+                                            "united_arab_emirates"
+                                        ],
+                                        "entities": [
+                                            "carrington_malin",
+                                            "anghami",
+                                            "airev",
+                                            "daniel_valle",
+                                            "dubai_university",
+                                            "muhammad_khalid",
+                                            "qatar_university",
+                                            "ai",
+                                            "ai_agents",
+                                            "ai_infrastructure"
+                                        ],
+                                        "tags": [
+                                            "carrington_malin",
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models",
+                                            "anghami",
+                                            "ai_ethics_and_governance",
+                                            "egypt",
+                                            "middle_east",
+                                            "airev",
+                                            "daniel_valle",
+                                            "dubai_university"
+                                        ],
+                                        "top_articles": [
+                                            {
+                                                "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                                "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                                "title": "UAE AI Programme adds Agentic AI focus",
+                                                "published_at": "2026-08-24T02:00:43Z",
+                                                "source": null
+                                            },
+                                            {
+                                                "id": "ec2e3641-07cd-5a9c-870f-79256e293481",
+                                                "url": "https://www.middleeastainews.com/p/kuwait-backs-ai-to-boost-smart-meter",
+                                                "title": "Kuwait backs AI to boost smart meter efficiency",
+                                                "published_at": "2026-08-22T02:00:35Z",
+                                                "source": null
+                                            },
+                                            {
+                                                "id": "e3a0e8ed-c10c-58ed-a408-61985f6f58f4",
+                                                "url": "https://www.middleeastainews.com/p/dubai-chambers-nasscom-partner-on",
+                                                "title": "Dubai Chambers, Nasscom partner on Agentic AI",
+                                                "published_at": "2026-08-21T02:00:07Z",
+                                                "source": null
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -1800,7 +2186,8 @@
                         "description": "Story UUID.",
                         "name": "id",
                         "in": "path",
-                        "required": true
+                        "required": true,
+                        "example": "06860aaa-a43c-585f-9cb3-a6710a93a74a"
                     }
                 ],
                 "responses": {
@@ -1808,6 +2195,84 @@
                         "description": "Story detail envelope",
                         "schema": {
                             "$ref": "#/definitions/router.StoryDetailResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "data": {
+                                    "id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                    "title": "UAE AI Programme adds Agentic AI focus",
+                                    "first_published_at": "2026-06-22T02:00:40Z",
+                                    "last_published_at": "2026-08-24T02:00:43Z",
+                                    "article_count": 12,
+                                    "source_count": 1,
+                                    "categories": [
+                                        "artificial_intelligence_and_machine_learning",
+                                        "generative_ai_and_foundation_models",
+                                        "ai_ethics_and_governance",
+                                        "robotics_and_autonomous_systems",
+                                        "media_and_journalism"
+                                    ],
+                                    "regions": [
+                                        "egypt",
+                                        "middle_east",
+                                        "africa",
+                                        "japan",
+                                        "riyadh",
+                                        "saudi_arabia",
+                                        "united_arab_emirates"
+                                    ],
+                                    "entities": [
+                                        "carrington_malin",
+                                        "anghami",
+                                        "airev",
+                                        "daniel_valle",
+                                        "dubai_university",
+                                        "muhammad_khalid",
+                                        "qatar_university",
+                                        "ai",
+                                        "ai_agents",
+                                        "ai_infrastructure"
+                                    ],
+                                    "tags": [
+                                        "carrington_malin",
+                                        "artificial_intelligence_and_machine_learning",
+                                        "generative_ai_and_foundation_models",
+                                        "anghami",
+                                        "ai_ethics_and_governance",
+                                        "egypt",
+                                        "middle_east",
+                                        "airev",
+                                        "daniel_valle",
+                                        "dubai_university"
+                                    ],
+                                    "top_articles": [
+                                        {
+                                            "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                            "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                            "title": "UAE AI Programme adds Agentic AI focus",
+                                            "published_at": "2026-08-24T02:00:43Z",
+                                            "source": null
+                                        },
+                                        {
+                                            "id": "ec2e3641-07cd-5a9c-870f-79256e293481",
+                                            "url": "https://www.middleeastainews.com/p/kuwait-backs-ai-to-boost-smart-meter",
+                                            "title": "Kuwait backs AI to boost smart meter efficiency",
+                                            "published_at": "2026-08-22T02:00:35Z",
+                                            "source": null
+                                        },
+                                        {
+                                            "id": "e3a0e8ed-c10c-58ed-a408-61985f6f58f4",
+                                            "url": "https://www.middleeastainews.com/p/dubai-chambers-nasscom-partner-on",
+                                            "title": "Dubai Chambers, Nasscom partner on Agentic AI",
+                                            "published_at": "2026-08-21T02:00:07Z",
+                                            "source": null
+                                        }
+                                    ],
+                                    "links": {
+                                        "articles": "/stories/06860aaa-a43c-585f-9cb3-a6710a93a74a/articles"
+                                    }
+                                }
+                            }
                         }
                     },
                     "400": {
@@ -1861,7 +2326,8 @@
                         "description": "Story UUID.",
                         "name": "id",
                         "in": "path",
-                        "required": true
+                        "required": true,
+                        "example": "06860aaa-a43c-585f-9cb3-a6710a93a74a"
                     },
                     {
                         "enum": [
@@ -2024,7 +2490,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -2038,6 +2505,50 @@
                         "description": "Story Article collection envelope",
                         "schema": {
                             "$ref": "#/definitions/router.StoryArticleCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTI0VDAyOjAwOjQzWiJ9"
+                                },
+                                "meta": {
+                                    "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                    "as_of": "2026-08-24T20:42:41.566851796Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                                        "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                                        "content_type": "news",
+                                        "published_at": "2026-08-24T02:00:43Z",
+                                        "author": "Carrington Malin",
+                                        "image_url": null,
+                                        "title": "UAE AI Programme adds Agentic AI focus",
+                                        "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+                                        "categories": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models"
+                                        ],
+                                        "regions": null,
+                                        "entities": [
+                                            "carrington_malin"
+                                        ],
+                                        "sentiments": [
+                                            "disturbed",
+                                            "anxious"
+                                        ],
+                                        "tags": [
+                                            "artificial_intelligence_and_machine_learning",
+                                            "generative_ai_and_foundation_models",
+                                            "carrington_malin"
+                                        ],
+                                        "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+                                        "source": null
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {
@@ -2224,7 +2735,8 @@
                         "default": 20,
                         "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "example": 1
                     },
                     {
                         "type": "string",
@@ -2238,6 +2750,53 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        },
+                        "examples": {
+                            "application/json": {
+                                "pagination": {
+                                    "limit": 1,
+                                    "num_results": 1,
+                                    "next_cursor": "eyJ2IjoxLCJzIjoidHJlbmRfc2NvcmUiLCJpZCI6IjVjZjk3NDAwLTY1ZTAtNTllZi1hZWMxLWFiNGU3YjA3ZTljMCIsInRzIjowfQ"
+                                },
+                                "meta": {
+                                    "as_of": "2026-08-24T20:42:40.160758718Z"
+                                },
+                                "data": [
+                                    {
+                                        "id": "5cf97400-65e0-59ef-aec1-ab4e7b07e9c0",
+                                        "url": "https://www.theguardian.com/us-news/2026/aug/23/hakeem-jeffries-jared-kushner-meeting",
+                                        "content_type": "news",
+                                        "published_at": "2026-08-23T17:55:52Z",
+                                        "author": null,
+                                        "image_url": "https://i.guim.co.uk/img/media/9c27978883c3099f3b215f8e74787e2ead13ad64/0_0_5000_4000/master/5000.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2cleft&overlay-width=100p&overlay-base64=l2ltzy9zdgf0awmvb3zlcmxhexmvdgctzgvmyxvsdc5wbmc&enable=upscale&s=fa0ea6e83cfaf04224f9cf17d1d4ca89",
+                                        "title": "Democrats incredulous over Hakeem Jeffries and Jared Kushner meeting",
+                                        "summary": null,
+                                        "categories": [
+                                            "internet_culture_and_social_media",
+                                            "elections_and_voting"
+                                        ],
+                                        "regions": [
+                                            "maryland",
+                                            "illinois",
+                                            "iran"
+                                        ],
+                                        "entities": null,
+                                        "sentiments": [
+                                            "contemplative",
+                                            "observant"
+                                        ],
+                                        "tags": [
+                                            "internet_culture_and_social_media",
+                                            "elections_and_voting",
+                                            "maryland",
+                                            "illinois",
+                                            "iran"
+                                        ],
+                                        "story_id": "3e44a72a-be72-5465-82b6-c5ffd43d474e",
+                                        "source": null
+                                    }
+                                ]
+                            }
                         }
                     },
                     "400": {

@@ -4,10 +4,9 @@ info:
   seq: 2
   tags:
     - Discovery
-
 http:
   method: GET
-  url: "{{baseUrl}}/entities?q=sam&limit=10"
+  url: "{{baseUrl}}/entities"
   params:
     - name: q
       value: sam
@@ -16,14 +15,12 @@ http:
       value: "10"
       type: query
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -106,14 +103,43 @@ examples:
           {
             "error": ""
           }
-
-docs: |-
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/entities"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+docs: >-
   Answers: Which normalized entity labels can I use as Article filters?
-  Returns: A cursor-paginated collection of extracted entity labels. Values are labels, not canonical entity profiles or IDs.
-  Use when: an agent has an unknown entity spelling and needs discovery before Article filtering.
-  Do not use when: a known normalized label is already available; query Articles directly.
+
+  Returns: A cursor-paginated collection of extracted entity labels. Values are
+  labels, not canonical entity profiles or IDs.
+
+  Use when: an agent has an unknown entity spelling and needs discovery before
+  Article filtering.
+
+  Do not use when: a known normalized label is already available; query Articles
+  directly.
+
   Search/filter behavior: q performs case-insensitive discovery matching.
+
   Time: no time filter applies.
-  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: the collection may be empty; no entity type or confidence is promised.
+
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit
+  defaults to 20 and is capped at 100.
+
+  Missing fields: the collection may be empty; no entity type or confidence is
+  promised.
+
   Next step: carry a returned value into the entities Article filter.

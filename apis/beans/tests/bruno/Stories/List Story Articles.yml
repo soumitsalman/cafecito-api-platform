@@ -1,0 +1,187 @@
+info:
+  name: List Story Articles by UUID
+  type: http
+  seq: 3
+  tags:
+    - Stories
+http:
+  method: GET
+  url: "{{baseUrl}}/stories/:id/articles"
+  params:
+    - name: id
+      value: 0325c4ec-8881-5597-b8dd-a8a6eae19c49
+      type: path
+    - name: content_type
+      value: news
+      type: query
+    - name: limit
+      value: "20"
+      type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pagination": {
+              "limit": 20,
+              "num_results": 1,
+              "next_cursor": null
+            },
+            "meta": {
+              "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+              "as_of": "2026-08-24T00:00:00Z"
+            },
+            "data": [
+              {
+                "id": "e4270d59-2fd8-4a2f-90ce-b1a669bedb75",
+                "url": "https://publisher.example/article",
+                "content_type": "news",
+                "published_at": "2026-08-24T10:00:00Z",
+                "author": null,
+                "image_url": null,
+                "title": "Article headline",
+                "summary": "Article summary",
+                "categories": [
+                  "technology"
+                ],
+                "regions": [],
+                "entities": [],
+                "sentiments": [],
+                "tags": [
+                  "technology"
+                ],
+                "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+                "source": {
+                  "id": "0af3e96e-912c-4e51-95b7-e44b53e5e07b",
+                  "url": "https://publisher.example",
+                  "domain": "publisher.example",
+                  "name": "Publisher",
+                  "description": null,
+                  "favicon_url": null,
+                  "rss_feed_url": null
+                }
+              }
+            ]
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 404 Response
+    description: Not Found
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/stories/:id/articles"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+docs: >-
+  Answers: Which publisher Articles belong to this Story UUID?
+
+  Returns: A cursor-paginated Article collection. meta.story_id identifies the
+  requested Story and each member Article carries the same stable story_id when
+  assigned.
+
+  Use when: a Story UUID came from GET /stories or GET /stories/{id}.
+
+  Request parameters: id is required; Article filters include content_type,
+  sources, domains, authors, categories, regions, entities, sentiments, tags,
+  from, to, and full_content; limit is 1-100; cursor continues the same request.
+
+  Do not use when: related reading is sufficient without Story membership; use
+  GET /articles/{id}/similar for similarity results.
+
+  Missing resource: HTTP 404 means the Story UUID was not found.
+
+  Next step: preserve each returned Article UUID for GET /articles/{id}.

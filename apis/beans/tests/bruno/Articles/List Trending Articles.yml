@@ -4,23 +4,20 @@ info:
   seq: 3
   tags:
     - Articles
-
 http:
   method: GET
-  url: "{{baseUrl}}/articles/trending?tags=politics"
+  url: "{{baseUrl}}/articles/trending"
   params:
     - name: tags
       value: politics
       type: query
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -150,14 +147,31 @@ examples:
           {
             "error": ""
           }
+docs: >-
+  Answers: Which Articles are receiving the most observed attention within the
+  requested window?
 
-docs: |-
-  Answers: Which Articles are receiving the most observed attention within the requested window?
-  Returns: A cursor-paginated collection of Articles ordered by attention, with nullable trend metrics when available. Empty results are HTTP 200 with data: [].
-  Use when: an agent needs what is gaining attention now rather than only what was published most recently.
-  Do not use when: chronological monitoring or a fixed headline window is needed; use latest or top-headlines.
-  Search/filter behavior: accepts q with optional score_threshold and the shared Article filters; filters narrow candidates before attention ordering.
-  Time: from and to are inclusive UTC dates applied to observed trend activity; omitted from defaults to the most recent 7 days.
-  Sort/pagination: attention-ranked order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: trend and each metric can be absent or null; zero is not fabricated when unavailable.
-  Next step: use GET /articles/{id} for detail or GET /articles/{id}/similar for related reading.
+  Returns: A cursor-paginated collection of Articles ordered by attention, with
+  nullable trend metrics when available. Empty results are HTTP 200 with data:
+  [].
+
+  Use when: an agent needs what is gaining attention now rather than only what
+  was published most recently.
+
+  Do not use when: chronological monitoring or a fixed headline window is
+  needed; use latest or top-headlines.
+
+  Search/filter behavior: accepts q with optional score_threshold and the shared
+  Article filters; filters narrow candidates before attention ordering.
+
+  Time: from and to are inclusive UTC dates applied to observed trend activity;
+  omitted from defaults to the most recent 7 days.
+
+  Sort/pagination: attention-ranked order; follow pagination.next_cursor
+  unchanged as cursor. limit defaults to 20 and is capped at 100.
+
+  Missing fields: trend and each metric can be absent or null; zero is not
+  fabricated when unavailable.
+
+  Next step: use GET /articles/{id} for detail or GET /articles/{id}/similar for
+  related reading.

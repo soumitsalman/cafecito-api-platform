@@ -1,0 +1,5 @@
+info:
+  name: Stories
+  type: folder
+request:
+  auth: inherit

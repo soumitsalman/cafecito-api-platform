@@ -4,19 +4,16 @@ info:
   seq: 1
   tags:
     - Health
-
 http:
   method: GET
   url: "{{baseUrl}}/health"
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: status alive
@@ -32,5 +29,5 @@ examples:
       body:
         type: json
         data: "{}"
-
-docs: Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.
+docs: Lightweight liveness probe. Use before other tools to confirm the service
+  is reachable. No authentication required when API keys are disabled.

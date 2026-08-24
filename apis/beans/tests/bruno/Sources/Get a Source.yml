@@ -4,19 +4,20 @@ info:
   seq: 2
   tags:
     - Sources
-
 http:
   method: GET
   url: "{{baseUrl}}/sources/:id"
   auth: inherit
-
+  params:
+    - name: id
+      value: 0af3e96e-912c-4e51-95b7-e44b53e5e07b
+      type: path
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -128,14 +129,24 @@ examples:
           {
             "error": ""
           }
-
-docs: |-
+docs: >-
   Answers: What publisher metadata belongs to this Source UUID?
-  Returns: One Source detail record inside data. Optional display metadata is returned only when available.
-  Use when: an agent needs to enrich an Article citation or inspect a known publisher.
-  Do not use when: the agent needs Articles from this Source; use GET /articles/search with sources.
+
+  Returns: One Source detail record inside data. Optional display metadata is
+  returned only when available.
+
+  Use when: an agent needs to enrich an Article citation or inspect a known
+  publisher.
+
+  Do not use when: the agent needs Articles from this Source; use GET
+  /articles/search with sources.
+
   Search/filter behavior: the path UUID is exact; no collection filters apply.
+
   Time: no time filter applies.
+
   Sort/pagination: one detail record; no cursor or ordering applies.
+
   Missing fields: name, description, favicon_url, and rss_feed_url may be null.
+
   Next step: use the Source UUID in Article search filters.

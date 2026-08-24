@@ -4,19 +4,20 @@ info:
   seq: 6
   tags:
     - Articles
-
 http:
   method: GET
   url: "{{baseUrl}}/articles/:id/similar"
   auth: inherit
-
+  params:
+    - name: id
+      value: e4270d59-2fd8-4a2f-90ce-b1a669bedb75
+      type: path
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -163,14 +164,32 @@ examples:
           {
             "error": ""
           }
+docs: >-
+  Answers: Which other publisher Articles are useful related reading for this
+  Article?
 
-docs: |-
-  Answers: Which other publisher Articles are useful related reading for this Article?
-  Returns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.
-  Use when: an agent has selected an Article and wants comparable coverage or related context.
-  Do not use when: all Articles in a durable Story or external mentions are needed.
-  Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
+  Returns: A cursor-paginated collection of related publisher coverage for the
+  path Article, ordered newest first; this is not a guarantee of Story
+  membership.
+
+  Use when: an agent has selected an Article and wants comparable coverage or
+  related context.
+
+  Do not use when: all Articles in a durable Story or external mentions are
+  needed.
+
+  Search/filter behavior: the path UUID is the related-coverage anchor. Source,
+  domain, author, label, content-type, and date filters narrow candidates;
+  full_content changes only the Article projection; q, score_threshold, ids, and
+  urls are not accepted.
+
   Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.
-  Sort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: Article enrichment, Source metadata, and content may be null or omitted.
-  Next step: use GET /articles/{id} on a selected result for detail and optional full content.
+
+  Sort/pagination: published_at descending; follow pagination.next_cursor
+  unchanged as cursor. limit defaults to 20 and is capped at 100.
+
+  Missing fields: Article enrichment, Source metadata, and content may be null
+  or omitted.
+
+  Next step: use GET /articles/{id} on a selected result for detail and optional
+  full content.

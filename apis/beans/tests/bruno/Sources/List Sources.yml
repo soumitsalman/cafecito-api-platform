@@ -4,23 +4,20 @@ info:
   seq: 1
   tags:
     - Sources
-
 http:
   method: GET
-  url: "{{baseUrl}}/sources?q=tech"
+  url: "{{baseUrl}}/sources"
   params:
     - name: q
       value: tech
       type: query
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -125,14 +122,28 @@ examples:
           {
             "error": ""
           }
-
-docs: |-
+docs: >-
   Answers: Which publisher Sources match this metadata query?
-  Returns: A cursor-paginated collection where each data item is one Source identified by UUID. Source records describe publishers; they are not Articles.
-  Use when: an agent needs Source metadata for citations or a Source UUID for Article filtering.
-  Do not use when: Article content or publication search is needed; use GET /articles/search or a feed.
-  Search/filter behavior: q performs case-insensitive metadata matching across domain, name, and URL; domains are exact filters.
+
+  Returns: A cursor-paginated collection where each data item is one Source
+  identified by UUID. Source records describe publishers; they are not Articles.
+
+  Use when: an agent needs Source metadata for citations or a Source UUID for
+  Article filtering.
+
+  Do not use when: Article content or publication search is needed; use GET
+  /articles/search or a feed.
+
+  Search/filter behavior: q performs case-insensitive metadata matching across
+  domain, name, and URL; domains are exact filters.
+
   Time: no time filter applies; Source metadata is current as returned.
-  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: name, description, favicon_url, and rss_feed_url may be null when unavailable.
-  Next step: use GET /sources/{id} for one Source or carry its UUID into Article sources filters.
+
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit
+  defaults to 20 and is capped at 100.
+
+  Missing fields: name, description, favicon_url, and rss_feed_url may be null
+  when unavailable.
+
+  Next step: use GET /sources/{id} for one Source or carry its UUID into Article
+  sources filters.

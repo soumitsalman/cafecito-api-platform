@@ -1,0 +1,159 @@
+info:
+  name: List Stories
+  type: http
+  seq: 1
+  tags:
+    - Stories
+http:
+  method: GET
+  url: "{{baseUrl}}/stories"
+  params:
+    - name: q
+      value: technology
+      type: query
+    - name: min_article_count
+      value: "2"
+      type: query
+    - name: limit
+      value: "20"
+      type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/stories"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pagination": {
+              "limit": 20,
+              "num_results": 1,
+              "next_cursor": null
+            },
+            "meta": {
+              "as_of": "2026-08-24T00:00:00Z"
+            },
+            "data": [
+              {
+                "id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+                "title": "Example Story",
+                "first_published_at": "2026-08-20T10:00:00Z",
+                "last_published_at": "2026-08-24T10:00:00Z",
+                "article_count": 4,
+                "source_count": 3,
+                "categories": [
+                  "technology"
+                ],
+                "regions": [],
+                "entities": [],
+                "tags": [
+                  "technology"
+                ],
+                "top_articles": []
+              }
+            ]
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/stories"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/stories"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/stories"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/stories"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+docs: >-
+  Answers: Which related-coverage Stories match this query?
+
+  Returns: A cursor-paginated Story collection. Each data item has a stable
+  Story UUID; member Articles are retrieved separately.
+
+  Use when: a news workflow needs to group related publisher coverage before
+  selecting a Story.
+
+  Request parameters: q is optional natural-language Story search text;
+  min_article_count defaults to 2; limit is 1-100; cursor continues the same
+  query.
+
+  Do not use when: one known Story UUID is already available; use GET
+  /stories/{id} or GET /stories/{id}/articles.
+
+  Response handoff: preserve data[].id as an opaque UUID for the Story detail
+  and member-Article calls.
+
+  Next step: call GET /stories/{id} for Story metadata or GET
+  /stories/{id}/articles for member Articles.

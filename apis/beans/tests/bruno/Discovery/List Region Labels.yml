@@ -4,19 +4,16 @@ info:
   seq: 3
   tags:
     - Discovery
-
 http:
   method: GET
   url: "{{baseUrl}}/regions"
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
-
 examples:
   - name: 200 Response
     description: OK
@@ -99,14 +96,44 @@ examples:
           {
             "error": ""
           }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/regions"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": ""
+          }
+docs: >-
+  Answers: Which normalized extracted region labels can I use as Article
+  filters?
 
-docs: |-
-  Answers: Which normalized extracted region labels can I use as Article filters?
-  Returns: A cursor-paginated collection of region labels, not country codes, coordinates, or radius-search objects.
-  Use when: an agent has an unknown region spelling and needs discovery before Article filtering.
-  Do not use when: a known normalized label is already available; query Articles directly.
+  Returns: A cursor-paginated collection of region labels, not country codes,
+  coordinates, or radius-search objects.
+
+  Use when: an agent has an unknown region spelling and needs discovery before
+  Article filtering.
+
+  Do not use when: a known normalized label is already available; query Articles
+  directly.
+
   Search/filter behavior: q performs case-insensitive discovery matching.
+
   Time: no time filter applies.
-  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
-  Missing fields: the collection may be empty; structured geography is not promised.
+
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit
+  defaults to 20 and is capped at 100.
+
+  Missing fields: the collection may be empty; structured geography is not
+  promised.
+
   Next step: carry a returned value into the regions Article filter.

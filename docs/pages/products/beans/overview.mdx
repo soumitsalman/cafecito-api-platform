@@ -1,6 +1,6 @@
 ---
 title: Overview
-description: Search and retrieve publisher Articles and Sources with an AI-friendly cursor API.
+description: Search publisher Articles, Sources, Stories, and external observations with the Beans REST API and MCP server.
 ---
 
 import { Badge } from "zudoku/ui/Badge";
@@ -12,201 +12,563 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v1</Badge><Badge className="badge-live">Live</Badge>
 
-Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+Beans is a read-only publisher-content API for news applications, research workflows, and AI agents. It returns publisher Articles, Source metadata, chronological and attention-ranked feeds, related publisher reading, external Article mentions, and stable Story groups.
 
-Use Espresso when the question is about structured Events, Signals, impact, forecasts, or evidence relationships.
+- **Articles** are publisher items: news, blogs, reports, podcasts etc.
+- **Sources** are publisher records available on an Article or through the Source routes.
+- **Stories** group related Articles under a stable UUID and expose the member-Article route.
+- **Mentions** are external platform or forum observations for a selected Article.
+- **Discovery routes** return normalized values that can be used as Article and Story filters.
+
+Use Espresso when the question asks for a structured Event, Signal, impact, forecast, or evidence relationship. Beans reports publisher material and its coverage context; it does not turn an Article or attention metric into an Espresso conclusion.
+
+## Key features
+
+- **Article-first retrieval**: search publisher material by relevance query, exact Article UUID or URL, type, Source, byline, date, and normalized labels.
+- **Purposeful feeds**: use `latest` for chronology, `top-headlines` for recent attention-ranked news, and `trending` for attention-ranked coverage.
+- **Controlled exploration**: choose Article, Source, and Story UUIDs from collection `data`, then request detail or a subresource only when it answers the next question.
+- **Coverage context**: inspect related publisher reading, Story membership, and external mentions without treating those concepts as interchangeable.
+- **Content on demand**: keep collections compact and request `full_content=true` only for a selected Article or a narrowed Article collection.
+- **Agent-friendly transport**: JSON is canonical. Cursor pagination, stable UUIDs, explicit envelopes, and small follow-up calls make the API suitable for tool and agent workflows.
+
+## Choose a route by the user question
+
+| User needs | Start here | Follow only when needed | Provider parallel |
+| --- | --- | --- | --- |
+| Publisher material about a topic, person, place, or organization | `GET /beans/articles/search` | Article detail, related Articles, mentions, Source detail, or Story detail | World News search-news, GNews search, NewsAPI.ai getArticles, NewsAPI.org everything |
+| The most recently published material | `GET /beans/articles/latest` | Continue with the returned cursor or inspect a selected Article | NewsData.io latest, Currents latest-news |
+| A current attention-ranked news set | `GET /beans/articles/top-headlines` | Article detail or related coverage for selected results | GNews and NewsAPI.org top-headlines |
+| The most attention-ranked coverage | `GET /beans/articles/trending` | Inspect available `trend` observations | World News top-news, TheNewsAPI top-news |
+| One known Article UUID | `GET /beans/articles/{id}` | Request content, related Articles, mentions, or the linked Story | TheNewsAPI UUID lookup, World News retrieve-news |
+| Related publisher reading for one Article | `GET /beans/articles/{id}/similar` | Inspect a selected related Article | TheNewsAPI similar-by-UUID |
+| External discussion of one Article | `GET /beans/articles/{id}/mentions` | Use the observation data directly | Beans extension |
+| A related-coverage group | `GET /beans/stories` | Story detail, then its member Articles | Beans Story collection |
+| A publisher or domain | `GET /beans/sources` | Source detail or Article search with the selected Source UUID | NewsAPI.org sources, provider source catalogs |
+| An accepted filter value is unknown | `GET /beans/categories`, `/entities`, `/regions`, or `/sentiments` | Reuse the returned `value` in an Article or Story filter | Provider-specific catalogs |
+
+A good workflow uses the smallest useful filter set, preserves returned IDs exactly, and stops after enough publisher support has been selected. Do not retrieve detail for every collection item.
+
+## Authentication and base URL
 
 <Button className="btn-with-link" asChild>
   <a href="/settings/api-keys">Get API Key</a>
 </Button>
 
-## Choose a route by intent
+All public Beans routes use the `/beans` prefix and the same Bearer API key used by other Cafecito products.
 
-| Need | Route | Returns | Provider parallel |
-| --- | --- | --- | --- |
-| Search the Article corpus | GET /beans/articles/search | Article collection | World News search-news, GNews search, NewsAPI.ai getArticles, NewsAPI.org everything |
-| Retrieve one known Article | GET /beans/articles/{id} | Article detail | TheNewsAPI UUID lookup, World News retrieve-news |
-| Monitor recent publication | GET /beans/articles/latest | Newest Articles | NewsData.io latest, Currents latest-news |
-| Monitor fixed headlines | GET /beans/articles/top-headlines | Recent attention-ranked Articles | GNews and NewsAPI.org top-headlines |
-| Monitor attention | GET /beans/articles/trending | Trend-ranked Articles with nullable metrics | World News top-news, TheNewsAPI top-news |
-| Find related reading | GET /beans/articles/{id}/similar | Similar Articles, not guaranteed Story members | TheNewsAPI similar-by-UUID |
-| Browse related coverage | GET /beans/stories | UUID-identified Stories | Beans Story collection |
-| Inspect a Story | GET /beans/stories/{id} | Story detail and member-Article link | Beans Story detail |
-| List a Story's Articles | GET /beans/stories/{id}/articles | Paginated member Articles | Beans Story members |
-| Inspect external observations | GET /beans/articles/{id}/mentions | Social/forum mention observations | Beans extension |
-| Resolve publisher metadata | GET /beans/sources or /beans/sources/{id} | Source records keyed by UUID | NewsAPI.org sources, provider source catalogs |
-| Discover filter values | GET /beans/categories, /beans/entities, /beans/regions, /beans/sentiments | Normalized filter labels | Provider-specific catalogs |
+```bash
+BASE_URL="https://api.cafecito.tech"
+API_KEY="YOUR-API-KEY"
 
-Do not treat a Beans Article as an Espresso Event, a trend metric as an Espresso Signal, a similar Article as guaranteed Story membership, or a mention as another publisher Article.
+curl -s "${BASE_URL}/beans/health" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
 
-## Public Article scope
+```http
+Authorization: Bearer YOUR-API-KEY
+```
 
-The public V1 content_type values are all stored types from the proposal: blog, contract, earnings_report, enforcement_action, financial_report, lawsuit, news, official_statement, podcast, post, press_release, research_paper, site, technical_documentation, and whitepaper. Omit content_type to search all stored types. Do not treat provider pr labels as Beans aliases.
+::::info
+The [Beans API reference](/api/beans) is the source for the complete gateway schemas, parameter validation, and HTTP status codes.
+::::
 
-## Common request rules
+## Quickstart in JavaScript, Python, and cURL
 
-| Rule | Contract |
-| --- | --- |
-| Authentication | Authorization: Bearer YOUR-API-KEY |
-| Page size | limit is 1-100; default 20 |
-| Continuation | Send pagination.next_cursor unchanged as cursor |
-| Unsupported pagination | offset, page, pageSize, size, and other aliases |
-| Empty collection | HTTP 200 with data: [] and next_cursor: null |
-| Date inputs | from and to use inclusive UTC calendar dates in YYYY-MM-DD |
-| Text query | q is route-specific natural-language search text |
-| Semantic threshold | score_threshold is 0.0-1.0 and requires q |
-| Content projection | full_content=true requests available Article content; it does not change matches |
-| Filter logic | Different fields combine with AND; multiple include values within one field use OR; exclusion filters remove matches |
-| Response format | JSON is canonical |
+The following requests make the same Article search. The query asks for publisher material rather than an Espresso Event or Signal. `score_threshold` is supplied with `q` so the request also works on the feed routes that require the threshold when a query is present.
 
-## Article filters
+<CodeTabs syncKey="beans-api">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
 
-| Parameter | Meaning |
-| --- | --- |
-| q | Natural-language semantic Article search, maximum 512 characters |
-| score_threshold | Minimum semantic similarity; only valid with q |
-| ids | Exact Article UUIDs; search only |
-| urls | Exact Article URLs; search only |
-| content_type | Any stored type listed above; omitted means all stored types |
-| sources / exclude_sources | Source UUID include/exclude filters |
-| domains / exclude_domains | Exact Source domain include/exclude filters |
-| authors | Case-insensitive exact byline values |
-| categories / exclude_categories | Normalized category include/exclude filters |
-| regions | Normalized extracted region labels |
-| entities | Normalized extracted entity labels |
-| sentiments | Categorical sentiment labels |
-| tags | Fuzzy matching across normalized category, region, and entity labels |
-| from / to | Inclusive publication bounds |
-| full_content | Optional body projection |
+const params = new URLSearchParams({
+  q: "agentic AI programme",
+  score_threshold: "0.5",
+  content_type: "news",
+  tags: "artificial_intelligence_and_machine_learning",
+  limit: "5",
+});
 
-## Canonical responses
+const response = await fetch(`${baseUrl}/beans/articles/search?${params}`, {
+  headers: { Authorization: `Bearer ${apiKey}` },
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-Collection routes return an envelope:
+const page = await response.json();
+console.log(page.data);
+```
 
-~~~json
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+
+response = requests.get(
+    "https://api.cafecito.tech/beans/articles/search",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={
+        "q": "agentic AI programme",
+        "score_threshold": 0.5,
+        "content_type": "news",
+        "tags": "artificial_intelligence_and_machine_learning",
+        "limit": 5,
+    },
+    timeout=30,
+)
+response.raise_for_status()
+print(response.json()["data"])
+```
+
+```bash title="cURL"
+curl -s --get "${BASE_URL}/beans/articles/search" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=agentic AI programme" \
+  --data-urlencode "score_threshold=0.5" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "tags=artificial_intelligence_and_machine_learning" \
+  --data-urlencode "limit=5"
+```
+</CodeTabs>
+
+The three requests return the same JSON envelope. Use `GET /beans/articles/latest` for chronology, `GET /beans/articles/top-headlines` for recent attention-ranked news, and `GET /beans/articles/trending` for attention-ranked coverage rather than relevance search.
+
+## Collections, IDs, and pagination
+
+Every REST collection returns `pagination`, `meta`, and `data`. This is a captured one-Article response from `GET /beans/articles/latest?limit=1`; values are an example, not a fixed dataset.
+
+```json
 {
   "pagination": {
-    "limit": 20,
+    "limit": 1,
     "num_results": 1,
-    "next_cursor": null
+    "next_cursor": "eyJ2IjoxLCJzIjoiY3JlYXRlZCIsImlkIjoiM2E0NzllM2MtYTg3ZC01OTFlLWJiNmMtNWM4M2MwM2I2YTQwIiwiYyI6IjIwMjYtMDgtMjRUMDI6MDA6NDNaIn0"
   },
   "meta": {
-    "as_of": "2026-08-19T12:00:00Z"
+    "as_of": "2026-08-24T20:42:39.633280927Z"
   },
   "data": [
     {
-      "id": "e4270d59-2fd8-4a2f-90ce-b1a669bedb75",
-      "url": "https://publisher.example/article",
+      "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+      "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
       "content_type": "news",
-      "title": "Article headline",
-      "summary": "Article summary",
-      "author": null,
+      "published_at": "2026-08-24T02:00:43Z",
+      "author": "Carrington Malin",
       "image_url": null,
-      "published_at": "2026-08-17T12:00:00Z",
-      "source": {
-        "id": "0af3e96e-912c-4e51-95b7-e44b53e5e07b",
-        "domain": "publisher.example",
-        "name": "Publisher",
-        "url": "https://publisher.example"
-      },
-      "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
-      "categories": ["technology"],
-      "regions": ["united_states"],
-      "entities": ["example_company"],
-      "sentiments": ["analytical"],
-      "tags": ["technology", "united_states", "example_company"]
-    }
-  ]
-}
-~~~
-
-Detail routes return { "data": { ... } }. Article content is omitted unless full_content=true; when requested but unavailable, content is null. story_id is a stable Story UUID when an Article belongs to a Story and is otherwise omitted. Missing enrichment and Source display fields remain null or omitted according to the route schema. Trend metrics are nullable; Beans does not fabricate zero values.
-
-Errors use HTTP status plus { "error": { "code": "...", "message": "..." } }. Successful responses do not repeat a status field.
-
-## MCP workflow
-
-Use these tools in this order when the question is about publisher material:
-
-1. listCategories, listEntities, listRegions, listSentiments when a filter value is unknown.
-2. searchArticles for broad or semantic retrieval.
-3. getLatestArticles, getTopHeadlines, or getTrendingArticles for feed intent.
-4. getArticle after selecting an Article UUID from data[].id.
-5. getSimilarArticles for related publisher reading.
-6. getArticleMentions for external observations.
-7. listSources or getSource for publisher metadata.
-
-The MCP server is https://api.cafecito.tech/beans/mcp. The same API key is used for REST and MCP. Pass cursor tokens unchanged.
-
-## Stories
-
-Stories have stable UUID identifiers. Start with GET /beans/stories, then pass data[].id to GET /beans/stories/{id} or GET /beans/stories/{id}/articles. Story discovery accepts q, score_threshold with q, Article filters, min_article_count, date bounds, and cursor pagination. Member-Article requests accept Article filters, full_content, date bounds, and cursor pagination.
-
-links.articles in a Story detail response is the service-relative member path. For the public gateway, call GET /beans followed by that value.
-
-~~~bash
-curl -s "https://api.cafecito.tech/beans/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49" -H "Authorization: Bearer YOUR_API_KEY"
-curl -s --get "https://api.cafecito.tech/beans/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49/articles" -H "Authorization: Bearer YOUR_API_KEY" --data-urlencode "content_type=news" --data-urlencode "limit=20"
-~~~
-
-Story detail response:
-
-~~~json
-{
-  "data": {
-    "id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
-    "title": "Example Story",
-    "first_published_at": "2026-08-20T10:00:00Z",
-    "last_published_at": "2026-08-24T10:00:00Z",
-    "article_count": 4,
-    "source_count": 3,
-    "categories": ["technology"],
-    "regions": [],
-    "entities": [],
-    "tags": ["technology"],
-    "top_articles": [],
-    "links": {
-      "articles": "/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49/articles"
-    }
-  }
-}
-~~~
-
-Member-Article response:
-
-~~~json
-{
-  "pagination": {
-    "limit": 20,
-    "num_results": 1,
-    "next_cursor": null
-  },
-  "meta": {
-    "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
-    "as_of": "2026-08-24T00:00:00Z"
-  },
-  "data": [
-    {
-      "id": "e4270d59-2fd8-4a2f-90ce-b1a669bedb75",
-      "url": "https://publisher.example/article",
-      "content_type": "news",
-      "published_at": "2026-08-24T10:00:00Z",
-      "author": null,
-      "image_url": null,
-      "title": "Article headline",
-      "summary": "Article summary",
-      "categories": ["technology"],
-      "regions": [],
-      "entities": [],
-      "sentiments": [],
-      "tags": ["technology"],
-      "story_id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+      "title": "UAE AI Programme adds Agentic AI focus",
+      "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+      "categories": [
+        "artificial_intelligence_and_machine_learning",
+        "generative_ai_and_foundation_models"
+      ],
+      "regions": null,
+      "entities": ["carrington_malin"],
+      "sentiments": ["disturbed", "anxious"],
+      "tags": [
+        "artificial_intelligence_and_machine_learning",
+        "generative_ai_and_foundation_models",
+        "carrington_malin"
+      ],
+      "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
       "source": null
     }
   ]
 }
-~~~
+```
 
-Count routes remain unpublished.
+- Preserve Article, Source, and Story UUIDs exactly. They are opaque identifiers for detail and subresource calls.
+- `pagination.limit` is the requested page size. It accepts `1` through `100` and defaults to `20`.
+- `pagination.num_results` is the number of records in this page. It is not a total count of possible matches.
+- When `pagination.next_cursor` is non-null, send the exact token as `cursor` on the same route with the same filters. Do not decode, modify, sort, or synthesize cursor values.
+- An empty collection is a successful HTTP `200` response with `data: []` and `next_cursor: null`.
+- Detail routes return `{ "data": { ... } }`. Missing Article, Source, and Story IDs return HTTP `404`.
+- Do not use offset-style pagination such as `offset`, `page`, `pageSize`, or `size`; Beans uses cursors.
 
-See the [Beans migration guide](/products/beans/migration) for provider comparisons and the [API reference](/api/beans) for exact schemas.
+### Detail and error envelopes
+
+Article detail returns the same Article fields plus follow-up links. This captured response shows the link and attention-observation shapes. `content` is omitted here because it was not requested.
+
+```json
+{
+  "data": {
+    "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+    "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+    "content_type": "news",
+    "published_at": "2026-08-24T02:00:43Z",
+    "author": "Carrington Malin",
+    "image_url": null,
+    "title": "UAE AI Programme adds Agentic AI focus",
+    "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+    "categories": [
+      "artificial_intelligence_and_machine_learning",
+      "generative_ai_and_foundation_models"
+    ],
+    "regions": null,
+    "entities": ["carrington_malin"],
+    "sentiments": ["disturbed", "anxious"],
+    "tags": [
+      "artificial_intelligence_and_machine_learning",
+      "generative_ai_and_foundation_models",
+      "carrington_malin"
+    ],
+    "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+    "source": null,
+    "trend": {
+      "likes": 0,
+      "comments": 0,
+      "mentions": 0,
+      "audiences": 0,
+      "related": 53,
+      "trend_score": 2650
+    },
+    "links": {
+      "similar": "/articles/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/similar",
+      "mentions": "/articles/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/mentions",
+      "story": "/stories/06860aaa-a43c-585f-9cb3-a6710a93a74a"
+    }
+  }
+}
+```
+
+Errors use an HTTP status and one error envelope:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable explanation"
+  }
+}
+```
+
+Expect HTTP `400` for invalid input, `401` for a missing or invalid key, `404` for a selected record that does not exist, `429` when request limits are reached, and `500` when the service is unavailable. A successful response does not include a duplicate status field.
+
+## Response types and nullable fields
+
+The route matrix below names the response type for every public path. The following tables explain the payload fields a client will parse most often.
+
+### Article
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `id` | UUID string | Stable Article identifier for detail, similar, and mention calls. |
+| `url` | string | Publisher Article URL. |
+| `content_type` | string enum | One stored Beans content type. |
+| `published_at` | RFC 3339 timestamp | Publisher publication time. |
+| `title`, `summary`, `author`, `image_url` | string or `null` | Available publisher metadata. |
+| `content` | optional string | Included only when `full_content=true` is requested and content is available. |
+| `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
+| `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |
+| `source` | Source object or `null` | Available publisher metadata for this Article. |
+| `trend` | optional Trend object | Available observed attention values on attention-ranked or enriched responses. It is not a forecast and is not guaranteed on every Article. |
+| `links` | detail only | Service-relative `similar`, `mentions`, and, when available, `story` paths. Prefix a returned path with `/beans` at the public gateway. |
+
+### Source, discovery label, and Mention
+
+| Response item | Fields | Contract |
+| --- | --- | --- |
+| Source | `id`, `url`, `domain`, `name`, optional `description`, `favicon_url`, `rss_feed_url` | Publisher metadata. Preserve `id` and use it with the `sources` Article or Story filter. |
+| Discovery label | `value`, optional `type` | A normalized filter value from categories, entities, regions, or sentiments. |
+| Mention | `url`, `platform`, `forum`, `observed_at`, `engagement` | An external observation for a selected Article, not another publisher Article. |
+| Mention engagement | `likes`, `comments`, `audience` | Nullable observed engagement values. Treat absent or null values as unavailable, not zero. |
+
+`GET /beans/articles/{id}/mentions` returns the normal collection envelope with Mention items. It accepts only the mention-specific filters in the route matrix, not Article text or taxonomy filters.
+
+### Story
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `id` | UUID string | Stable Story identifier for `GET /beans/stories/{id}` and `GET /beans/stories/{id}/articles`. |
+| `title` | string | Story title. |
+| `first_published_at`, `last_published_at` | RFC 3339 timestamps | Publication bounds of the Story's available Articles. |
+| `article_count`, `source_count` | integer | Counts of available Story Articles and Sources. |
+| `categories`, `regions`, `entities`, `tags` | string arrays | Normalized Story labels. |
+| `top_articles` | Article-preview array | Compact Article previews with `id`, `url`, `title`, `published_at`, and available `source`. It is not the full member set. |
+| `links.articles` | Story detail only | Service-relative path for the Story's member-Article collection. Prefix it with `/beans` at the public gateway. |
+
+## Public route contract and request parameters
+
+All request parameters are query parameters unless the table marks `id` as a path parameter. CSV parameters accept comma-separated values. The table is intentionally route-specific: do not assume that a parameter available on Article search is accepted by every feed or follow-up route.
+
+### Health, discovery, Sources, and MCP
+
+| Route | Response type | Accepted request parameters |
+| --- | --- | --- |
+| `GET /beans/health` | Health object | None |
+| `GET /beans/categories` | Label collection envelope | `q`, `limit`, `cursor` |
+| `GET /beans/entities` | Label collection envelope | `q`, `limit`, `cursor` |
+| `GET /beans/regions` | Label collection envelope | `q`, `limit`, `cursor` |
+| `GET /beans/sentiments` | Label collection envelope | `q`, `limit`, `cursor` |
+| `GET /beans/sources` | Source collection envelope | `q`, `domains`, `limit`, `cursor` |
+| `GET /beans/sources/{id}` | Source detail envelope | `id` path parameter |
+| `GET /beans/mcp` | MCP tool transport | No REST filter parameters; connect with the same API key. |
+
+### Article routes
+
+| Route | Response type | Accepted request parameters |
+| --- | --- | --- |
+| `GET /beans/articles/search` | Article collection envelope | `q`, `score_threshold`, `ids`, `urls`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/latest` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/top-headlines` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/trending` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/{id}` | Article detail envelope | `id` path parameter, `full_content` |
+| `GET /beans/articles/{id}/similar` | Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/{id}/mentions` | Mention collection envelope | `id` path parameter, `platforms`, `forums`, `from`, `to`, `limit`, `cursor` |
+
+### Story routes
+
+| Route | Response type | Accepted request parameters |
+| --- | --- | --- |
+| `GET /beans/stories` | Story collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `min_article_count`, `from`, `to`, `limit`, `cursor` |
+| `GET /beans/stories/{id}` | Story detail envelope | `id` path parameter |
+| `GET /beans/stories/{id}/articles` | Story Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
+
+## Query and filter rules
+
+### Shared request rules
+
+| Rule | Contract |
+| --- | --- |
+| Authentication | Send `Authorization: Bearer YOUR-API-KEY`. |
+| Page size | `limit` is `1` through `100`; the default is `20`. |
+| Continuation | Send `pagination.next_cursor` unchanged as `cursor` on the same route and filter set. |
+| Date inputs | `from` and `to` use inclusive UTC calendar dates in `YYYY-MM-DD` form. |
+| Text query | `q` is a route-specific natural-language relevance query and accepts up to 512 characters. |
+| Relevance threshold | `score_threshold` is in the `0.0` through `1.0` range. Use it only with `q`. Article feed routes require a non-zero `score_threshold` when `q` is present; Story discovery rejects a threshold without `q`. |
+| Content projection | `full_content=true` requests available Article content without changing which records match. |
+| Filter combination | Different filter fields combine with AND. Include values within one category, region, entity, sentiment, Source, or domain field match any listed value. Exclusion filters remove matching records. All supplied `tags` and author terms further narrow results. |
+| Response format | JSON is canonical for REST responses and MCP tool results. |
+
+### Article and Story filters
+
+| Parameter | Matching behavior | Available on |
+| --- | --- | --- |
+| `q` | Natural-language relevance query. | Article search and feeds; Story discovery. |
+| `score_threshold` | Relevance threshold used with `q`. Higher values are stricter. | Article search and feeds; Story discovery. |
+| `ids`, `urls` | Exact Article UUIDs or canonical URLs. | Article search only. |
+| `content_type` | One stored Article type. Omit to include every stored type. | Article search, latest, trending, similar, Stories, Story Articles. |
+| `sources`, `exclude_sources` | Include or exclude exact Source UUIDs. | Article and Story collection routes listed in the matrix. |
+| `domains`, `exclude_domains` | Include or exclude exact Source domains. | Article and Story collection routes listed in the matrix. |
+| `authors` | Case-insensitive byline text matching. | Article and Story collection routes listed in the matrix. |
+| `categories`, `exclude_categories` | Normalized category labels. | Article and Story collection routes listed in the matrix. |
+| `regions`, `entities`, `sentiments` | Normalized extracted labels. | Article and Story collection routes listed in the matrix. |
+| `tags` | All supplied normalized category, region, or entity terms must match. It is not a title or body phrase search. | Article and Story collection routes listed in the matrix. |
+| `from`, `to` | Inclusive UTC publication-date bounds. | Article search, similar Articles, Stories, and Story Articles. Mention dates bound `observed_at` instead. |
+| `full_content` | Requests available Article content. | Article search and feeds, Article detail, similar Articles, and Story Articles. |
+| `min_article_count` | Minimum number of Articles in a Story. Default `2`, minimum `2`. | Story discovery only. |
+| `platforms`, `forums` | External observation platform or forum filters. | Article mentions only. |
+
+`GET /beans/articles/top-headlines` is a recent attention-ranked **news** route. It does not accept `content_type`, `ids`, `urls`, `from`, or `to`. The current public feed routes also do not accept custom date bounds; use Article search, similar Articles, Stories, or Story Articles when the workflow needs `from` and `to`.
+
+### Public content types
+
+`content_type` accepts every stored Beans type. Omit it when a collection should include all stored types:
+
+`blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`.
+
+Do not translate provider labels such as `pr` into Beans aliases. Use one of the published values exactly.
+
+## Discovery and Sources
+
+Discovery routes return accepted filter values rather than requiring a client to guess a taxonomy value:
+
+| Route | Returns | Use it for |
+| --- | --- | --- |
+| `GET /beans/categories` | Category labels. | `categories` or `exclude_categories`. |
+| `GET /beans/entities` | Entity labels. | `entities` or `tags`. |
+| `GET /beans/regions` | Region labels. | `regions` or `tags`. |
+| `GET /beans/sentiments` | Sentiment labels. | `sentiments`. |
+
+Each discovery route accepts `q`, `limit`, and `cursor`. Use it only when the normalized value is unknown; send a known value directly to the Article or Story route.
+
+Sources are publisher records, not Article results. Resolve a publisher with `GET /beans/sources?q=...` or `domains=...`, preserve its UUID, then use that value with `sources` on Article or Story retrieval.
+
+```bash
+# Resolve a publisher, then use its returned data[].id as a Source filter.
+curl -s --get "${BASE_URL}/beans/sources" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=middleeastainews.com" \
+  --data-urlencode "domains=middleeastainews.com" \
+  --data-urlencode "limit=5"
+
+curl -s --get "${BASE_URL}/beans/articles/search" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "sources=SOURCE_UUID" \
+  --data-urlencode "limit=20"
+```
+
+`GET /beans/sources/{id}` returns one Source detail envelope. Description, favicon, and RSS metadata are optional display fields; an unavailable field is not an error.
+
+## Follow-up calls for coverage and context
+
+### Inspect a selected Article
+
+```bash
+curl -s --get "${BASE_URL}/beans/articles/ARTICLE_UUID" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "full_content=true"
+```
+
+Use Article detail after a collection has selected an Article UUID. The response can include available publisher body content plus links to related publisher reading, external mentions, and the Article's Story.
+
+```bash
+# Related publisher reading. This is not guaranteed Story membership.
+curl -s "${BASE_URL}/beans/articles/ARTICLE_UUID/similar?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# Observed external platform or forum references to the selected Article.
+curl -s "${BASE_URL}/beans/articles/ARTICLE_UUID/mentions?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+`similar` returns related publisher reading. `mentions` returns external observations with available platform, forum, observation time, and engagement fields. Neither route returns a replacement for the selected publisher Article, and related Articles are not guaranteed Story members.
+
+### Inspect a Story and its member Articles
+
+```bash
+# Discover Story UUIDs with Article-style filters and a minimum Article count.
+curl -s --get "${BASE_URL}/beans/stories" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "tags=generative_ai_and_foundation_models" \
+  --data-urlencode "min_article_count=2" \
+  --data-urlencode "limit=20"
+
+curl -s "${BASE_URL}/beans/stories/STORY_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s --get "${BASE_URL}/beans/stories/STORY_UUID/articles" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=20"
+```
+
+The following captured Story detail response shows the full response type. The `top_articles` field contains previews, while `links.articles` identifies the pageable member collection.
+
+```json
+{
+  "data": {
+    "id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+    "title": "UAE AI Programme adds Agentic AI focus",
+    "first_published_at": "2026-06-22T02:00:40Z",
+    "last_published_at": "2026-08-24T02:00:43Z",
+    "article_count": 12,
+    "source_count": 1,
+    "categories": [
+      "artificial_intelligence_and_machine_learning",
+      "generative_ai_and_foundation_models",
+      "ai_ethics_and_governance",
+      "robotics_and_autonomous_systems",
+      "media_and_journalism"
+    ],
+    "regions": [
+      "egypt",
+      "middle_east",
+      "africa",
+      "japan",
+      "riyadh",
+      "saudi_arabia",
+      "united_arab_emirates"
+    ],
+    "entities": [
+      "carrington_malin",
+      "anghami",
+      "airev",
+      "daniel_valle",
+      "dubai_university",
+      "muhammad_khalid",
+      "qatar_university",
+      "ai",
+      "ai_agents",
+      "ai_infrastructure"
+    ],
+    "tags": [
+      "carrington_malin",
+      "artificial_intelligence_and_machine_learning",
+      "generative_ai_and_foundation_models",
+      "anghami",
+      "ai_ethics_and_governance",
+      "egypt",
+      "middle_east",
+      "airev",
+      "daniel_valle",
+      "dubai_university"
+    ],
+    "top_articles": [
+      {
+        "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+        "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+        "title": "UAE AI Programme adds Agentic AI focus",
+        "published_at": "2026-08-24T02:00:43Z",
+        "source": null
+      },
+      {
+        "id": "ec2e3641-07cd-5a9c-870f-79256e293481",
+        "url": "https://www.middleeastainews.com/p/kuwait-backs-ai-to-boost-smart-meter",
+        "title": "Kuwait backs AI to boost smart meter efficiency",
+        "published_at": "2026-08-22T02:00:35Z",
+        "source": null
+      },
+      {
+        "id": "e3a0e8ed-c10c-58ed-a408-61985f6f58f4",
+        "url": "https://www.middleeastainews.com/p/dubai-chambers-nasscom-partner-on",
+        "title": "Dubai Chambers, Nasscom partner on Agentic AI",
+        "published_at": "2026-08-21T02:00:07Z",
+        "source": null
+      }
+    ],
+    "links": {
+      "articles": "/stories/06860aaa-a43c-585f-9cb3-a6710a93a74a/articles"
+    }
+  }
+}
+```
+
+Story-member Articles use the normal Article collection shape with Story-specific metadata. `meta.story_id` is the Story UUID used for this member response.
+
+```json
+{
+  "pagination": {
+    "limit": 1,
+    "num_results": 1,
+    "next_cursor": null
+  },
+  "meta": {
+    "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a",
+    "as_of": "2026-08-24T20:42:39.633280927Z"
+  },
+  "data": [
+    {
+      "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+      "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+      "content_type": "news",
+      "published_at": "2026-08-24T02:00:43Z",
+      "title": "UAE AI Programme adds Agentic AI focus",
+      "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+      "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a"
+    }
+  ]
+}
+```
+
+Count routes remain unpublished. Use the pagination envelope to process returned records; do not infer a total match count from `num_results`.
+
+## JSON and MCP workflows
+
+JSON is the canonical Beans response format. Keep collection envelopes intact in application code, and pass IDs and cursors through without parsing implementation details from them.
+
+For an MCP workflow, choose a tool from the user question, then move to a detail tool only after selecting an ID:
+
+1. Use `listCategories`, `listEntities`, `listRegions`, or `listSentiments` when a filter value is unknown.
+2. Use `searchArticles` for topic retrieval or `getLatestArticles`, `getTopHeadlines`, and `getTrendingArticles` for feed intent.
+3. Use `getArticle` for a selected Article UUID, then `getSimilarArticles` or `getArticleMentions` only when that context is needed.
+4. Use `listStories`, `getStory`, and `listStoryArticles` for related-coverage workflows.
+5. Use `listSources` or `getSource` to resolve publisher metadata and reuse a Source UUID as a filter.
+
+MCP clients connect to `https://api.cafecito.tech/beans/mcp` with the same API key used for REST. See [MCP & AI agents](/guides/mcp-ai-agents) for connection and tool guidance.
+
+## Continue learning
+
+- [Beans workflows and scenarios](/products/beans/scenarios)
+- [Migrate to Beans](/products/beans/migration)
+- [Beans API reference](/api/beans)
+- [MCP & AI agents](/guides/mcp-ai-agents)

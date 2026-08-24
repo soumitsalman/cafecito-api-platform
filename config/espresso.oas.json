@@ -557,6 +557,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "created_at": "2026-08-23T22:00:43-04:00",
+                          "drivers": [
+                            "UAE AI Programme adding Agentic AI focus",
+                            "Enclave42 launching verifiable AI inference service",
+                            "Syira AI expanding international presence with Doha office"
+                          ],
+                          "event_type": "ai_sector_expansion_in_middle_east",
+                          "future_outlook": "Continued expansion of AI infrastructure across GCC nations with increased investment in agentic systems",
+                          "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                          "impact_level": "high",
+                          "impacted_domains": [
+                            "artificial_intelligence",
+                            "technology",
+                            "business_development",
+                            "regional_economic_growth"
+                          ],
+                          "impacts": [
+                            "Increased agentic AI adoption in UAE",
+                            "New AI inference capabilities deployed in Dubai",
+                            "International market entry by Syira AI"
+                          ],
+                          "key_points": [
+                            "UAE AI Programme adds Agentic AI focus",
+                            "Enclave42 launches verifiable AI inference in Dubai",
+                            "Syira AI opens new Doha Office"
+                          ],
+                          "kind": "event",
+                          "people": [
+                            "carrington_malin"
+                          ],
+                          "summary": "The Middle East AI News Minute highlights three major developments: UAE's AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate accelerating AI adoption across regional markets. The UAE programme represents a strategic shift toward autonomous AI applications, while Enclave42's launch addresses verification needs in enterprise settings. Syira's expansion signals growing foreign direct investment in AI talent and operations within the region.",
+                          "tags": [
+                            "artificial_intelligence",
+                            "regional_economic_growth",
+                            "business_development",
+                            "carrington_malin",
+                            "generative_ai_and_foundation_models",
+                            "artificial_intelligence_and_machine_learning",
+                            "ai_sector_expansion_in_middle_east",
+                            "technology"
+                          ]
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:36:18.204225338Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -673,6 +733,73 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventDetailResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": {
+                        "base_url": "www.middleeastainews.com",
+                        "counts": {
+                          "evidence": 54,
+                          "signals": 1
+                        },
+                        "created_at": "2026-08-23T22:00:43-04:00",
+                        "drivers": [
+                          "UAE AI Programme adding Agentic AI focus",
+                          "Enclave42 launching verifiable AI inference service",
+                          "Syira AI expanding international presence with Doha office"
+                        ],
+                        "event_type": "ai_sector_expansion_in_middle_east",
+                        "future_outlook": "Continued expansion of AI infrastructure across GCC nations with increased investment in agentic systems",
+                        "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                        "impact_level": "high",
+                        "impacted_domains": [
+                          "artificial_intelligence",
+                          "technology",
+                          "business_development",
+                          "regional_economic_growth"
+                        ],
+                        "impacts": [
+                          "Increased agentic AI adoption in UAE",
+                          "New AI inference capabilities deployed in Dubai",
+                          "International market entry by Syira AI"
+                        ],
+                        "key_points": [
+                          "UAE AI Programme adds Agentic AI focus",
+                          "Enclave42 launches verifiable AI inference in Dubai",
+                          "Syira AI opens new Doha Office"
+                        ],
+                        "kind": "event",
+                        "links": {
+                          "evidence": "/events/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/evidence",
+                          "signals": "/events/3a479e3c-a87d-591e-bb6c-5c83c03b6a40/signals"
+                        },
+                        "people": [
+                          "carrington_malin"
+                        ],
+                        "source": {
+                          "id": "8d47f649-a937-5b3e-b912-23495c6a8c4d",
+                          "url": "www.middleeastainews.com",
+                          "domain": "middleeastainews",
+                          "name": null
+                        },
+                        "source_id": "8d47f649-a937-5b3e-b912-23495c6a8c4d",
+                        "summary": "The Middle East AI News Minute highlights three major developments: UAE's AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate accelerating AI adoption across regional markets. The UAE programme represents a strategic shift toward autonomous AI applications, while Enclave42's launch addresses verification needs in enterprise settings. Syira's expansion signals growing foreign direct investment in AI talent and operations within the region.",
+                        "tags": [
+                          "artificial_intelligence",
+                          "regional_economic_growth",
+                          "business_development",
+                          "carrington_malin",
+                          "generative_ai_and_foundation_models",
+                          "artificial_intelligence_and_machine_learning",
+                          "ai_sector_expansion_in_middle_east",
+                          "technology"
+                        ],
+                        "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -862,6 +989,41 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventEvidenceCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                          "kind": "event",
+                          "created_at": "2026-08-23T22:00:43-04:00",
+                          "tags": [
+                            "artificial_intelligence",
+                            "regional_economic_growth",
+                            "business_development",
+                            "carrington_malin",
+                            "generative_ai_and_foundation_models",
+                            "artificial_intelligence_and_machine_learning",
+                            "ai_sector_expansion_in_middle_east",
+                            "technology"
+                          ],
+                          "source_id": "8d47f649-a937-5b3e-b912-23495c6a8c4d",
+                          "url": "https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai",
+                          "base_url": "www.middleeastainews.com"
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:44.456102494Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -1077,6 +1239,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SignalCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "categories": [
+                            "media_and_journalism",
+                            "artificial_intelligence_and_machine_learning",
+                            "generative_ai_and_foundation_models"
+                          ],
+                          "companies": [
+                            "dubai_university",
+                            "spotify",
+                            "qatar_university"
+                          ],
+                          "confidence": "high",
+                          "created_at": "2026-08-23T22:00:43-04:00",
+                          "drivers": [
+                            "Governing bodies implement structured AI policies",
+                            "Private firms leverage AI for competitive advantage"
+                          ],
+                          "future_outlook": "Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe",
+                          "id": "72f16578-f9b3-5921-b595-90977d00493d",
+                          "impact_level": "high",
+                          "impacted_domains": [
+                            "technology",
+                            "food_safety",
+                            "financial_services",
+                            "algorithmic_governance"
+                          ],
+                          "impacts": [
+                            "Trade increases via efficient logistics",
+                            "Environment protects from algal blooms",
+                            "Capital inflow fuels AI ventures",
+                            "Data quality rises with fraud prevention"
+                          ],
+                          "key_points": [
+                            "2026-07-25 UAE launches AI policy training program",
+                            "2026-07-25 Morocco deploys AI drones to control toxic algae",
+                            "2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals",
+                            "2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types"
+                          ],
+                          "kind": "signal",
+                          "people": [
+                            "anghami",
+                            "carrington_malin",
+                            "muhammad_khalid",
+                            "deezer",
+                            "daniel_valle",
+                            "dubai_chambers"
+                          ],
+                          "regions": [
+                            "oman",
+                            "casablanca",
+                            "egypt",
+                            "saudi_arabia",
+                            "morocco",
+                            "japan",
+                            "riyadh",
+                            "abu_dhabi"
+                          ],
+                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "tags": [
+                            "oman",
+                            "riyadh",
+                            "abu_dhabi",
+                            "spotify",
+                            "carrington_malin",
+                            "egypt",
+                            "daniel_valle",
+                            "anghami",
+                            "dubai_chambers",
+                            "algorithmic_governance",
+                            "media_and_journalism",
+                            "qatar_university",
+                            "dubai_university",
+                            "food_safety",
+                            "casablanca",
+                            "artificial_intelligence_and_machine_learning",
+                            "financial_services",
+                            "generative_ai_and_foundation_models",
+                            "japan",
+                            "deezer",
+                            "morocco",
+                            "technology",
+                            "muhammad_khalid",
+                            "saudi_arabia"
+                          ]
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": null
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:44.504323225Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -1178,6 +1442,14 @@
                   "type": "object",
                   "additionalProperties": {
                     "type": "string"
+                  }
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "status": "alive"
+                    }
                   }
                 }
               }
@@ -1344,6 +1616,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SignalCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "categories": [
+                            "media_and_journalism",
+                            "artificial_intelligence_and_machine_learning",
+                            "generative_ai_and_foundation_models"
+                          ],
+                          "companies": [
+                            "dubai_university",
+                            "spotify",
+                            "qatar_university"
+                          ],
+                          "confidence": "high",
+                          "created_at": "2026-08-23T22:00:43-04:00",
+                          "drivers": [
+                            "Governing bodies implement structured AI policies",
+                            "Private firms leverage AI for competitive advantage"
+                          ],
+                          "future_outlook": "Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe",
+                          "id": "72f16578-f9b3-5921-b595-90977d00493d",
+                          "impact_level": "high",
+                          "impacted_domains": [
+                            "technology",
+                            "food_safety",
+                            "financial_services",
+                            "algorithmic_governance"
+                          ],
+                          "impacts": [
+                            "Trade increases via efficient logistics",
+                            "Environment protects from algal blooms",
+                            "Capital inflow fuels AI ventures",
+                            "Data quality rises with fraud prevention"
+                          ],
+                          "key_points": [
+                            "2026-07-25 UAE launches AI policy training program",
+                            "2026-07-25 Morocco deploys AI drones to control toxic algae",
+                            "2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals",
+                            "2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types"
+                          ],
+                          "kind": "signal",
+                          "people": [
+                            "anghami",
+                            "carrington_malin",
+                            "muhammad_khalid",
+                            "deezer",
+                            "daniel_valle",
+                            "dubai_chambers"
+                          ],
+                          "regions": [
+                            "oman",
+                            "casablanca",
+                            "egypt",
+                            "saudi_arabia",
+                            "morocco",
+                            "japan",
+                            "riyadh",
+                            "abu_dhabi"
+                          ],
+                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "tags": [
+                            "oman",
+                            "riyadh",
+                            "abu_dhabi",
+                            "spotify",
+                            "carrington_malin",
+                            "egypt",
+                            "daniel_valle",
+                            "anghami",
+                            "dubai_chambers",
+                            "algorithmic_governance",
+                            "media_and_journalism",
+                            "qatar_university",
+                            "dubai_university",
+                            "food_safety",
+                            "casablanca",
+                            "artificial_intelligence_and_machine_learning",
+                            "financial_services",
+                            "generative_ai_and_foundation_models",
+                            "japan",
+                            "deezer",
+                            "morocco",
+                            "technology",
+                            "muhammad_khalid",
+                            "saudi_arabia"
+                          ]
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:36:18.229694905Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -1460,6 +1834,107 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SignalDetailResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": {
+                        "base_url": null,
+                        "categories": [
+                          "media_and_journalism",
+                          "artificial_intelligence_and_machine_learning",
+                          "generative_ai_and_foundation_models"
+                        ],
+                        "companies": [
+                          "dubai_university",
+                          "spotify",
+                          "qatar_university"
+                        ],
+                        "confidence": "high",
+                        "counts": {
+                          "events": 24
+                        },
+                        "created_at": "2026-08-23T22:00:43-04:00",
+                        "drivers": [
+                          "Governing bodies implement structured AI policies",
+                          "Private firms leverage AI for competitive advantage"
+                        ],
+                        "future_outlook": "Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe",
+                        "id": "72f16578-f9b3-5921-b595-90977d00493d",
+                        "impact_level": "high",
+                        "impacted_domains": [
+                          "technology",
+                          "food_safety",
+                          "financial_services",
+                          "algorithmic_governance"
+                        ],
+                        "impacts": [
+                          "Trade increases via efficient logistics",
+                          "Environment protects from algal blooms",
+                          "Capital inflow fuels AI ventures",
+                          "Data quality rises with fraud prevention"
+                        ],
+                        "key_points": [
+                          "2026-07-25 UAE launches AI policy training program",
+                          "2026-07-25 Morocco deploys AI drones to control toxic algae",
+                          "2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals",
+                          "2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types"
+                        ],
+                        "kind": "signal",
+                        "links": {
+                          "events": "/signals/72f16578-f9b3-5921-b595-90977d00493d/events"
+                        },
+                        "people": [
+                          "anghami",
+                          "carrington_malin",
+                          "muhammad_khalid",
+                          "deezer",
+                          "daniel_valle",
+                          "dubai_chambers"
+                        ],
+                        "regions": [
+                          "oman",
+                          "casablanca",
+                          "egypt",
+                          "saudi_arabia",
+                          "morocco",
+                          "japan",
+                          "riyadh",
+                          "abu_dhabi"
+                        ],
+                        "source_id": null,
+                        "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                        "tags": [
+                          "oman",
+                          "riyadh",
+                          "abu_dhabi",
+                          "spotify",
+                          "carrington_malin",
+                          "egypt",
+                          "daniel_valle",
+                          "anghami",
+                          "dubai_chambers",
+                          "algorithmic_governance",
+                          "media_and_journalism",
+                          "qatar_university",
+                          "dubai_university",
+                          "food_safety",
+                          "casablanca",
+                          "artificial_intelligence_and_machine_learning",
+                          "financial_services",
+                          "generative_ai_and_foundation_models",
+                          "japan",
+                          "deezer",
+                          "morocco",
+                          "technology",
+                          "muhammad_khalid",
+                          "saudi_arabia"
+                        ],
+                        "url": null
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -1766,6 +2241,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "created_at": "2026-08-23T22:00:43-04:00",
+                          "drivers": [
+                            "UAE AI Programme adding Agentic AI focus",
+                            "Enclave42 launching verifiable AI inference service",
+                            "Syira AI expanding international presence with Doha office"
+                          ],
+                          "event_type": "ai_sector_expansion_in_middle_east",
+                          "future_outlook": "Continued expansion of AI infrastructure across GCC nations with increased investment in agentic systems",
+                          "id": "3a479e3c-a87d-591e-bb6c-5c83c03b6a40",
+                          "impact_level": "high",
+                          "impacted_domains": [
+                            "artificial_intelligence",
+                            "technology",
+                            "business_development",
+                            "regional_economic_growth"
+                          ],
+                          "impacts": [
+                            "Increased agentic AI adoption in UAE",
+                            "New AI inference capabilities deployed in Dubai",
+                            "International market entry by Syira AI"
+                          ],
+                          "key_points": [
+                            "UAE AI Programme adds Agentic AI focus",
+                            "Enclave42 launches verifiable AI inference in Dubai",
+                            "Syira AI opens new Doha Office"
+                          ],
+                          "kind": "event",
+                          "people": [
+                            "carrington_malin"
+                          ],
+                          "summary": "The Middle East AI News Minute highlights three major developments: UAE's AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate accelerating AI adoption across regional markets. The UAE programme represents a strategic shift toward autonomous AI applications, while Enclave42's launch addresses verification needs in enterprise settings. Syira's expansion signals growing foreign direct investment in AI talent and operations within the region.",
+                          "tags": [
+                            "artificial_intelligence",
+                            "regional_economic_growth",
+                            "business_development",
+                            "carrington_malin",
+                            "generative_ai_and_foundation_models",
+                            "artificial_intelligence_and_machine_learning",
+                            "ai_sector_expansion_in_middle_east",
+                            "technology"
+                          ]
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:44.545869075Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -1923,6 +2458,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "8d47f649-a937-5b3e-b912-23495c6a8c4d",
+                          "url": "www.middleeastainews.com",
+                          "domain": "middleeastainews",
+                          "name": null
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": null
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:45.111260573Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2039,6 +2597,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceItemResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": {
+                        "id": "8d47f649-a937-5b3e-b912-23495c6a8c4d",
+                        "url": "www.middleeastainews.com",
+                        "domain": "middleeastainews",
+                        "name": null
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2196,6 +2767,31 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "value": "microsoft",
+                          "type": "company"
+                        },
+                        {
+                          "value": "sam_altman",
+                          "type": "people"
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwMDdfZmlyc3RfbGlnaHQiLCJ0eXBlIjoiY29tcGFueSJ9fQ"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:09.860031881Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2310,6 +2906,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "value": "north_america",
+                          "type": "region"
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwIiwidHlwZSI6InJlZ2lvbiJ9fQ"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:12.441502467Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2424,6 +3041,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "value": "price_increase",
+                          "type": "event_type"
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwXzYwX21waF9hY2NlbGVyYXRpb24iLCJ0eXBlIjoiZXZlbnRfdHlwZSJ9fQ"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:38:23.220950257Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2481,10 +3119,10 @@
     },
     "/espresso/tags": {
       "get": {
-        "summary": "Discover fuzzy tag vocabulary",
+        "summary": "Discover fuzzy tag filters",
         "description": "Use only when an agent needs vocabulary for a fuzzy `tags` query. Returns persisted labels for Event and Signal filtering; tags are not a fixed taxonomy or exact-only values.\nIf a useful tag is already known, search Events or Signals directly instead of making a discovery request. Use `resource` to limit discovery to Event or Signal labels.",
         "tags": [
-          "Tags"
+          "Discovery"
         ],
         "operationId": "listIntelligenceTags",
         "parameters": [
@@ -2551,6 +3189,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": {
+                      "data": [
+                        {
+                          "value": "startups"
+                        }
+                      ],
+                      "pagination": {
+                        "limit": 1,
+                        "num_results": 1,
+                        "next_cursor": "eyJ2IjoxLCJpZCI6bnVsbCwiayI6IlxuXG5teV93aWZlX3F1aXR0ZXJfam9iX2VwaXNvZGVfc2NyaXB0X2FuYWx5c2lzIn0"
+                      },
+                      "meta": {
+                        "as_of": "2026-08-24T20:36:55.938524571Z"
+                      }
+                    }
+                  }
                 }
               },
               "application/yaml": {
@@ -2650,6 +3308,22 @@
               "application/json": {
                 "schema": {
                   "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Live response",
+                    "value": "404 page not found"
+                  }
                 }
               }
             }
