@@ -1,29 +1,24 @@
-import {ZuploContext, ZuploRequest} from "@zuplo/runtime";
+import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
 
-export function rateLimit(request: ZuploRequest, context: ZuploContext) {
-  const user = request.user;
-  // TODO: change the rate limit to hour
-  // premium customers get 1000 requests per minute
+const FREE_REQUESTS_PER_MINUTE = 100;
+const BALLER_REQUESTS_PER_MINUTE = 1000;
 
-  if (user.data.subscription_plan === "baller") {
+export function rateLimit(request: ZuploRequest, _context: ZuploContext) {
+  const sub = request.user?.sub;
+  const plan = (request.user?.data as Record<string, unknown> | undefined)
+    ?.subscription_plan;
+
+  if (plan === "baller" && sub) {
     return {
-      key: user.sub,
-      requestsAllowed: 1000,
+      key: sub,
+      requestsAllowed: BALLER_REQUESTS_PER_MINUTE,
       timeWindowMinutes: 1,
     };
   }
-  // base customers get 100 requests per minute
-  if (user.data.subscription_plan === "broke") {
-    return {
-      key: user.sub,
-      requestsAllowed: 100,
-      timeWindowMinutes: 1,
-    };
-  }
-  // everybody else gets 10 requests per minute
+
   return {
-    key: user.sub,
-    requestsAllowed: 10,
+    key: sub ?? "anonymous",
+    requestsAllowed: FREE_REQUESTS_PER_MINUTE,
     timeWindowMinutes: 1,
   };
 }

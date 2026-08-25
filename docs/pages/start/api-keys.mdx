@@ -1,28 +1,37 @@
 ---
-description: Create and safely use an API key across Cafecito APIs and MCP servers.
+title: Create a Cafecito API key
+description: Create a Bearer API key that authenticates Beans and Espresso REST and MCP. Health routes stay public.
 ---
 
 import { Stepper } from "zudoku/ui/Stepper";
 
-# API Keys
+# API keys
 
-One Cafecito API key works across the gateway REST APIs and MCP servers.
+One Cafecito API key authenticates every **live** product: Beans and Espresso REST, plus `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`. Cortado and Latte are future products and do not accept this key yet.
+
+There is no official SDK. Send the key as a Bearer token. [Health](/guides/api-conventions) routes are public.
 
 <Stepper>
-1. Go to [API Keys](/settings/api-keys).
-2. Create a key and copy it into a secret manager or environment variable.
-3. Send it as Authorization: Bearer YOUR-API-KEY.
+1. Open [API Keys](/settings/api-keys) in the developer portal.
+2. Create a key and store it in a secret manager or `CAFECITO_API_KEY`. Never commit it.
+3. On every authenticated request, send:
+
+   `Authorization: Bearer YOUR-API-KEY`
 </Stepper>
 
 ## Example
 
 ~~~bash
 curl -s --get "https://api.cafecito.tech/beans/articles/latest" \
-  --data-urlencode "content_type=blog" \
   --data-urlencode "limit=5" \
   -H "Authorization: Bearer YOUR-API-KEY"
 ~~~
 
-Use separate keys per app or environment, rotate leaked keys, and never commit keys to source control.
+Use a separate key per application or environment and rotate a key if it leaks. All keys for the same user share the [free-tier meter](/guides/pricing-limits) (100 requests per minute and 50,000 per month; REST and MCP together).
 
-The same key works for https://api.cafecito.tech/beans/mcp and https://api.cafecito.tech/espresso/mcp.
+## Next
+
+- [First API call](/start/first-api-call)
+- [API conventions](/guides/api-conventions)
+- [Reusable clients](/guides/client-patterns)
+- [Troubleshooting](/guides/troubleshooting)

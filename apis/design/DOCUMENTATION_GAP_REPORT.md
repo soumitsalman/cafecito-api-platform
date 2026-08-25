@@ -1,8 +1,19 @@
 # Cafecito Documentation Gap Report
 
-**Date:** 2026-08-25  
-**Scope:** Repository-wide static audit of the Cafecito documentation system  
-**Audience:** Maintainers planning documentation and contract cleanup
+| Field | Value |
+|---|---|
+| Status | **current** |
+| Authority | Internal audit of documentation surfaces; **not** the public API contract |
+| Audience | Maintainers planning documentation and contract cleanup |
+| Last verified | 2026-08-25 |
+| Owner role | Documentation steward |
+| Superseded by | n/a |
+
+**Index:** [README.md](README.md)
+
+Settled **published** Beans collection envelope (do not treat older proposal text as live): `{ data, pagination.limit, pagination.num_results, pagination.next_cursor, meta.as_of }`. Findings below that still argue for omitting `num_results` or restricting `meta.as_of` are historical relative to gateway OpenAPI.
+
+**Scope:** Repository-wide static audit of the Cafecito documentation system.
 
 This report identifies information that is missing, contradictory, stale, or difficult to discover. It covers the public Zudoku portal, gateway OpenAPI files, backend router contracts, generated Swagger artifacts, service READMEs, design plans, MCP definitions, and executable examples.
 
@@ -493,8 +504,8 @@ The old indexes also describe Espresso as “sips,” mention `same_as` and `der
 
 - [`docs/README.md`](docs/README.md): old portal paths, old product terminology, old pricing, and an obsolete product lineup.
 - [`README.md`](README.md): repository setup and path references that need a current-docs cross-check.
-- [`apis/beans/README.md`](apis/beans/README.md): legacy route and parameter documentation.
-- [`apis/espresso/README.md`](apis/espresso/README.md): legacy “sip” model, response format, and relation-route documentation.
+- [`apis/README.md`](apis/README.md): legacy route and parameter documentation.
+- [`apis/README.md`](apis/README.md): legacy “sip” model, response format, and relation-route documentation.
 - [`apis/design/BEANS_ESPRESSO_DOCUMENTATION_PLAN.md`](apis/design/BEANS_ESPRESSO_DOCUMENTATION_PLAN.md): old destination paths.
 - [`apis/design/BEANS_API_DOCUMENTATION_PLAN.md`](apis/design/BEANS_API_DOCUMENTATION_PLAN.md): old portal path assumptions.
 - [`apis/design/ESPRESSO_API_DOCUMENTATION_PLAN.md`](apis/design/ESPRESSO_API_DOCUMENTATION_PLAN.md): old portal path assumptions.
@@ -590,7 +601,7 @@ Every example in `beans/scenarios.mdx` must validate against the exact parameter
 
 The current Espresso `Pagination` response struct serializes `limit`, `num_results`, and `next_cursor`, but no `cursor`. The generated Swagger and gateway OpenAPI require both `cursor` and `next_cursor`, and the public portal examples show `cursor` in JSON but stale `page` fields in YAML and TOON.
 
-The public target contract already describes `pagination.cursor` and `pagination.next_cursor`, so the preferred resolution is to make runtime output match that contract unless the product intentionally revises it.
+**2026-08-25 note:** Published Beans and Espresso collection pagination is `limit`, `num_results` (this page only), and `next_cursor` (no `pagination.cursor` in the response). `meta.as_of` is required on Beans collections. Prefer gateway OpenAPI over this finding if they disagree. The older target-contract preference for `pagination.cursor` in the response is **superseded**.
 
 ### Missing or incorrect in
 
@@ -629,7 +640,7 @@ The service README describes a `sip`/`action`/`event`/`signal` model and `respon
 
 ### Missing or incorrect in
 
-- `apis/espresso/README.md`, especially its data-model and response-format sections.
+- `apis/README.md`, especially its data-model and response-format sections.
 - `apis/design/ESPRESSO_API_DOCUMENTATION_PLAN.md` where old terminology remains.
 - Any generated or gateway descriptions that still mention old formats or Actions.
 
@@ -655,8 +666,8 @@ Older service READMEs describe `204` for empty results and a flat `{ "error": ".
 
 ### Missing or incorrect in
 
-- `apis/beans/README.md`.
-- `apis/espresso/README.md`.
+- `apis/README.md`.
+- `apis/README.md`.
 - `apis/beans/router/responses.go` and `apis/espresso/router/responses.go`.
 - Router annotations and generated Swagger in both services.
 - `config/beans.oas.json` and `config/espresso.oas.json`.
@@ -775,8 +786,8 @@ The public pricing page also uses “vector search,” while the public document
 
 ### Missing or incorrect in
 
-- `apis/beans/README.md`.
-- `apis/espresso/README.md`.
+- `apis/README.md`.
+- `apis/README.md`.
 - `docs/README.md`.
 - `docs/pages/guides/pricing-limits.mdx`.
 - Any public page or generated description containing persistence, embedding, relation-storage, or infrastructure details.
@@ -1319,8 +1330,8 @@ Repository crawlers and AI agents see stale READMEs and design plans before or a
 
 - `README.md`.
 - `docs/README.md`.
-- `apis/beans/README.md`.
-- `apis/espresso/README.md`.
+- `apis/README.md`.
+- `apis/README.md`.
 - `apis/design/*.md` documentation plans and gap reports.
 
 ### Edit or add
@@ -1623,8 +1634,8 @@ Primary files:
 - config/beans.oas.json
 - config/espresso.oas.json
 - docs/pages/**
-- apis/beans/README.md
-- apis/espresso/README.md
+- apis/README.md
+- apis/README.md
 - docs/README.md
 
 Exit condition: no known P0 contradiction remains open without an explicit planned/not-available label.
@@ -1761,8 +1772,8 @@ Required metadata for apis/design/*.md and service READMEs:
 Edit:
 
 - apis/design/*.md
-- apis/beans/README.md
-- apis/espresso/README.md
+- apis/README.md
+- apis/README.md
 - docs/README.md
 - docs/zudoku.config.tsx
 

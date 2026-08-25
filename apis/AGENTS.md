@@ -1,5 +1,5 @@
 # Cafecito API Implementations
-Updated: 2026-08-14
+Updated: 2026-08-25
 
 ## Coding Guideline (`apis/`)
 
@@ -22,11 +22,13 @@ When writing or editing Go code under `apis/`, follow:
 
 Integration tests live under each service's `tests/` directory and need a reachable database. Env is loaded from that service's `.env` (at least `PG_CONNECTION_STRING`; beans also needs embedder vars for some tests).
 
+The manual **API Contract & Docs** workflow (`.github/workflows/api-contract-docs.yml`, `workflow_dispatch` only) starts `pgvector/pgvector:pg16`, applies `.github/ci/schema-beans.sql` or `schema-espresso.sql`, seeds Espresso from `.github/ci/seed-espresso.sql`, and relies on Beans `tests/fixtures_test.go` for deterministic rows. It does not run on PRs or gate deploys. Router vector-search tests that call a live embedder are skipped in that workflow (`-skip 'TestRouterVectorSearch'`). Stress tests skip when no process is listening on `:8080`.
+
 ```bash
-# Beans
+# Beans (seeds CI fixtures; fake embedder)
 cd apis/beans && go test ./tests/...
 
-# Espresso
+# Espresso (hermetic contract tests always; DB tests need PG + fixtures)
 cd apis/espresso && go test ./tests/...
 ```
 
@@ -398,6 +400,7 @@ For any update in public routes, params and responses
 2. Update api gateway definitions `../config/<product>.oas.json`'
 3. Update developer portal docs under `../docs/pages` e.g. ', `../docs/pages/products/<product>/`, and their effect on shared documents like `../docs/pages/start`, `../docs/pages/guides`. Always include sample params and responses
 4. Update corresponding Bruno definitions in `<product>/tests/bruno/`
+5. Close the Definition of Done in root `AGENTS.md` and `.github/pull_request_template.md`. Maintainer run/test/swag commands: [`README.md`](README.md). Frozen public policy: **100/min**, **50,000/month**, **Bearer** except health, no private backend headers in public docs. Contract/docs GitHub workflow is manual only and does not gate CI.
 
 ### Public documentation boundary
 

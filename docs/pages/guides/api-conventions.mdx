@@ -1,40 +1,142 @@
 ---
-description: Shared authentication, pagination, response, and route-selection conventions for Cafecito APIs.
+title: Cafecito API conventions
+description: Canonical authentication, pagination, dates, errors, retries, and query validation for Beans and Espresso REST and MCP.
 ---
 
 # API conventions
 
-## Authentication
+Use this page to implement a shared HTTP client. Product pages describe resources and filters; this page is the shared transport contract.
 
-All gateway REST and MCP requests use a Cafecito API key as a Bearer token:
+Live products: **Beans** and **Espresso**. **Cortado** and **Latte** are future products and have no public API.
+
+There is **no official Cafecito SDK**. Integrate with REST or MCP using the patterns on [Reusable clients](/guides/client-patterns). For limits, see [Pricing and limits](/guides/pricing-limits). For recovery, see [Troubleshooting](/guides/troubleshooting).
+
+## Base URL and authentication
+
+| Item | Contract |
+| --- | --- |
+| Gateway base URL | `https://api.cafecito.tech` |
+| Authenticated requests | `Authorization: Bearer YOUR-API-KEY` |
+| Health | `GET /beans/health` and `GET /espresso/health` are public. Do not send a key. |
+| MCP | Same key as REST. Hosted endpoints: `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`. |
 
 ~~~http
 Authorization: Bearer YOUR-API-KEY
 ~~~
 
-The gateway base URL is https://api.cafecito.tech.
+One key works across live REST APIs and MCP servers. Store the key in an environment variable or secret manager. Never commit it.
 
-## Product conventions
+## Query validation
 
-| Behavior | Beans | Espresso |
+Unknown query parameters, parameters that a route does not accept, malformed UUIDs, malformed cursors, and out-of-range `limit` values are **rejected** with HTTP `400` and the error envelope below. Clients must not assume extra query fields are ignored. Offset-style fields such as `offset`, `page`, `pageSize`, and `size` are not part of the contract.
+
+Use only the parameters listed for that route in the [Beans](/api/beans) or [Espresso](/api/espresso) reference.
+
+## Pagination
+
+Both products paginate collections with `limit` (default `20`, maximum `100`) and an opaque `cursor`. `pagination.num_results` is the count **in this page**, not a total match count. When `pagination.next_cursor` is non-null, send that exact string as the next request `cursor` on the same route with the same filters. Do not decode, modify, sort, or synthesize tokens.
+
+Empty collections are HTTP `200` with `data: []`. Missing detail resources are HTTP `404`.
+
+### Beans collection envelope
+
+Beans collections return `pagination`, `meta`, and `data`. Beans **does not** serialize a `pagination.cursor` field. Continuation uses only `next_cursor` → request `cursor`.
+
+```json
+{
+  "pagination": {
+    "limit": 20,
+    "num_results": 20,
+    "next_cursor": "OPAQUE_TOKEN_OR_NULL"
+  },
+  "meta": {
+    "as_of": "2026-08-24T20:42:39Z"
+  },
+  "data": []
+}
+```
+
+### Espresso collection envelope
+
+Espresso collections return `data`, `pagination`, and `meta`. Pagination is `limit`, `num_results` (this page only), and `next_cursor`. Continue by sending `pagination.next_cursor` unchanged as the next request `cursor`. There is no `pagination.cursor` echo field.
+
+```json
+{
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "num_results": 0,
+    "next_cursor": "OPAQUE_TOKEN_OR_NULL"
+  },
+  "meta": {}
+}
+```
+
+Detail routes for both products return `{ "data": { ... } }`.
+
+## Dates and freshness
+
+| Concept | Meaning |
+| --- | --- |
+| Date-only filters (`from`, `to`) | Inclusive UTC calendar dates in `YYYY-MM-DD`. |
+| Beans `from` / `to` | Bound Article publication time (`published_at`), not the response snapshot. |
+| Espresso `from` / `to` | Bound record `created_at`. |
+| Beans `meta.as_of` | UTC time this collection snapshot was produced. Show it to users as freshness. Values in examples are captured, not a live dataset. |
+| Espresso `meta` | Present on collections; treat listed timestamps on Events and Signals as the record times to display. |
+
+Captured examples on product pages are not a guaranteed live result set. Re-query when the application needs a current snapshot.
+
+`full_content=true` on Beans requests Article body text **when it is available**. It does not guarantee a full publisher copy. Handle a missing or partial `content` value and cite the canonical Article `url`.
+
+## Response formats
+
+JSON is canonical for REST. Espresso may also return YAML or TOON where `response_type` is documented; those encodings carry the same fields, including opaque cursors. Beans REST and MCP results use JSON.
+
+## Errors
+
+Application errors from Beans and Espresso use HTTP status plus:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable explanation"
+  }
+}
+```
+
+Missing or invalid **public** keys are rejected at the gateway with HTTP `401` (engine body). Send `Authorization: Bearer <key>`. Do not send a backend key header.
+
+| HTTP status | Typical cause | Retry? |
 | --- | --- | --- |
-| Collection pagination | limit plus opaque cursor | limit plus opaque cursor |
-| Continue a collection | Send pagination.next_cursor unchanged as cursor | Send pagination.next_cursor unchanged as cursor |
-| Empty collections | HTTP 200 with data: [] | HTTP 200 with data: [] |
-| Canonical format | JSON | JSON |
-| AI-agent formats | Use the REST/MCP JSON contract | YAML and TOON may be used where the Espresso contract supports them |
+| `400` | Invalid or unknown query, malformed UUID or cursor, unsupported parameter | No. Fix the request. |
+| `401` | Missing or invalid public API key (gateway) | No. Create or replace the key. |
+| `404` | Detail resource does not exist | No. Do not treat empty collections as 404. |
+| `429` | Rate or monthly quota reached | Yes, after backoff. See [Pricing](/guides/pricing-limits). |
+| `5xx` | Temporary service failure | Yes, with bounded retries. |
 
-Beans V1 Article filters accept all stored content types listed in the Beans contract; omitting content_type includes all stored types. Espresso filters and resource meanings are separate. Use each product reference for route-specific limits, filters, schemas, and status codes: [Beans API](/api/beans) and [Espresso API](/api/espresso).
+Successful collections never use `204` for empty results.
 
-## Envelope rules
+## Retries and operational recovery
 
-Collections return pagination and data, plus meta when the route exposes freshness metadata. Detail routes return data. Empty collections are successful HTTP 200 responses with data: [].
+1. Confirm `GET /beans/health` or `GET /espresso/health` without a key.
+2. Retry `429` and `5xx` with exponential backoff and jitter. Honor any `Retry-After` header when present.
+3. Do not retry `400`, `401`, or `404` with the same request.
+4. If a cursor is rejected (`400`), restart the collection from the first page with the same filters.
+5. If a response format is unsupported, fall back to JSON (`response_type=json` or omit the parameter).
+6. Keep identifiers and `next_cursor` values exactly as returned.
 
-Follow the returned cursor exactly. Do not construct a cursor or substitute offset, page, pageSize, or size.
+## Versioning and support
+
+- Compatible changes are **additive**: new optional fields, new routes, and new enum values may appear without a URL version bump.
+- **Breaking** changes ship as a new API version, with deprecation notices on this portal before removal.
+- Report bugs and request features via [Contact](/contact) (GitHub issue templates).
 
 ## Product choice
 
-- Use Beans for publisher Articles, citations, full Article content when available, Source metadata, similar reading, and external Article mentions.
-- Use Espresso for structured Events, Signals, impact, forecasts, and evidence relationships.
+| Job | Product |
+| --- | --- |
+| Publisher Articles, Sources, Stories, mentions, available full content | Beans |
+| Structured Events, Signals, evidence, Sources | Espresso |
 
-See [MCP and AI agents](/guides/mcp-ai-agents) for tool selection.
+MCP tool catalogs and product overviews cover route selection. Shared client wrappers live on [Reusable clients](/guides/client-patterns).

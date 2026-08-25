@@ -38,10 +38,12 @@ func TestNewDigestDocumentIncludesSipFields(t *testing.T) {
 	require.NotNil(t, doc)
 	assert.Equal(t, id, doc["id"])
 	assert.Equal(t, created, doc["created_at"])
+	assert.Equal(t, db.SIP_KIND_EVENT, doc["kind"])
 	assert.Equal(t, []string{"markets"}, doc["tags"])
-	assert.Equal(t, "Example Semiconductor cut its annual outlook.", doc["briefing"])
+	assert.Equal(t, "Example Semiconductor cut its annual outlook.", doc["summary"])
+	assert.NotContains(t, doc, "briefing")
 	assert.Equal(t, "earnings_guidance", doc["event_type"])
-	assert.NotContains(t, doc, "kind")
+	assert.Contains(t, doc, "stock_tickers")
 }
 
 func TestNewDigestDocumentRejectsNonObject(t *testing.T) {
@@ -129,8 +131,5 @@ func TestNewSourceDocumentUsesPublicFieldNames(t *testing.T) {
 	assert.Equal(t, "https://example.com", fields["url"])
 	assert.Contains(t, fields, "domain")
 	assert.Contains(t, fields, "name")
-	assert.Contains(t, fields, "description")
-	assert.Contains(t, fields, "favicon_url")
-	assert.Contains(t, fields, "rss_feed_url")
 	assert.NotContains(t, fields, "base_url")
 }

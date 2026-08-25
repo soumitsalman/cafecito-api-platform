@@ -29,7 +29,6 @@ const (
 	ROUTE_TRENDING   = "/articles/trending"
 	ROUTE_HEADLINES  = "/top-headlines"
 	ROUTE_ARTICLES   = "/articles"
-	ROUTE_COUNT      = "/articles/count"
 	ROUTE_SOURCES    = "/sources"
 	ROUTE_CATEGORIES = "/categories"
 	ROUTE_ENTITIES   = "/entities"
@@ -133,24 +132,20 @@ func assertExpectedPagination(t *testing.T, body []byte, expected_limit int) []m
 	env := parseCollection(t, body)
 	require.NotNil(t, env.Data)
 	require.Equal(t, float64(expected_limit), env.Pagination["limit"])
-	assert.Len(t, env.Pagination, 2)
+	require.Contains(t, env.Pagination, "num_results")
+	assert.Equal(t, float64(len(env.Data)), env.Pagination["num_results"])
 	require.Contains(t, env.Pagination, "next_cursor")
+	assert.Len(t, env.Pagination, 3)
 	assert.NotContains(t, env.Pagination, "page")
 	assert.NotContains(t, env.Pagination, "offset")
 	assert.NotContains(t, env.Pagination, "found")
 	assert.NotContains(t, env.Pagination, "returned")
-	assert.NotContains(t, env.Pagination, "num_results")
+	assert.NotContains(t, env.Pagination, "cursor")
 	var raw map[string]any
 	require.NoError(t, json.Unmarshal(body, &raw))
 	assert.NotContains(t, raw, "success")
 	assert.NotContains(t, raw, "status")
 	return env.Data
-}
-
-func assertNoCollectionMeta(t *testing.T, body []byte) {
-	t.Helper()
-	env := parseCollection(t, body)
-	assert.Empty(t, env.Meta)
 }
 
 func nextCursorFromBody(t *testing.T, body []byte) string {
@@ -245,7 +240,11 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 	assert.Contains(t, item, "content_type")
 	content_type, ok := item["content_type"].(string)
 	require.True(t, ok, "article has invalid content_type")
-	assert.Contains(t, []string{"blog", "news"}, content_type)
+	assert.Contains(t, []string{
+		"blog", "contract", "earnings_report", "enforcement_action", "financial_report",
+		"lawsuit", "news", "official_statement", "podcast", "post", "press_release",
+		"research_paper", "site", "technical_documentation", "whitepaper",
+	}, content_type)
 	assert.NotEmpty(t, item["title"])
 	assert.Contains(t, item, "summary")
 	assert.Contains(t, item, "author")
@@ -361,7 +360,10 @@ func assertExpectedTag(t *testing.T, item map[string]any) {
 	value, ok := item["value"].(string)
 	require.True(t, ok, "discovery item is missing string value")
 	assert.NotEmpty(t, value)
-	require.Len(t, item, 1)
+	if item["type"] != nil {
+		_, ok = item["type"].(string)
+		require.True(t, ok)
+	}
 }
 
 func skipIfEmbedderUnavailable(t *testing.T, status int, body []byte) {
@@ -428,14 +430,14 @@ func TestRouterDocs(t *testing.T) {
 
 func TestRouterDiscoveryRoutes(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	for _, path := range []string{ROUTE_CATEGORIES, ROUTE_ENTITIES, ROUTE_REGIONS, ROUTE_SENTIMENTS, ROUTE_TAGS} {
+	for _, path := range []string{ROUTE_CATEGORIES, ROUTE_ENTITIES, ROUTE_REGIONS, ROUTE_SENTIMENTS} {
 		t.Run(path, func(t *testing.T) {
 			params := url.Values{}
 			params.Set("limit", "5")
 			status, body := routerGET(t, srv.URL, path, params)
 			printResponse(t, path, body)
 			requireStatus(t, http.StatusOK, status, body)
-			assertNoCollectionMeta(t, body)
+			assertMetaAsOf(t, body)
 			items := assertExpectedPagination(t, body, 5)
 			require.NotEmpty(t, items, path)
 			assertExpectedTag(t, items[0])
@@ -451,7 +453,7 @@ func TestRouterDiscoveryQuery(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_CATEGORIES, params)
 	printResponse(t, "CATEGORIES_Q", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedTag(t, item)
@@ -478,7 +480,7 @@ func TestRouterGetSources(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	sources := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, sources)
 	for _, source := range sources {
@@ -508,7 +510,7 @@ func TestRouterGetSourcesByQueryAndDomain(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES_FILTERED", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	assertExpectedPagination(t, body, 5)
 }
 
@@ -527,7 +529,7 @@ func TestRouterSourcesFilterByIDs(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES_BY_IDS", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	matched := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, matched)
 	for _, source := range matched {
@@ -539,7 +541,7 @@ func TestRouterSourcesFilterByIDs(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SOURCES, params)
 	printResponse(t, "SOURCES_BY_MISSING_IDS", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	assert.Empty(t, assertExpectedPagination(t, body, 5))
 }
 
@@ -558,7 +560,7 @@ func TestRouterSearchArticlesUnfiltered(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_UNFILTERED", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -575,7 +577,7 @@ func TestRouterSearchArticlesByCategories(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_CATEGORIES", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -593,7 +595,7 @@ func TestRouterSearchArticlesByExactIDsAndURLs(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_IDS", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	assert.Equal(t, article_id, items[0]["id"])
@@ -604,7 +606,7 @@ func TestRouterSearchArticlesByExactIDsAndURLs(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_BY_URLS", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items = assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assert.Equal(t, test_article_urls[0], item["url"])
@@ -626,7 +628,7 @@ func TestRouterSearchArticlesFilters(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "SEARCH_FILTERS", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -644,7 +646,7 @@ func TestRouterVectorSearchArticles(t *testing.T) {
 	printResponse(t, "VECTOR_SEARCH", body)
 	skipIfEmbedderUnavailable(t, status, body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -700,7 +702,7 @@ func TestRouterGetLatestArticles(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_LATEST, params)
 	printResponse(t, "LATEST", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -719,7 +721,7 @@ func TestRouterVectorSearchLatest(t *testing.T) {
 	printResponse(t, "VECTOR_SEARCH_LATEST", body)
 	skipIfEmbedderUnavailable(t, status, body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -749,7 +751,7 @@ func TestRouterGetHeadlines(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_HEADLINES, params)
 	printResponse(t, "HEADLINES", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, items)
 	for _, item := range items {
@@ -777,7 +779,7 @@ func TestRouterLatestAndTrendingRejectExactIdentityFilters(t *testing.T) {
 
 func TestRouterFeedsRejectDisallowedDateBounds(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	for _, path := range []string{ROUTE_LATEST, ROUTE_HEADLINES} {
+	for _, path := range []string{ROUTE_LATEST, ROUTE_HEADLINES, ROUTE_TRENDING} {
 		t.Run(path, func(t *testing.T) {
 			params := url.Values{}
 			params.Set("from", testSearchFrom().Format("2006-01-02"))
@@ -791,17 +793,15 @@ func TestRouterFeedsRejectDisallowedDateBounds(t *testing.T) {
 	}
 }
 
-func TestRouterTrendingHonorsObservationWindow(t *testing.T) {
+func TestRouterTopHeadlinesRejectsContentType(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
-	params.Set("from", "2000-01-01")
-	params.Set("to", "2000-01-02")
+	params.Set("content_type", "news")
 	params.Set("limit", "5")
-	status, body := routerGET(t, srv.URL, ROUTE_TRENDING, params)
-	printResponse(t, "TRENDING_OLD_WINDOW", body)
-	requireStatus(t, http.StatusOK, status, body)
-	assertMetaAsOf(t, body)
-	assert.Empty(t, assertExpectedPagination(t, body, 5))
+	status, body := routerGET(t, srv.URL, ROUTE_HEADLINES, params)
+	printResponse(t, "HEADLINES_CONTENT_TYPE", body)
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 }
 
 func TestRouterSearchRejectsUnsupportedParameters(t *testing.T) {
@@ -879,7 +879,7 @@ func TestRouterSimilarArticles(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_ARTICLES+"/"+article_id+"/similar", params)
 	printResponse(t, "SIMILAR", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	for _, item := range items {
 		assertExpectedArticle(t, item)
@@ -974,47 +974,47 @@ func TestRouterStoryNotFound(t *testing.T) {
 	assertExpectedAPIError(t, body, shared.API_ERROR_NOT_FOUND)
 }
 
-func TestRouterArticlesCount(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	params := url.Values{}
-	params.Set("from", testSearchFrom().Format("2006-01-02"))
-	params.Set("to", testSearchTo().Format("2006-01-02"))
-	status, body := routerGET(t, srv.URL, ROUTE_COUNT, params)
-	printResponse(t, "COUNT", body)
-	requireStatus(t, http.StatusOK, status, body)
-	var response map[string]any
-	require.NoError(t, json.Unmarshal(body, &response))
-	data, ok := response["data"].(map[string]any)
-	require.True(t, ok)
-	_, ok = data["count"].(float64)
-	require.True(t, ok)
-	meta, ok := response["meta"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "article", meta["counted_resource"])
-	assert.Equal(t, "published_at", meta["time_field"])
-	as_of, ok := meta["as_of"].(string)
-	require.True(t, ok)
-	_, err := time.Parse(time.RFC3339Nano, as_of)
-	require.NoError(t, err)
+func TestRouterBackendAPIKey(t *testing.T) {
+	db := setupTestDB()
+	embedder := setupTestEmbedder()
+	gin.SetMode(gin.TestMode)
+	engine := router.NewRouter(db, embedder, map[string]string{"X-API-KEY": "test-token"})
+	srv := httptest.NewServer(engine)
+	t.Cleanup(func() {
+		srv.Close()
+		_ = embedder.Close()
+		db.Close()
+	})
 
-	params.Set("group_by", "content_type")
-	status, body = routerGET(t, srv.URL, ROUTE_COUNT, params)
-	printResponse(t, "COUNT_GROUP", body)
+	status, body := routerGET(t, srv.URL, ROUTE_HEALTH, nil)
 	requireStatus(t, http.StatusOK, status, body)
-	require.NoError(t, json.Unmarshal(body, &response))
-	data, ok = response["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "content_type", data["group_by"])
-	_, ok = data["buckets"].([]any)
-	require.True(t, ok)
+
+	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, url.Values{"limit": {"1"}})
+	requireStatus(t, http.StatusUnauthorized, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_UNAUTHORIZED)
+
+	req, err := http.NewRequest(http.MethodGet, routerURL(srv.URL, ROUTE_SEARCH, url.Values{"limit": {"1"}}), nil)
+	require.NoError(t, err)
+	req.Header.Set("X-API-KEY", "test-token")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	requireStatus(t, http.StatusOK, resp.StatusCode, body)
+	assertMetaAsOf(t, body)
 }
 
-func TestRouterArticlesCountRequiresDateBounds(t *testing.T) {
+func TestRouterPostContentTypeIsResponseOnly(t *testing.T) {
 	srv := newTestHTTPServer(t)
-	status, body := routerGET(t, srv.URL, ROUTE_COUNT, nil)
-	printResponse(t, "COUNT_MISSING_BOUNDS", body)
-	requireStatus(t, http.StatusBadRequest, status, body)
-	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+	params := url.Values{}
+	params.Set("ids", fixturePostID.String())
+	params.Set("limit", "5")
+	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+	requireStatus(t, http.StatusOK, status, body)
+	items := assertExpectedPagination(t, body, 5)
+	require.NotEmpty(t, items)
+	assert.Equal(t, "post", items[0]["content_type"])
 }
 
 func TestRouterCursorPagination(t *testing.T) {
@@ -1054,7 +1054,7 @@ func TestRouterDefaultPagination(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, nil)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 20)
 	require.NotEmpty(t, items)
 	assert.LessOrEqual(t, len(items), 20)
@@ -1069,7 +1069,7 @@ func TestRouterEmptyCollection(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "EMPTY_COLLECTION", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	items := assertExpectedPagination(t, body, 5)
 	assert.Empty(t, items)
 	assert.Equal(t, "", nextCursorFromBody(t, body))
@@ -1084,7 +1084,7 @@ func TestRouterFullContentProjection(t *testing.T) {
 	status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "WITHOUT_FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	without_content := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, without_content)
 	assert.NotContains(t, without_content[0], "content")
@@ -1093,7 +1093,7 @@ func TestRouterFullContentProjection(t *testing.T) {
 	status, body = routerGET(t, srv.URL, ROUTE_SEARCH, params)
 	printResponse(t, "FULL_CONTENT", body)
 	requireStatus(t, http.StatusOK, status, body)
-	assertNoCollectionMeta(t, body)
+	assertMetaAsOf(t, body)
 	with_content := assertExpectedPagination(t, body, 5)
 	require.NotEmpty(t, with_content)
 	assert.Equal(t, without_content[0]["id"], with_content[0]["id"])

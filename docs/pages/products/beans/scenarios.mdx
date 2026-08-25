@@ -1,6 +1,6 @@
 ---
-title: Scenarios
-description: Compose Beans Article, Source, discovery, and cursor routes into data-serving workflows for a news application.
+title: Beans API Workflows for Feeds, Sources, and Stories
+description: Compose Beans Article, Source, Story, and discovery routes into publisher-content workflows, including news, earnings, and litigation monitoring.
 ---
 
 # Serve a News Application with Beans
@@ -21,11 +21,12 @@ export BASE_URL="https://api.cafecito.tech"
 | Choose a feed route by intent. | `latest` is chronological, `top-headlines` uses a fixed recent attention window, and `trending` ranks observed attention. |
 | Preserve Article and Source UUIDs. | IDs are the handoff between search, detail, similar, mentions, and Source-filtered Article calls. |
 | Keep collection calls independent. | A temporary failure in one collection does not prevent the others from being served. |
-| Request `full_content=true` only for selected Article detail. | Collections remain compact; the Article body is optional and can be unavailable. |
+| Request `full_content=true` only for selected Article detail. | Collections remain compact. Body content is available only when Beans has it; use `url` for attribution. |
 | Treat `pagination.next_cursor` as opaque. | Send it back only as `cursor` with the same route and filters. |
 | Use discovery only for an unknown value. | Known normalized categories, entities, regions, and sentiments can go directly into Article filters. |
+| Send only documented parameters. | Unknown or route-inapplicable keys, including `content_type` on top-headlines and `from`/`to` on feeds, return HTTP `400`. |
 
-`content_type` accepts every stored Beans type: `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`. Omit it when a collection should include all stored types.
+Request `content_type` accepts 14 filterable types: `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`. `post` may appear on responses. `content_type=post` returns HTTP `400`. Omit `content_type` when a collection should include all stored types.
 
 ## Shared server helper
 
@@ -58,8 +59,8 @@ async function beansGet(path, query = {}) {
 **Call sequence:** 3 independent calls
 
 1. `GET /beans/articles/latest` for chronological publication.
-2. `GET /beans/articles/top-headlines` for the fixed recent attention window.
-3. `GET /beans/articles/trending` for attention-ranked coverage over a supplied or default date window.
+2. `GET /beans/articles/top-headlines` for the fixed recent attention window (news only; no `content_type` or dates).
+3. `GET /beans/articles/trending` for attention-ranked coverage (no `from` or `to`).
 
 ~~~js
 const settled = await Promise.allSettled([
@@ -68,13 +69,10 @@ const settled = await Promise.allSettled([
     limit: 24,
   }),
   beansGet("/beans/articles/top-headlines", {
-    content_type: "news",
     limit: 12,
   }),
   beansGet("/beans/articles/trending", {
     content_type: "news",
-    from: "2026-08-12",
-    to: "2026-08-19",
     limit: 12,
   }),
 ]);
@@ -123,14 +121,11 @@ curl -s --get "$BASE_URL/beans/articles/latest" \
 
 curl -s --get "$BASE_URL/beans/articles/top-headlines" \
   -H "Authorization: Bearer $API_KEY" \
-  --data-urlencode "content_type=news" \
   --data-urlencode "limit=12"
 
 curl -s --get "$BASE_URL/beans/articles/trending" \
   -H "Authorization: Bearer $API_KEY" \
   --data-urlencode "content_type=news" \
-  --data-urlencode "from=2026-08-12" \
-  --data-urlencode "to=2026-08-19" \
   --data-urlencode "limit=12"
 ~~~
 
@@ -376,3 +371,41 @@ const payload = storyId
 ~~~
 
 The detail response carries the same stable UUID and a service-relative `links.articles` path. For a gateway request, call `GET /beans` followed by that path. The member-Article envelope repeats the requested Story UUID in `meta.story_id`; Article `story_id` is present for members assigned to a Story.
+
+## Scenario 7: Monitor earnings or litigation coverage
+
+**Use when:** The application watches publisher financial reports or lawsuits rather than general news.
+
+**Call sequence:** 1 call (repeat with `cursor` as needed)
+
+`GET /beans/articles/search` with a filterable `content_type`. Do not send `content_type=post`.
+
+~~~js
+const earnings = await beansGet("/beans/articles/search", {
+  content_type: "earnings_report",
+  from: "2026-08-01",
+  limit: 20,
+});
+
+const litigation = await beansGet("/beans/articles/search", {
+  content_type: "lawsuit",
+  entities: "openai",
+  limit: 20,
+});
+~~~
+
+~~~bash
+curl -s --get "$BASE_URL/beans/articles/search" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=earnings_report" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+
+curl -s --get "$BASE_URL/beans/articles/search" \
+  -H "Authorization: Bearer $API_KEY" \
+  --data-urlencode "content_type=official_statement" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+~~~
+
+**Serving rule:** These types are publisher documents. For structured impact or outlook, continue in Espresso after selecting identifiers here.

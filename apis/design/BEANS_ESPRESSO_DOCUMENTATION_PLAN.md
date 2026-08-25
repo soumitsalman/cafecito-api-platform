@@ -1,8 +1,15 @@
 # Beans and Espresso Documentation Separation Plan
 
-Status: proposed documentation contract and execution plan  
-Prepared: 2026-07-30  
-Scope: developer portal, OpenAPI descriptions, examples, and MCP guidance
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None; product boundary copy has shipped in the portal |
+| Audience | Historical docs-planning readers |
+| Last verified | 2026-08-25 |
+| Owner role | Documentation steward (archival) |
+| Superseded by | [`docs/pages/start/overview.mdx`](../../docs/pages/start/overview.mdx), product overviews |
+
+Prepared: 2026-07-30. Scope at the time: developer portal, OpenAPI descriptions, examples, and MCP guidance. Route tables in this file may not match live paths.
 
 ## The distinction the documentation must teach
 

@@ -1,6 +1,15 @@
 # Espresso API Capability Gap Analysis
 
-Last updated: 2026-08-13T17:53:00-04:00
+| Field | Value |
+|---|---|
+| Status | **historical** |
+| Authority | Snapshot versus a **superseded** route proposal (2026-08-13 live probes) |
+| Audience | Maintainers reading that snapshot |
+| Last verified | 2026-08-25 |
+| Owner role | API maintainers (archival) |
+| Superseded by | [`config/espresso.oas.json`](../../config/espresso.oas.json) |
+
+Last updated: 2026-08-13T17:53:00-04:00. Published collections use `pagination.num_results` and `meta.as_of`.
 
 ## References
 

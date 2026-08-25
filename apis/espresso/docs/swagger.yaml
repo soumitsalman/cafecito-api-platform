@@ -1,5 +1,5 @@
 definitions:
-  db.TagValue:
+  db.Tag:
     properties:
       type:
         example: region
@@ -14,11 +14,22 @@ definitions:
       message:
         type: string
     type: object
+  router.Counts:
+    properties:
+      actions:
+        type: integer
+      events:
+        type: integer
+      evidence:
+        type: integer
+      signals:
+        type: integer
+    type: object
   router.DiscoveryValueCollectionResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/db.TagValue'
+          $ref: '#/definitions/db.Tag'
         type: array
       meta:
         $ref: '#/definitions/router.ResponseMeta'
@@ -57,7 +68,33 @@ definitions:
     - data
     type: object
   router.EventDocument:
-    additionalProperties: {}
+    properties:
+      counts:
+        $ref: '#/definitions/router.Counts'
+      created_at:
+        type: string
+      id:
+        format: uuid
+        type: string
+      kind:
+        enum:
+        - event
+        type: string
+      links:
+        $ref: '#/definitions/router.Links'
+      source:
+        $ref: '#/definitions/router.SourceDocument'
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - created_at
+    - id
+    - kind
+    - tags
     type: object
   router.EventEvidence:
     properties:
@@ -93,28 +130,31 @@ definitions:
     - meta
     - pagination
     type: object
+  router.Links:
+    properties:
+      actions:
+        type: string
+      events:
+        type: string
+      evidence:
+        type: string
+      signals:
+        type: string
+    type: object
   router.Pagination:
     properties:
-      cursor:
-        type: string
       limit:
         type: integer
       next_cursor:
         type: string
+        x-nullable: true
       num_results:
         type: integer
-    required:
-    - cursor
-    - limit
-    - next_cursor
-    - num_results
     type: object
   router.ResponseMeta:
     properties:
       as_of:
         type: string
-    required:
-    - as_of
     type: object
   router.SignalCollectionResponse:
     properties:
@@ -139,7 +179,33 @@ definitions:
     - data
     type: object
   router.SignalDocument:
-    additionalProperties: {}
+    properties:
+      counts:
+        $ref: '#/definitions/router.Counts'
+      created_at:
+        type: string
+      id:
+        format: uuid
+        type: string
+      kind:
+        enum:
+        - signal
+        type: string
+      links:
+        $ref: '#/definitions/router.Links'
+      source:
+        $ref: '#/definitions/router.SourceDocument'
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - created_at
+    - id
+    - kind
+    - tags
     type: object
   router.SourceCollectionResponse:
     properties:
@@ -182,20 +248,15 @@ definitions:
     - data
     type: object
 info:
-  contact:
-    email: soumitsrah@cafecito.tech
-    name: Project Cafecito
-    url: http://cafecito.tech
+  contact: {}
   description: |-
     Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.
     **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
     **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
     **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
-    **Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.
+    **Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404. Errors use `{ "error": { "code", "message" } }`. Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`); `/health` does not. Public clients send Bearer keys to the gateway, not this service.
     **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
     **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
-  license:
-    name: MIT
   title: Espresso API & MCP
   version: "0.2"
 paths:
@@ -251,10 +312,16 @@ paths:
           description: Invalid limit, cursor token, or parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "500":
-          description: Database unavailable; retry
+        "401":
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable; retry.
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Discover exact Event entity filters
       tags:
       - Discovery
@@ -303,10 +370,16 @@ paths:
           description: Invalid limit, cursor token, or parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "500":
-          description: Database unavailable; retry
+        "401":
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable; retry.
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Discover exact Event type filters
       tags:
       - Discovery
@@ -464,9 +537,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database or embedder unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Find concrete Events
       tags:
       - Events
@@ -518,9 +593,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Inspect one Event
       tags:
       - Events
@@ -608,9 +685,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Inspect evidence for an Event
       tags:
       - Events
@@ -713,9 +792,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database or embedder unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Find Signals connected to an Event
       tags:
       - Events
@@ -782,10 +863,16 @@ paths:
           description: Invalid limit, cursor token, or parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "500":
-          description: Database unavailable; retry
+        "401":
+          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable; retry.
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Discover exact Event region filters
       tags:
       - Discovery
@@ -893,9 +980,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database or embedder unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Find synthesized Signals
       tags:
       - Signals
@@ -947,9 +1036,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Inspect one Signal
       tags:
       - Signals
@@ -1102,9 +1193,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database or embedder unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Inspect Events supporting a Signal
       tags:
       - Signals
@@ -1170,9 +1263,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Find intelligence Sources
       tags:
       - Sources
@@ -1224,9 +1319,11 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Inspect one Source
       tags:
       - Sources
@@ -1291,12 +1388,19 @@ paths:
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
-          description: Database unavailable; retry
+          description: Service unavailable; retry.
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Discover fuzzy tag vocabulary
       tags:
       - Tags
 schemes:
 - https
+securityDefinitions:
+  BackendAPIKey:
+    in: header
+    name: X-API-KEY
+    type: apiKey
 swagger: "2.0"

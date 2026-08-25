@@ -1,5 +1,5 @@
 # Cafecito API Platform
-Updated: 2026-08-14
+Updated: 2026-08-25
 
 ## System map
 
@@ -17,7 +17,7 @@ Stack:
 
 - TypeScript, Zuplo runtime, Zudoku docs portal
 - Workspaces: root gateway plus `docs/`
-- Main scripts: `npm run dev`, `npm run test`, `npm run docs`, `npm run lint`
+- Main scripts: `npm run dev`, `npm run test`, `npm run docs`, `npm run lint`, `npm run verify:api-contracts`, `npm run verify:docs`
 
 Key files:
 
@@ -38,8 +38,9 @@ Auth/gateway behavior:
 - Zudoku signs the create-key request using Clerk auth context.
 - Created Zuplo consumers carry `tags.sub`, `tags.email`, and metadata such as `subscription_plan` and `subscription_status`.
 - `gate-auth` currently requires an authenticated user but has inactive-subscription blocking commented out.
-- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)`.
-- Published docs say one API key works across product APIs and MCP endpoints.
+- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)` (private; never document this header on public surfaces).
+- Published docs: one API key works across product APIs and MCP endpoints.
+- **Frozen public policy:** free tier **100 requests/minute** and **50,000 requests/month** per authenticated user; REST clients send `Authorization: Bearer` except **health** (unauthenticated); do not publish private backend headers.
 
 Docs/products:
 
@@ -53,7 +54,7 @@ The backend Swagger, gateway OpenAPI, and portal pages are separate artifacts. A
 
 - Backend route behavior, request/response types, or Swagger annotations in `apis/<service>/router/` are the service-local contract. Regenerate that service's committed Swagger artifacts after changing annotations; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`.
   - Espresso: changing annotations in `apis/espresso/router/routes.go` (or referenced router types) requires, from `apis/espresso/`, `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`.
-  - Beans: changing annotations requires the documented `swag` command in `apis/beans/README.md`.
+  - Beans: changing annotations requires the documented `swag` command in [`apis/README.md`](apis/README.md).
 - A public Espresso contract change must also be reflected manually in `config/espresso.oas.json`. It is the gateway contract under `/espresso`, powers the portal reference at `/api/espresso` through `docs/zudoku.config.tsx`, and declares the `/espresso/mcp` server and its exported `operationId` tools. Keep gateway paths, request/response schemas, descriptions, error semantics, and MCP tool mappings consistent with the backend behavior.
 - Apply the same review to `config/beans.oas.json` for Beans. `docs/zudoku.config.tsx` mounts it at `/api/beans` and mounts Espresso at `/api/espresso`.
 - A public Espresso behavior change must be reflected in the relevant `docs/pages/` content:
@@ -77,10 +78,70 @@ Never expose:
 Public docs may describe Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements, but not how those concepts are stored or implemented.
 
 
-CI/deploy:
+## CI, ownership, and Definition of Done
 
-- `.github/workflows/deploy-gateway.yml`: lint/test; `paths-ignore: apis/**`
-- Zuplo deploys via GitHub integration — configure path filters to exclude `apis/**`
+**API Contract & Docs** (`.github/workflows/api-contract-docs.yml`) is **manual only** (`workflow_dispatch`). It must not run on pull_request or push, must not be called from other workflows, and must **not** be a required GitHub check.
+
+### Run verification locally
+
+From the repo root. Go tests need Postgres with pgvector and `PG_CONNECTION_STRING` (same role as `.github/workflows/api-contract-docs.yml`: apply `.github/ci/schema-beans.sql` or `schema-espresso.sql` + `.github/ci/seed-espresso.sql`).
+
+```bash
+# Beans (deterministic fixtures / fake embedder; stress tests skip without :8080)
+(cd apis/beans && go test ./tests/... -count=1 -timeout 20m)
+
+# Espresso (skip live-embedder vector search)
+(cd apis/espresso && go test ./tests/... -count=1 -timeout 20m -skip 'TestRouterVectorSearch')
+
+# Swagger must match annotations (no hand-edits)
+(cd apis/beans && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal)
+(cd apis/espresso && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal)
+git diff --exit-code -- apis/beans/docs apis/espresso/docs
+
+# Gateway OpenAPI, cascade, docs, lint, portal
+npm ci
+npm run lint
+node --input-type=module -e 'import { readFile } from "node:fs/promises";
+for (const f of ["config/beans.oas.json","config/espresso.oas.json"]) {
+  const spec = JSON.parse(await readFile(f, "utf8"));
+  if (!String(spec.openapi||"").startsWith("3.")) throw new Error(f + " is not OpenAPI 3.x");
+}'
+npm run verify:api-contracts
+# optional live gateway: ZUPLO_TEST_ENDPOINT=... npm test
+npm run build --workspace docs
+node scripts/verify-documentation.mjs --require-generated
+bash .github/ci/inspect-portal-output.sh .
+```
+
+Without a portal build, `npm run verify:docs` still checks examples, terms, lifecycle, links, and inventory (`generated` is skipped). After a Zudoku build, use `--require-generated` as above.
+
+Manual GitHub run: Actions → **API Contract & Docs** → **Run workflow**.
+
+Workflows:
+
+| Workflow `name` | File | Role |
+|---|---|---|
+| API Contract & Docs | `.github/workflows/api-contract-docs.yml` | Manual: Go suites, Swagger diff, OpenAPI, cascade, docs, lint, Zudoku, portal inspection |
+| Gateway CI | `.github/workflows/zpl-deploy-gateway.yml` | Lint on gateway-path PRs/`main`. `paths-ignore: apis/**` |
+| Fly Deploy Beans API | `.github/workflows/fly-deploy-beans.yml` | `flyctl deploy` (no contract-docs gate) |
+| Fly Deploy Espresso API | `.github/workflows/fly-deploy-espresso.yml` | Same as Beans Fly |
+| Trigger auto deployment for cafecito-beans-api | `.github/workflows/az-deploy-beans.yml` | Disabled (`__disabled__`); correct `Dockerfile` + `API_KEY` before re-enable |
+| Trigger auto deployment for cafecito-espresso-api | `.github/workflows/az-deploy-espresso.yml` | Same as Beans Azure |
+
+Zuplo production deploy is GitHub integration: configure path filters to exclude `apis/**`.
+
+CODEOWNERS: `.github/CODEOWNERS` (`@soumitsalman`). PR checklist: `.github/pull_request_template.md`.
+
+Definition of Done for a public API change:
+
+1. Runtime behavior and tests are complete.
+2. Annotations are updated.
+3. Generated Swagger is regenerated (`git diff --exit-code` on `apis/<service>/docs`).
+4. Gateway OpenAPI is reconciled.
+5. MCP exposure is reconciled.
+6. Portal pages and examples are reconciled.
+7. Intent and frozen public policy remain correct.
+8. `npm run verify:api-contracts` and `node scripts/verify-documentation.mjs --require-generated` after a Zudoku build. Do not wait on GitHub **API Contract & Docs** (manual only).
 
 
 ## API Implementation

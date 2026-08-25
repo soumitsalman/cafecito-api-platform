@@ -10,32 +10,48 @@ import (
 )
 
 // Pagination is the pagination block returned by every collection response.
+// Send next_cursor unchanged as the next request's cursor. The response does not echo a cursor field.
 type Pagination struct {
-	Limit      int     `json:"limit" toon:"limit"`
-	NumResults int     `json:"num_results" toon:"num_results"`
-	NextCursor *string `json:"next_cursor" toon:"next_cursor"`
+	Limit      int     `json:"limit" yaml:"limit" toon:"limit"`
+	NumResults int     `json:"num_results" yaml:"num_results" toon:"num_results"`
+	NextCursor *string `json:"next_cursor" yaml:"next_cursor" toon:"next_cursor" extensions:"x-nullable"`
+}
+
+// NewPagination builds the public pagination object for JSON, YAML, and TOON.
+func NewPagination(limit int, num_results int, next_cursor *string) Pagination {
+	return Pagination{
+		Limit:      limit,
+		NumResults: num_results,
+		NextCursor: next_cursor,
+	}
 }
 
 // ResponseMeta carries freshness metadata for a collection response.
 type ResponseMeta struct {
-	AsOf time.Time `json:"as_of" toon:"as_of"`
+	AsOf time.Time `json:"as_of" yaml:"as_of" toon:"as_of"`
 }
 
 // PageResponse is the canonical envelope for list endpoints.
 type PageResponse[T any] struct {
-	Data       []T          `json:"data" toon:"data"`
-	Pagination Pagination   `json:"pagination" toon:"pagination"`
-	Meta       ResponseMeta `json:"meta" toon:"meta"`
+	Data       []T          `json:"data" yaml:"data" toon:"data"`
+	Pagination Pagination   `json:"pagination" yaml:"pagination" toon:"pagination"`
+	Meta       ResponseMeta `json:"meta" yaml:"meta" toon:"meta"`
 }
 
 // ItemResponse is the canonical envelope for single-resource endpoints.
 type ItemResponse[T any] struct {
-	Data T `json:"data" toon:"data"`
+	Data T `json:"data" yaml:"data" toon:"data"`
 }
 
-// ErrorResponse is the canonical envelope for error responses.
+// APIError is the typed object inside the public error envelope.
+type APIError struct {
+	Code    string `json:"code" yaml:"code" toon:"code"`
+	Message string `json:"message" yaml:"message" toon:"message"`
+}
+
+// ErrorResponse is the canonical envelope for error responses: {"error":{"code","message"}}.
 type ErrorResponse struct {
-	Error error `json:"error"`
+	Error APIError `json:"error" yaml:"error" toon:"error"`
 }
 
 // DigestDocument preserves arbitrary upstream digest members without imposing a closed Event or Signal response schema.
@@ -59,6 +75,10 @@ func NewDigestDocumentForSip(sip *db.Sip) DigestDocument {
 	}
 	return doc
 }
+
+// Stable Event/Signal fields present on every public record: id, kind, created_at, tags.
+// Conditional fields include summary, source, links, and counts.
+// All other keys are extension fields; clients must ignore unknown extension fields.
 
 func NewDigestDocumentForExtendedSip(sip *db.ExtendedSip) DigestDocument {
 	doc := NewDigestDocumentForSip(&sip.Sip)
@@ -129,13 +149,13 @@ THESE TYPES ARE USED PRIMARILY TO GENERATE THE OPENAPI SPEC
 // SourceDocument is the stable public Source response shape. Optional source
 // metadata is represented explicitly as null when it is unavailable.
 type SourceDocument struct {
-	ID          uuid.UUID `json:"id" toon:"id" swaggertype:"string" format:"uuid"`
-	BaseURL     string    `json:"url" toon:"url"`
-	DomainName  string    `json:"domain" toon:"domain"`
-	SiteName    *string   `json:"name" toon:"name"`
-	Description *string   `json:"description,omitempty" toon:"description,omitempty"`
-	Favicon     *string   `json:"favicon_url,omitempty" toon:"favicon_url,omitempty"`
-	RSSFeed     *string   `json:"rss_feed_url,omitempty" toon:"rss_feed_url,omitempty"`
+	ID          uuid.UUID `json:"id" yaml:"id" toon:"id" swaggertype:"string" format:"uuid"`
+	BaseURL     string    `json:"url" yaml:"url" toon:"url"`
+	DomainName  string    `json:"domain" yaml:"domain" toon:"domain"`
+	SiteName    *string   `json:"name" yaml:"name" toon:"name"`
+	Description *string   `json:"description,omitempty" yaml:"description,omitempty" toon:"description,omitempty"`
+	Favicon     *string   `json:"favicon_url,omitempty" yaml:"favicon_url,omitempty" toon:"favicon_url,omitempty"`
+	RSSFeed     *string   `json:"rss_feed_url,omitempty" yaml:"rss_feed_url,omitempty" toon:"rss_feed_url,omitempty"`
 }
 
 func NewSourceDocument(source *db.Source) *SourceDocument {
@@ -166,28 +186,28 @@ func NewSourceDocuments(sources []db.Source) []SourceDocument {
 }
 
 type Links struct {
-	Evidence string `json:"evidence,omitempty" toon:"evidence,omitempty"`
-	Actions  string `json:"actions,omitempty" toon:"actions,omitempty"`
-	Events   string `json:"events,omitempty" toon:"events,omitempty"`
-	Signals  string `json:"signals,omitempty" toon:"signals,omitempty"`
+	Evidence string `json:"evidence,omitempty" yaml:"evidence,omitempty" toon:"evidence,omitempty"`
+	Actions  string `json:"actions,omitempty" yaml:"actions,omitempty" toon:"actions,omitempty"`
+	Events   string `json:"events,omitempty" yaml:"events,omitempty" toon:"events,omitempty"`
+	Signals  string `json:"signals,omitempty" yaml:"signals,omitempty" toon:"signals,omitempty"`
 }
 
 type Counts struct {
-	Evidence *int64 `json:"evidence,omitempty" toon:"evidence,omitempty"`
-	Actions  *int64 `json:"actions,omitempty" toon:"actions,omitempty"`
-	Events   *int64 `json:"events,omitempty" toon:"events,omitempty"`
-	Signals  *int64 `json:"signals,omitempty" toon:"signals,omitempty"`
+	Evidence *int64 `json:"evidence,omitempty" yaml:"evidence,omitempty" toon:"evidence,omitempty"`
+	Actions  *int64 `json:"actions,omitempty" yaml:"actions,omitempty" toon:"actions,omitempty"`
+	Events   *int64 `json:"events,omitempty" yaml:"events,omitempty" toon:"events,omitempty"`
+	Signals  *int64 `json:"signals,omitempty" yaml:"signals,omitempty" toon:"signals,omitempty"`
 }
 
 // SipEvidenceItem is the explicit bare-list response item for R03.
 type EventEvidence struct {
-	ID       uuid.UUID  `json:"id" toon:"id"`
-	Kind     string     `json:"kind" toon:"kind"`
-	Created  time.Time  `json:"created_at" toon:"created_at"`
-	Tags     []string   `json:"tags" toon:"tags"`
-	SourceID *uuid.UUID `json:"source_id" toon:"source_id"`
-	URL      string     `json:"url" toon:"url"`
-	BaseURL  string     `json:"base_url" toon:"base_url"`
+	ID       uuid.UUID  `json:"id" yaml:"id" toon:"id"`
+	Kind     string     `json:"kind" yaml:"kind" toon:"kind"`
+	Created  time.Time  `json:"created_at" yaml:"created_at" toon:"created_at"`
+	Tags     []string   `json:"tags" yaml:"tags" toon:"tags"`
+	SourceID *uuid.UUID `json:"source_id" yaml:"source_id" toon:"source_id"`
+	URL      string     `json:"url" yaml:"url" toon:"url"`
+	BaseURL  string     `json:"base_url" yaml:"base_url" toon:"base_url"`
 }
 
 func NewEventEvidence(sip *db.Sip) EventEvidence {
@@ -241,11 +261,31 @@ type EventEvidenceCollectionResponse struct {
 	Meta       ResponseMeta    `json:"meta" binding:"required"`
 }
 
-// EventDocument is the flattened, extensible public Event collection/detail payload.
-type EventDocument map[string]any
+// EventDocument is the public Event schema for OpenAPI generation.
+// Runtime Event records remain extensible maps; clients must ignore unknown extension fields.
+type EventDocument struct {
+	ID        uuid.UUID       `json:"id" yaml:"id" toon:"id" binding:"required" swaggertype:"string" format:"uuid"`
+	Kind      string          `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"event"`
+	CreatedAt time.Time       `json:"created_at" yaml:"created_at" toon:"created_at" binding:"required"`
+	Tags      []string        `json:"tags" yaml:"tags" toon:"tags" binding:"required"`
+	Summary   string          `json:"summary,omitempty" yaml:"summary,omitempty" toon:"summary,omitempty"`
+	Source    *SourceDocument `json:"source,omitempty" yaml:"source,omitempty" toon:"source,omitempty"`
+	Links     *Links          `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
+	Counts    *Counts         `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
+}
 
-// SignalDocument is the flattened, extensible public Signal collection/detail payload.
-type SignalDocument map[string]any
+// SignalDocument is the public Signal schema for OpenAPI generation.
+// Runtime Signal records remain extensible maps; clients must ignore unknown extension fields.
+type SignalDocument struct {
+	ID        uuid.UUID       `json:"id" yaml:"id" toon:"id" binding:"required" swaggertype:"string" format:"uuid"`
+	Kind      string          `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"signal"`
+	CreatedAt time.Time       `json:"created_at" yaml:"created_at" toon:"created_at" binding:"required"`
+	Tags      []string        `json:"tags" yaml:"tags" toon:"tags" binding:"required"`
+	Summary   string          `json:"summary,omitempty" yaml:"summary,omitempty" toon:"summary,omitempty"`
+	Source    *SourceDocument `json:"source,omitempty" yaml:"source,omitempty" toon:"source,omitempty"`
+	Links     *Links          `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
+	Counts    *Counts         `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
+}
 
 type EventCollectionResponse struct {
 	Data       []EventDocument `json:"data" binding:"required"`

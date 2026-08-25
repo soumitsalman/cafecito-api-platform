@@ -1,5 +1,14 @@
 # Unusual Whales API Inventory
 
+| Field | Value |
+|---|---|
+| Status | **current** (external inventory) |
+| Authority | Unusual Whales public OpenAPI as of retrieval date; **not** Cafecito contract |
+| Audience | Product research |
+| Last verified | 2026-08-25 |
+| Owner role | Product research |
+| Superseded by | n/a |
+
 > Verified against the live Unusual Whales OpenAPI specification and operation documentation retrieved August 14, 2026.
 
 - **Documented groups:** 35

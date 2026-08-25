@@ -28,6 +28,8 @@ examples:
           value: application/json
       body:
         type: json
-        data: "{}"
-docs: Lightweight liveness probe. Use before other tools to confirm the service
-  is reachable. No authentication required when API keys are disabled.
+        data: |-
+          {
+            "status": "alive"
+          }
+docs: Lightweight liveness probe. No authentication required.

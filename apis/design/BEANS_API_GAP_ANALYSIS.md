@@ -1,6 +1,15 @@
 # Beans API Gap Assessment
 
-Updated 2026-08-24. Contract authority: `BEANS_API_ROUTE_PROPOSAL.md`. Every collection probe in the refreshed criteria and router tests uses `limit=5` or higher.
+| Field | Value |
+|---|---|
+| Status | **historical** |
+| Authority | Snapshot of gaps versus a **superseded** route proposal |
+| Audience | Maintainers reading 2026-08-24 test evidence |
+| Last verified | 2026-08-25 |
+| Owner role | API maintainers (archival) |
+| Superseded by | [`config/beans.oas.json`](../../config/beans.oas.json); do not treat the proposal as live contract |
+
+The P0 “collection envelope” row recorded that runtime already returned `pagination.num_results` and universal `meta.as_of`. That shape **matches the published API**. It was a gap only against the old proposal, which permitted only `limit` and `next_cursor` and restricted `meta`. Every collection probe in that campaign used `limit=5` or higher.
 
 ## Live re-run status
 

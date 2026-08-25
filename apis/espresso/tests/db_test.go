@@ -13,7 +13,7 @@ import (
 )
 
 func TestQueryTags(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	page, err := pg_cupboard.QueryTags(context.Background(), "academic", []string{db.SIP_KIND_EVENT}, db.PageRequest{Limit: 200})
@@ -23,7 +23,7 @@ func TestQueryTags(t *testing.T) {
 }
 
 func TestScalarSearchEvents(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	filters := db.Filters{
@@ -38,7 +38,7 @@ func TestScalarSearchEvents(t *testing.T) {
 }
 
 func TestScalarSearchSignals(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	filters := db.Filters{
@@ -52,7 +52,7 @@ func TestScalarSearchSignals(t *testing.T) {
 }
 
 func TestVectorSearchEvents(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	filters := db.Filters{
@@ -67,7 +67,7 @@ func TestVectorSearchEvents(t *testing.T) {
 }
 
 func TestVectorSearchSignals(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	distance := 0.6
@@ -82,7 +82,7 @@ func TestVectorSearchSignals(t *testing.T) {
 }
 
 func TestQuerySources(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	page, err := pg_cupboard.QuerySources(context.Background(), "", nil, db.PageRequest{Limit: 5})
@@ -99,7 +99,7 @@ func TestQuerySources(t *testing.T) {
 }
 
 func TestGetEventAndRelations(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	list, err := pg_cupboard.QuerySips(context.Background(), db.Filters{Kind: db.SIP_KIND_EVENT}, db.PageRequest{Limit: 1})
@@ -130,7 +130,7 @@ func TestGetEventAndRelations(t *testing.T) {
 }
 
 func TestGetEventNotFound(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	event, err := pg_cupboard.GetSip(context.Background(), uuid.New(), db.SIP_KIND_EVENT)
@@ -139,7 +139,7 @@ func TestGetEventNotFound(t *testing.T) {
 }
 
 func TestCursorPaginationEvents(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	first, err := pg_cupboard.QuerySips(context.Background(), db.Filters{
@@ -163,7 +163,7 @@ func TestCursorPaginationEvents(t *testing.T) {
 }
 
 func TestDiscoveryQueries(t *testing.T) {
-	pg_cupboard := setupTestDB()
+	pg_cupboard := setupTestDB(t)
 	defer pg_cupboard.Close()
 
 	for _, query := range []func() (db.Page[db.Tag], error){

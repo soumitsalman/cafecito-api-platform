@@ -1,9 +1,15 @@
 # API Route Decision Rationale
 
-Status: decision record for the latest Beans and Espresso route proposals  
-Prepared: 2026-08-04  
-Scope: public route vocabulary, payload boundaries, query contracts, and documentation decisions  
-Source documents: [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md), [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md), [BEANS_ESPRESSO_DOCUMENTATION_PLAN.md](BEANS_ESPRESSO_DOCUMENTATION_PLAN.md)
+| Field | Value |
+|---|---|
+| Status | **historical** |
+| Authority | Rationale for superseded route proposals; live paths may differ (e.g. Stories vs clusters) |
+| Audience | Historical design readers |
+| Last verified | 2026-08-25 |
+| Owner role | Product design (archival) |
+| Superseded by | [`config/beans.oas.json`](../../config/beans.oas.json), [`config/espresso.oas.json`](../../config/espresso.oas.json) |
+
+Prepared: 2026-08-04. Source documents (all superseded or historical): [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md), [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md), [BEANS_ESPRESSO_DOCUMENTATION_PLAN.md](BEANS_ESPRESSO_DOCUMENTATION_PLAN.md).
 
 ## Why this document exists
 

@@ -3,6 +3,7 @@ package espressoapi_test
 import (
 	"context"
 	"os"
+	"testing"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -339,16 +340,19 @@ var test_query_embedding = []float32{
 	0.10056325793266296,
 }
 
-func setupTestDB() *db.Cupboard {
-	db.NoError(godotenv.Load("../.env"))
+func setupTestDB(t *testing.T) *db.Cupboard {
+	t.Helper()
+	_ = godotenv.Load("../.env")
 	conn_str := os.Getenv("PG_CONNECTION_STRING")
+	if conn_str == "" {
+		t.Skip("skipping integration test: PG_CONNECTION_STRING not set")
+	}
 	return db.NewCupboard(context.Background(), conn_str)
 }
 
 func setupTestEmbedder() embedding.Embedder {
-	db.NoError(godotenv.Load("../.env"))
+	_ = godotenv.Load("../.env")
 	return embedding.NewHTTPEmbedder("http://localhost:10000", "", "test")
-
 }
 
 func testSearchFrom() time.Time {

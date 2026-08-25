@@ -1,9 +1,17 @@
 # Espresso API Target Design and Implementation Specification
 
-Status: Target design and implementation specification
-Updated: 2026-08-11
-Scope: Espresso API
-Comparison baseline: [INDUSTRY_EVENT_API_ROUTE_REFERENCE.md](INDUSTRY_EVENT_API_ROUTE_REFERENCE.md)
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None for live API behavior |
+| Audience | Historical design readers |
+| Last verified | 2026-08-25 |
+| Owner role | Product design (archival) |
+| Superseded by | [`config/espresso.oas.json`](../../config/espresso.oas.json) and portal `/api/espresso` |
+
+Live Espresso collections use `{ data, pagination, meta }` with `pagination.limit`, `pagination.num_results` (this page), `pagination.next_cursor`, and `meta.as_of`. This file remains a historical target sketch.
+
+Scope: Espresso API. Comparison baseline: [INDUSTRY_EVENT_API_ROUTE_REFERENCE.md](INDUSTRY_EVENT_API_ROUTE_REFERENCE.md).
 
 ## 1. Purpose
 

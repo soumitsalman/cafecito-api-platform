@@ -1,6 +1,17 @@
 # Beans API test criteria
 
-Source of truth: `BEANS_API_ROUTE_PROPOSAL.md`. These criteria define the router contract tests; each collection request uses `limit=5` or higher.
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None for live envelope; tests in `apis/beans/tests/` follow shipped behavior |
+| Audience | Historical test-planning readers |
+| Last verified | 2026-08-25 |
+| Owner role | API maintainers (archival) |
+| Superseded by | [`config/beans.oas.json`](../../config/beans.oas.json), `apis/beans/tests/` |
+
+**Published envelope (use this, not C01/C02 below):** collections return `data`, `pagination.limit`, `pagination.num_results`, `pagination.next_cursor`, and `meta.as_of`.
+
+The rows below were written against [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md) and are **historical**. Each collection request in that campaign used `limit=5` or higher.
 
 ## Cross-route contract
 

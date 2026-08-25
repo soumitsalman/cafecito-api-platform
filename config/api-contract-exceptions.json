@@ -1,0 +1,57 @@
+{
+  "description": "Reviewed, time-bounded exceptions for Swagger-to-gateway contract comparison. Do not list unexplained drift. Wave 2/4 must keep each entry explicit, owned, reasoned, and review-dated.",
+  "authority": "gateway-contract-owner",
+  "last_reviewed_on": "2026-08-25",
+  "exceptions": [
+    {
+      "id": "beans-mcp-gateway-only",
+      "product": "beans",
+      "kind": "gateway_only_path",
+      "method": "POST",
+      "backend_path": null,
+      "gateway_path": "/beans/mcp",
+      "intentional_difference": "MCP is a gateway-exported agent surface, not a backend Swagger path.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "MCP tools are selected at the gateway. Backend Swagger documents REST routes without the product prefix.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "beans-top-headlines-path-rewrite",
+      "product": "beans",
+      "kind": "path_rewrite",
+      "method": "GET",
+      "backend_path": "/top-headlines",
+      "gateway_path": "/beans/articles/top-headlines",
+      "intentional_difference": "Public Beans top-headlines live under /beans/articles/top-headlines; the backend Swagger path remains /top-headlines and the gateway rewrites to that backend route.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Gateway product prefix plus the Articles collection grouping; backend registration is unprefixed /top-headlines.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "espresso-mcp-gateway-only",
+      "product": "espresso",
+      "kind": "gateway_only_path",
+      "method": "POST",
+      "backend_path": null,
+      "gateway_path": "/espresso/mcp",
+      "intentional_difference": "MCP is a gateway-exported agent surface, not a backend Swagger path.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "MCP tools are selected at the gateway. Backend Swagger documents REST routes without the product prefix.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "espresso-pagination-required-flags",
+      "product": "espresso",
+      "kind": "envelope",
+      "code": "envelope.pagination_required",
+      "intentional_difference": "Gateway Pagination marks limit, next_cursor, and num_results required. Generated backend Swagger lists the same properties without a required array.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Public OAS is explicit about required pagination fields. Swaggo output currently omits required on router.Pagination even though the runtime envelope includes those keys.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    }
+  ]
+}

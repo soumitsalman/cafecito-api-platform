@@ -60,7 +60,10 @@ examples:
         type: json
         data: |-
           {
-            "error": ""
+            "error": {
+              "code": "invalid_request",
+              "message": ""
+            }
           }
   - name: 401 Response
     description: Unauthorized
@@ -77,7 +80,10 @@ examples:
         type: json
         data: |-
           {
-            "error": ""
+            "error": {
+              "code": "unauthorized",
+              "message": ""
+            }
           }
   - name: 500 Response
     description: Internal Server Error
@@ -94,7 +100,10 @@ examples:
         type: json
         data: |-
           {
-            "error": ""
+            "error": {
+              "code": "unavailable",
+              "message": ""
+            }
           }
   - name: 429 Response
     description: Too Many Requests
@@ -111,7 +120,10 @@ examples:
         type: json
         data: |-
           {
-            "error": ""
+            "error": {
+              "code": "rate_limited",
+              "message": ""
+            }
           }
 docs: >-
   Answers: Which categorical sentiment labels can I use as Article filters?

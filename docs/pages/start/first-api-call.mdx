@@ -1,42 +1,54 @@
 ---
-description: Make a minimal authenticated Cafecito API request.
+title: Make your first Cafecito API call
+description: Authenticate with a Bearer API key and run a first Beans or Espresso request. No official SDK.
 ---
 
 # First API call
 
-Cafecito APIs use the same gateway base URL and Bearer API-key header.
+Cafecito uses one gateway (`https://api.cafecito.tech`) and `Authorization: Bearer` for authenticated REST and MCP. Health is public. There is **no official SDK**; copy [reusable clients](/guides/client-patterns) when you need pagination, errors, and retries.
+
+Live products: **Beans** and **Espresso**. **Cortado** and **Latte** are not callable yet.
 
 ~~~bash
 export CAFECITO_API_KEY="YOUR_API_KEY"
 export BASE_URL="https://api.cafecito.tech"
+
+curl -sS "$BASE_URL/beans/health"
+curl -sS "$BASE_URL/espresso/health"
 ~~~
 
-## Beans: retrieve recent publisher Articles
-
-Use Beans when the question needs publisher Article material; this example filters to news.
+## Beans: recent publisher Articles
 
 ~~~bash
-curl -s --get "$BASE_URL/beans/articles/latest" \
+curl -sS --get "$BASE_URL/beans/articles/latest" \
   --data-urlencode "content_type=news" \
   --data-urlencode "limit=5" \
   -H "Authorization: Bearer $CAFECITO_API_KEY"
 ~~~
 
-The public content_type enum includes all stored types listed in the Beans overview; this example uses news. Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans).
+Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans). Beans collections return `pagination.next_cursor` (no `pagination.cursor` field).
 
-## Espresso: find structured developments
-
-Use Espresso when the question is what happened or what it may mean.
+## Espresso: structured Events
 
 ~~~bash
-curl -s --get "$BASE_URL/espresso/events" \
+curl -sS --get "$BASE_URL/espresso/events" \
   --data-urlencode "q=semiconductor supply pressure" \
   --data-urlencode "limit=5" \
   -H "Authorization: Bearer $CAFECITO_API_KEY"
 ~~~
 
+Espresso collections return `pagination.next_cursor` (no `pagination.cursor` field). Always continue with `pagination.next_cursor`. See [API conventions](/guides/api-conventions).
+
+Unknown query parameters return HTTP `400`. Empty searches return HTTP `200` with `data: []`.
+
+## Using the API in production
+
+- Limits: 100 requests/minute and 50,000/month per authenticated user, shared across keys; REST and MCP share the meter. [Pricing](/guides/pricing-limits)
+- Compatibility is additive; breaking changes get a new version and deprecation notices. Support: [Contact](/contact)
+- Operational recovery: [Troubleshooting](/guides/troubleshooting)
+
 ## Next steps
 
-- [Create or manage API keys](/start/api-keys)
-- [API conventions](/guides/api-conventions)
+- [API keys](/start/api-keys)
+- [Reusable clients](/guides/client-patterns)
 - [MCP and AI agents](/guides/mcp-ai-agents)

@@ -1,7 +1,13 @@
 # Industry Event and News API Route Reference
 
-Status: External API reference
-Reviewed: 2026-08-11
+| Field | Value |
+|---|---|
+| Status | **current** (external comparison only) |
+| Authority | Third-party event/news API documentation as of last review; **not** Cafecito contract |
+| Audience | Product and docs maintainers comparing Espresso to the market |
+| Last verified | 2026-08-25 |
+| Owner role | Product research |
+| Superseded by | n/a |
 
 This document lists the documented public routes, principal parameters, response payloads, and purpose of the GDELT Cloud, PredictHQ, and Perigon APIs. It is a reference for comparing the Espresso route proposal with established event and news-intelligence services.
 

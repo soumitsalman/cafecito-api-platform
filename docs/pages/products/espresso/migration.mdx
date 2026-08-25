@@ -1,16 +1,18 @@
 ---
-title: Migration
-description: Migrate from article, event, story, or intelligence feeds to Espresso Events, Signals, evidence, and agent-ready formats.
+title: Migrate to Espresso Events and Signals
+description: Map GDELT and Perigon event-intelligence patterns to Espresso Events, Signals, evidence, and Sources without claiming route-for-route equivalence.
 ---
 
 # Migrate to Espresso
 
-Espresso is a business-intelligence API for answering two different questions:
+Espresso is a market, business, event, and news intelligence API. GDELT and Perigon are comparison patterns, not a claim that Espresso copies every provider route or field.
 
 - **What happened?** Search **Events** for concrete developments.
-- **What does it mean?** Search **Signals** for synthesized conclusions, then retrieve the supporting Events when the answer needs substantiation.
+- **What does it mean?** Search **Signals** for synthesized conclusions, then retrieve supporting Events when the answer needs substantiation.
 
-It is not a drop-in replacement for an article archive or a generic entity database. Plan the migration around the question your application or agent must answer, then carry returned IDs into the next call.
+It is not a drop-in replacement for an article archive, a GDELT dump, or a generic entity database. Plan the migration around the question your application or agent must answer, then carry returned IDs into the next call.
+
+There is no official SDK. Cortado and Latte are future products and are not live APIs.
 
 ## Choose the right target
 
@@ -48,16 +50,25 @@ Start from a collection, select an ID, and retrieve more context only when it ch
 
 Do not fetch every detail route for every search result. Collections provide enough information to choose relevant IDs; detail and relationship routes are targeted follow-up calls.
 
-## Adapt common provider patterns
+## GDELT and Perigon concept map
 
-These mappings describe the typical adaptation when moving from similar intelligence services. Validate field availability against the [Espresso API reference](/api/espresso) before changing production parsers.
+These mappings describe typical user jobs, not identical schemas or coverage.
 
-| Existing service pattern | Espresso adaptation | Important difference |
-| --- | --- | --- |
-| **GDELT-style event or theme search** | Search Events with `q`, fuzzy `tags`, and exact Event filters. | `tags` are fuzzy. Structured values such as `companies`, `regions`, and `event_types` use exact normalized values. |
-| **PredictHQ-style structured event monitoring** | Search Events by company, people, product, region, category, type, or impact level. | `from` and `to` filter Espresso record `created_at`; they are not occurrence, lifecycle, or forecast dates. |
-| **Perigon-style article or story retrieval** | Use Events for concrete developments and Signals for synthesized conclusions. | Espresso does not expose article bodies or a story-cluster substitute through these routes. |
-| **Publisher or domain filtering** | Resolve a Source, then pass its UUID as `source_ids` to Event routes. | `GET /espresso/sources?q=...` is case-insensitive source-metadata matching, not semantic retrieval. |
+| GDELT or Perigon pattern | Espresso interpretation |
+| --- | --- |
+| Event search | `GET /espresso/events` |
+| Event detail | `GET /espresso/events/{event_id}` |
+| Story or article evidence | Event evidence and Source routes |
+| Signal or semantic interpretation | `GET /espresso/signals` |
+| Supporting event traversal | `GET /espresso/signals/{signal_id}/events` |
+| Entity, region, and event-type discovery | Espresso discovery routes |
+| Source or publisher context | Espresso Sources |
+| Free-text or semantic search | `q` on supported collection routes |
+| Cursor continuation | `cursor` and `next_cursor` |
+
+### Not currently exposed
+
+Espresso does not currently offer public equivalents for provider-specific story graphs, raw article-body archives, GDELT-style count or vector export APIs, or route-for-route Perigon story endpoints. Use [Beans](/products/beans) for publisher Articles. Do not assume field names, geocoding, or aggregation endpoints match another provider.
 
 ## Adapt queries and filters
 
@@ -85,7 +96,6 @@ Espresso collections return one stable envelope:
   "pagination": {
     "limit": 20,
     "num_results": 0,
-    "cursor": null,
     "next_cursor": null
   },
   "meta": {}
@@ -96,6 +106,9 @@ Espresso collections return one stable envelope:
 - Send a non-null `pagination.next_cursor` unchanged as the next request `cursor`. Never construct, decode, or sort the token.
 - An empty collection is a successful HTTP `200` response with `data: []`.
 - Detail routes return `{ "data": { ... } }`; a missing detail resource returns HTTP `404`.
+- Errors use `{ "error": { "code", "message" } }`. REST calls except health require Bearer authentication.
+
+Stable Event and Signal fields are `id`, `kind`, `created_at`, and `tags`. Treat `summary`, `source`, `links`, `counts`, and any other keys as conditional or extension fields and ignore unknown keys.
 
 Use `response_type=json` for the canonical schema. `response_type=yaml` and `response_type=toon` contain the same payload in token-optimized forms for MCP and AI-agent workflows. They do not change the filters, records, or pagination behavior.
 

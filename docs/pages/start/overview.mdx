@@ -1,7 +1,8 @@
 ---
-description: Choose a Cafecito API product and start building with a shared API key.
+title: Cafecito APIs and MCP
+description: Choose Beans (news and publisher content) or Espresso (events and signals). One API key. Cortado and Latte are future products.
 ---
-import { Badge } from "zudoku/ui/Badge";
+import { ProductStatusTable } from "../../src/product-status";
 
 ![Cafecito banner](/cafecito-banner.png)
 
@@ -9,13 +10,11 @@ import { Badge } from "zudoku/ui/Badge";
 
 Choose the product that matches the job you need to do. Every live product uses the same API key and gateway base URL: `https://api.cafecito.tech`.
 
+**Live:** Beans and Espresso. **Future:** Cortado and Latte (no public API). There is no official SDK.
+
 ## Products
 
-| Product | Status | Features |
-| --- | --- | --- |
-| **[Beans](/products/beans)** News & Blogs | <Badge className="badge-live">Live</Badge> | The Beans API is a read-only API providing searchable and filterable access to publisher Articles, Sources, Stories, feeds, and coverage context. |
-| **[Espresso](/products/espresso)** Business intelligence | <Badge className="badge-live">Live</Badge> | The Espresso API is a read-only API providing searchable business intelligence through concrete Events, synthesized Signals, evidence, and Sources. |
-| **[Cortado](/products/cortado)** Social Media Automation | <Badge variant="secondary">Coming Soon</Badge> | Social publishing, scheduling, and analytics. |
+<ProductStatusTable />
 
 ## Start building
 
@@ -23,4 +22,4 @@ Choose the product that matches the job you need to do. Every live product uses 
 2. **[Make your first API call](/start/first-api-call)** with Beans or Espresso.
 3. Continue to the relevant product overview for concepts, examples, and next steps.
 
-For AI-agent and MCP clients, see [MCP & AI agents](/guides/mcp-ai-agents). For shared request behavior, see [API conventions](/guides/api-conventions). For current preview limits, see [Pricing and limits](/guides/pricing-limits).
+For AI-agent and MCP clients, see [MCP & AI agents](/guides/mcp-ai-agents). To combine Beans publisher material with Espresso Events and Signals, see [Cross-product workflow](/guides/cross-product-workflow). For shared request behavior, see [API conventions](/guides/api-conventions). Copy [reusable clients](/guides/client-patterns) for pagination and retries. For failed calls, see [Troubleshooting](/guides/troubleshooting). For current limits, see [Pricing and limits](/guides/pricing-limits).

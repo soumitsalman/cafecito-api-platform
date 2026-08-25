@@ -24,11 +24,11 @@ var (
 	test_source_query = "tech"
 	test_authors      = []string{"Reuters"}
 	test_article_urls = []string{
-		"https://www.foxla.com/news/more-us-airlines-raise-baggage-fees-see-list",
-		"https://www.slashgear.com/2143752/us-airlines-increased-fees-fuel-prices/",
-		"http://andersource.dev/2026/03/29/tradeoff-sliders.html",
-		"https://massivelyop.com/2026/04/08/perfect-ten-have-official-mmo-websites-improved-in-the-last-decade/",
-		"https://phys.org/news/2026-04-uncharted-island-nautical.html",
+		"https://techcrunch.com/ci/beans-article-1",
+		"https://techcrunch.com/ci/beans-article-2",
+		"https://slashgear.com/ci/beans-article-3",
+		"https://techcrunch.com/ci/beans-article-4",
+		"https://techcrunch.com/ci/beans-article-5",
 	}
 	test_query_embedding = []float32{
 		-0.1990760862827301,
@@ -361,17 +361,26 @@ func setupTestDB() *db.PGSack {
 }
 
 func setupTestEmbedder() embedding.Embedder {
-	shared.NoError(godotenv.Load("../.env"))
-	base_url := os.Getenv("EMBEDDER_BASE_URL")
-	if base_url == "" {
-		base_url = "http://localhost:10000"
-	}
-	return embedding.NewHTTPEmbedder(
-		base_url,
-		os.Getenv("EMBEDDER_API_KEY"),
-		os.Getenv("EMBEDDER_MODEL"),
-	)
+	return fakeEmbedder{}
 }
+
+type fakeEmbedder struct{}
+
+func (fakeEmbedder) EmbedQuery(_ context.Context, _ string) []float32 {
+	out := make([]float32, len(test_query_embedding))
+	copy(out, test_query_embedding)
+	return out
+}
+
+func (fakeEmbedder) EmbedDocuments(ctx context.Context, docs []string) [][]float32 {
+	out := make([][]float32, len(docs))
+	for i := range docs {
+		out[i] = fakeEmbedder{}.EmbedQuery(ctx, docs[i])
+	}
+	return out
+}
+
+func (fakeEmbedder) Close() error { return nil }
 
 func testSearchFrom() time.Time {
 	return time.Now().UTC().AddDate(0, 0, -7)

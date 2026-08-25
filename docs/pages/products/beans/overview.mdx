@@ -1,6 +1,6 @@
 ---
-title: Overview
-description: Search publisher Articles, Sources, Stories, and external observations with the Beans REST API and MCP server.
+title: Beans News and Publisher Content API
+description: Read-only publisher-content API for news, blogs, earnings and financial reports, litigation, official statements, research, technical documents, Sources, and Stories.
 ---
 
 import { Badge } from "zudoku/ui/Badge";
@@ -12,15 +12,26 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v1</Badge><Badge className="badge-live">Live</Badge>
 
-**In one line:** The Beans API is a read-only API providing searchable and filterable access to publisher Articles, Sources, Stories, feeds, and coverage context for news, research, and AI-agent applications.
+**In one line:** Beans is a read-only publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
 
-- **Articles** are publisher items: news, blogs, reports, podcasts etc.
+- **Articles** are publisher items (news, blogs, reports, statements, research, and other stored types).
 - **Sources** are publisher records available on an Article or through the Source routes.
 - **Stories** group related Articles under a stable UUID and expose the member-Article route.
 - **Mentions** are external platform or forum observations for a selected Article.
 - **Discovery routes** return normalized values that can be used as Article and Story filters.
 
-Use Espresso when the question asks for a structured Event, Signal, impact, forecast, or evidence relationship. Beans reports publisher material and its coverage context; it does not turn an Article or attention metric into an Espresso conclusion.
+| If the user asks | Use |
+| --- | --- |
+| What did publishers report? | Beans |
+| Which sources covered the same story? | Beans Stories and Sources |
+| What external discussion exists around an Article? | Beans Mentions |
+| What happened in structured intelligence terms? | [Espresso](/products/espresso) Events |
+| What does it mean or what is the outlook? | Espresso Signals |
+| What evidence supports the conclusion? | Espresso Evidence |
+
+Beans reports publisher material and coverage context. It does not produce Espresso Events, Signals, impact, or forecast.
+
+There is no official Cafecito SDK. Integrate with REST or MCP. Cortado and Latte are reserved products and are not live APIs.
 
 ## Key features
 
@@ -54,19 +65,24 @@ A good workflow uses the smallest useful filter set, preserves returned IDs exac
   <a href="/settings/api-keys">Get API Key</a>
 </Button>
 
-All public Beans routes use the `/beans` prefix and the same Bearer API key used by other Cafecito products.
+All public Beans REST routes except health, and the Beans MCP endpoint, require the same Bearer API key used by other Cafecito products. Paths use the `/beans` prefix.
 
 ```bash
 BASE_URL="https://api.cafecito.tech"
 API_KEY="YOUR-API-KEY"
 
-curl -s "${BASE_URL}/beans/health" \
-  -H "Authorization: Bearer ${API_KEY}"
+curl -s "${BASE_URL}/beans/health"
+
+curl -s --get "${BASE_URL}/beans/articles/search" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "limit=5"
 ```
 
 ```http
 Authorization: Bearer YOUR-API-KEY
 ```
+
+Unknown or route-inapplicable query parameters return HTTP `400`. Clients that previously sent extra keys and expected them to be ignored must stop sending those keys.
 
 ::::info
 The [Beans API reference](/api/beans) is the source for the complete gateway schemas, parameter validation, and HTTP status codes.
@@ -74,7 +90,7 @@ The [Beans API reference](/api/beans) is the source for the complete gateway sch
 
 ## Quickstart in JavaScript, Python, and cURL
 
-The following requests make the same Article search. The query asks for publisher material rather than an Espresso Event or Signal. `score_threshold` is supplied with `q` so the request also works on the feed routes that require the threshold when a query is present.
+The following requests make the same Article search. The query asks for publisher material rather than an Espresso Event or Signal. `score_threshold` is optional with `q`; sending `score_threshold` without `q` returns HTTP `400`.
 
 <CodeTabs syncKey="beans-api">
 ```js
@@ -241,7 +257,7 @@ Errors use an HTTP status and one error envelope:
 }
 ```
 
-Expect HTTP `400` for invalid input, `401` for a missing or invalid key, `404` for a selected record that does not exist, `429` when request limits are reached, and `500` when the service is unavailable. A successful response does not include a duplicate status field.
+Expect HTTP `400` for invalid input, `401` for a missing or invalid public key (gateway), `404` for a selected record that does not exist, `429` when request limits are reached, and `500` when the service is unavailable. Application errors from the product API use `{ "error": { "code", "message" } }`. A successful response does not include a duplicate status field.
 
 ## Response types and nullable fields
 
@@ -256,7 +272,7 @@ The route matrix below names the response type for every public path. The follow
 | `content_type` | string enum | One stored Beans content type. |
 | `published_at` | RFC 3339 timestamp | Publisher publication time. |
 | `title`, `summary`, `author`, `image_url` | string or `null` | Available publisher metadata. |
-| `content` | optional string | Included only when `full_content=true` is requested and content is available. |
+| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee. Handle a missing value and use `url` for attribution. |
 | `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
 | `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |
 | `source` | Source object or `null` | Available publisher metadata for this Article. |
@@ -294,14 +310,14 @@ All request parameters are query parameters unless the table marks `id` as a pat
 
 | Route | Response type | Accepted request parameters |
 | --- | --- | --- |
-| `GET /beans/health` | Health object | None |
+| `GET /beans/health` | Health object | None. No Bearer header. |
 | `GET /beans/categories` | Label collection envelope | `q`, `limit`, `cursor` |
 | `GET /beans/entities` | Label collection envelope | `q`, `limit`, `cursor` |
 | `GET /beans/regions` | Label collection envelope | `q`, `limit`, `cursor` |
 | `GET /beans/sentiments` | Label collection envelope | `q`, `limit`, `cursor` |
-| `GET /beans/sources` | Source collection envelope | `q`, `domains`, `limit`, `cursor` |
+| `GET /beans/sources` | Source collection envelope | `q`, `ids`, `domains`, `limit`, `cursor` |
 | `GET /beans/sources/{id}` | Source detail envelope | `id` path parameter |
-| `GET /beans/mcp` | MCP tool transport | No REST filter parameters; connect with the same API key. |
+| `POST /beans/mcp` | MCP tool transport | No REST filter parameters; Bearer required. |
 
 ### Article routes
 
@@ -334,8 +350,8 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | Continuation | Send `pagination.next_cursor` unchanged as `cursor` on the same route and filter set. |
 | Date inputs | `from` and `to` use inclusive UTC calendar dates in `YYYY-MM-DD` form. |
 | Text query | `q` is a route-specific natural-language relevance query and accepts up to 512 characters. |
-| Relevance threshold | `score_threshold` is in the `0.0` through `1.0` range. Use it only with `q`. Article feed routes require a non-zero `score_threshold` when `q` is present; Story discovery rejects a threshold without `q`. |
-| Content projection | `full_content=true` requests available Article content without changing which records match. |
+| Relevance threshold | `score_threshold` is in the `0.0` through `1.0` range. Use it only with `q`. A threshold without `q` returns HTTP `400`. `q` may omit the threshold. |
+| Content projection | `full_content=true` requests available Article content when Beans has it. It does not change which records match and does not guarantee a full publisher copy. |
 | Filter combination | Different filter fields combine with AND. Include values within one category, region, entity, sentiment, Source, or domain field match any listed value. Exclusion filters remove matching records. All supplied `tags` and author terms further narrow results. |
 | Response format | JSON is canonical for REST responses and MCP tool results. |
 
@@ -346,7 +362,7 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | `q` | Natural-language relevance query. | Article search and feeds; Story discovery. |
 | `score_threshold` | Relevance threshold used with `q`. Higher values are stricter. | Article search and feeds; Story discovery. |
 | `ids`, `urls` | Exact Article UUIDs or canonical URLs. | Article search only. |
-| `content_type` | One stored Article type. Omit to include every stored type. | Article search, latest, trending, similar, Stories, Story Articles. |
+| `content_type` | One filterable Article type. `post` is not accepted as a request filter. | Article search, latest, trending, similar, Stories, Story Articles. Not accepted on top-headlines. |
 | `sources`, `exclude_sources` | Include or exclude exact Source UUIDs. | Article and Story collection routes listed in the matrix. |
 | `domains`, `exclude_domains` | Include or exclude exact Source domains. | Article and Story collection routes listed in the matrix. |
 | `authors` | Case-insensitive byline text matching. | Article and Story collection routes listed in the matrix. |
@@ -362,11 +378,35 @@ All request parameters are query parameters unless the table marks `id` as a pat
 
 ### Public content types
 
-`content_type` accepts every stored Beans type. Omit it when a collection should include all stored types:
+Request `content_type` accepts these 14 filterable values:
 
 `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`.
 
-Do not translate provider labels such as `pr` into Beans aliases. Use one of the published values exactly.
+`post` may appear on Article **responses**. Sending `content_type=post` returns HTTP `400`. Omit `content_type` to include every stored type, including response-only `post`. Do not translate provider labels such as `pr` into Beans aliases.
+
+| User need | Beans content types | Starting route |
+| --- | --- | --- |
+| General news and blogs | `news`, `blog` | `GET /beans/articles/search` |
+| Company financial updates | `earnings_report`, `financial_report` | Article search with `content_type` |
+| Legal and regulatory monitoring | `lawsuit`, `enforcement_action`, `contract` | Article search with type and entity filters |
+| Corporate communications | `official_statement`, `press_release` | Article search with type, Source, and date |
+| Research and technical monitoring | `research_paper`, `technical_documentation`, `whitepaper` | Article search with type and topic filters |
+| Audio and publication discovery | `podcast`, `site` | Article search with type and Source filters |
+
+```bash
+# Earnings monitoring (searchArticles). lawsuit monitoring uses the same route with content_type=lawsuit.
+curl -s --get "${BASE_URL}/beans/articles/search" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "content_type=earnings_report" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+
+curl -s --get "${BASE_URL}/beans/articles/search" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "content_type=lawsuit" \
+  --data-urlencode "entities=openai" \
+  --data-urlencode "limit=20"
+```
 
 ## Discovery and Sources
 
@@ -572,3 +612,5 @@ MCP clients connect to `https://api.cafecito.tech/beans/mcp` with the same API k
 - [Migrate to Beans](/products/beans/migration)
 - [Beans API reference](/api/beans)
 - [MCP & AI agents](/guides/mcp-ai-agents)
+
+Maintained executable requests for the local backend live in `apis/beans/tests/bruno/` in the repository. They are examples, not a second public contract.

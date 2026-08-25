@@ -4,10 +4,13 @@
 // @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
 // @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
 // @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
-// @description       **Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.
+// @description       **Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404. Errors use `{ "error": { "code", "message" } }`. Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`); `/health` does not. Public clients send Bearer keys to the gateway, not this service.
 // @description       **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
 // @description       **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
 // @schemes           https
+// @securityDefinitions.apikey BackendAPIKey
+// @in header
+// @name X-API-KEY
 // @license.name      MIT
 // @contact.name      Project Cafecito
 // @contact.url       http://cafecito.tech
@@ -177,13 +180,13 @@ func createSipKinds(resources []string) []string {
 }
 
 // writeCollection writes a typed collection envelope as JSON, or compact text when requested.
-func writePage[T any](c *gin.Context, items []T, limit int, cursor string, next_cursor *string, response_type string) {
+func writePage[T any](c *gin.Context, items []T, limit int, next_cursor *string, response_type string) {
 	if items == nil {
 		items = []T{}
 	}
 	response := PageResponse[T]{
 		Data:       items,
-		Pagination: Pagination{Limit: limit, NumResults: len(items), NextCursor: next_cursor},
+		Pagination: NewPagination(limit, len(items), next_cursor),
 		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
 	}
 	switch response_type {
@@ -221,15 +224,19 @@ func writeItem[T any](c *gin.Context, item T, response_type string) {
 // Uses InternalServerError for DB, Embedding, Encoding errors and default cases
 func writeError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
+	body := APIError{Code: utils.API_ERROR_DB_ERROR, Message: API_ERROR_MSG_OUR_BAD}
 	if api_err, ok := err.(utils.APIError); ok {
+		body = APIError{Code: api_err.Code, Message: api_err.Message}
 		switch api_err.Code {
 		case utils.API_ERROR_INVALID_REQUEST:
 			status = http.StatusBadRequest
 		case utils.API_ERROR_NOT_FOUND:
 			status = http.StatusNotFound
+		case utils.API_ERROR_UNAUTHORIZED:
+			status = http.StatusUnauthorized
 		}
 	}
-	c.AbortWithStatusJSON(status, ErrorResponse{Error: err})
+	c.AbortWithStatusJSON(status, ErrorResponse{Error: body})
 }
 
 // health godoc
@@ -274,7 +281,8 @@ func (r *Configuration) health(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID searchEvents
 // @Router /events [get]
 func (r *Configuration) getEvents(c *gin.Context) {
@@ -301,7 +309,7 @@ func (r *Configuration) getEvents(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEvent godoc
@@ -317,7 +325,8 @@ func (r *Configuration) getEvents(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getEvent
 // @Router /events/{event_id} [get]
 func (r *Configuration) getEvent(c *gin.Context) {
@@ -363,7 +372,8 @@ func (r *Configuration) getEvent(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getEventEvidence
 // @Router /events/{event_id}/evidence [get]
 func (r *Configuration) getEventEvidence(c *gin.Context) {
@@ -402,7 +412,7 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 	evidence := datautils.Transform(page_out.Items, func(sip *db.Sip) EventEvidence {
 		return NewEventEvidence(sip)
 	})
-	writePage(c, evidence, page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, evidence, page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEventSignals godoc
@@ -426,7 +436,8 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getEventSignals
 // @Router /events/{event_id}/signals [get]
 func (r *Configuration) getEventSignals(c *gin.Context) {
@@ -462,7 +473,7 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getSignals godoc
@@ -487,7 +498,8 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID searchSignals
 // @Router /signals [get]
 func (r *Configuration) getSignals(c *gin.Context) {
@@ -514,7 +526,7 @@ func (r *Configuration) getSignals(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // @Summary Inspect one Signal
@@ -529,7 +541,8 @@ func (r *Configuration) getSignals(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getSignal
 // @Router /signals/{signal_id} [get]
 func (r *Configuration) getSignal(c *gin.Context) {
@@ -584,7 +597,8 @@ func (r *Configuration) getSignal(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database or embedder unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getSignalEvents
 // @Router /signals/{signal_id}/events [get]
 func (r *Configuration) getSignalEvents(c *gin.Context) {
@@ -620,7 +634,7 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewDigestDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // @Summary Find intelligence Sources
@@ -637,7 +651,8 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID listIntelligenceSources
 // @Router /sources [get]
 func (r *Configuration) getSources(c *gin.Context) {
@@ -657,7 +672,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, NewSourceDocuments(page_out.Items), page_req.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getSource godoc
@@ -673,7 +688,8 @@ func (r *Configuration) getSources(c *gin.Context) {
 // @Failure 404 {object} ErrorResponse "No Source with this UUID"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID getIntelligenceSource
 // @Router /sources/{source_id} [get]
 func (r *Configuration) getSource(c *gin.Context) {
@@ -710,7 +726,8 @@ func (r *Configuration) getSource(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or response_type"
 // @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID listIntelligenceTags
 // @Router /tags [get]
 func (r *Configuration) getTags(c *gin.Context) {
@@ -738,7 +755,7 @@ func (r *Configuration) getTags(c *gin.Context) {
 	items := datautils.Transform(page_out.Items, func(tag *string) db.Tag {
 		return db.Tag{Value: *tag}
 	})
-	writePage(c, items, page.Limit, params.Cursor, next, params.ResponseType)
+	writePage(c, items, page.Limit, next, params.ResponseType)
 }
 
 // getEntities godoc
@@ -754,7 +771,9 @@ func (r *Configuration) getTags(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Entity value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID listIntelligenceEntities
 // @Router /entities [get]
 func (r *Configuration) getEntities(c *gin.Context) {
@@ -777,7 +796,7 @@ func (r *Configuration) getEntities(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getRegions godoc
@@ -792,7 +811,9 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Region value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID listIntelligenceRegions
 // @Router /regions [get]
 func (r *Configuration) getRegions(c *gin.Context) {
@@ -811,7 +832,7 @@ func (r *Configuration) getRegions(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 // getEventTypes godoc
@@ -826,7 +847,9 @@ func (r *Configuration) getRegions(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Event type value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 500 {object} ErrorResponse "Database unavailable; retry"
+// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
+// @Failure 500 {object} ErrorResponse "Service unavailable; retry."
+// @Security BackendAPIKey
 // @ID listIntelligenceEventTypes
 // @Router /event-types [get]
 func (r *Configuration) getEventTypes(c *gin.Context) {
@@ -845,7 +868,7 @@ func (r *Configuration) getEventTypes(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	writePage(c, page_out.Items, page.Limit, params.Cursor, encodeNextCursor(page_out.NextCursor), params.ResponseType)
+	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
 func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {

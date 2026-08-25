@@ -1,7 +1,15 @@
 # Industry News and Blog API Route Reference
 
-Status: External API reference
-Reviewed: 2026-08-17
+| Field | Value |
+|---|---|
+| Status | **current** (external comparison only) |
+| Authority | Third-party news/blog API documentation as of last review; **not** Cafecito contract |
+| Audience | Product and docs maintainers comparing Beans to the market |
+| Last verified | 2026-08-25 |
+| Owner role | Product research |
+| Superseded by | n/a |
+
+Provider tables below are comparison research. The **Beans Baseline** subsection is a **historical snapshot** of an older Beans surface (offset pagination, bare arrays). Live Beans uses `{ data, pagination.limit, pagination.num_results, pagination.next_cursor, meta.as_of }` per `config/beans.oas.json`.
 
 This document lists the documented public routes, principal query parameters, response payloads, and capabilities of multi-source news and blog APIs. It is a route and contract reference for comparing Beans with established news-intelligence services.
 
@@ -28,16 +36,18 @@ A searchable body, a response snippet, and full article text are materially diff
 
 All providers return JSON, but their identifiers, date formats, content rights, and response envelopes are incompatible. A client should normalize only the stable public fields it needs rather than assuming that fields named content or summary have equivalent meaning.
 
-## Beans Baseline
+## Beans Baseline (historical snapshot — not live)
 
-| Capability | Current Beans surface |
+The table below is a **historical** Beans surface used for market comparison. Live Beans uses cursor pagination and `{ data, pagination.limit, pagination.num_results, pagination.next_cursor, meta.as_of }` (`config/beans.oas.json`).
+
+| Capability | Historical Beans surface (do not implement) |
 | --- | --- |
 | Feeds | GET /articles/latest, /articles/trending, and /articles/top-headlines. |
 | Search | GET /articles/search accepts q, urls, content_type (news or blog), categories, regions, entities, tags, sources, from, full_content, limit, and offset. |
 | Discovery | GET /tags/categories, /tags/entities, /tags/regions, and /sources expose exact filter values. |
 | Cross-source context | GET and POST /articles/propagation accept article URLs and return coverage and mention data. |
 | Payload | Article objects include title, URL, author, source, summary, optional content, image, publication date, category/region/entity/sentiment labels, and tags. Search/trend results can add engagement and trend fields. |
-| Pagination | List routes use limit and offset and return arrays, not a total-count envelope. |
+| Pagination | List routes used limit and offset and returned arrays, not the published envelope. |
 
 ## 1. Capability and Commercial Snapshot
 

@@ -31,6 +31,9 @@ examples:
           value: application/json
       body:
         type: json
-        data: "{}"
+        data: |-
+          {
+            "status": "alive"
+          }
 
 docs: Use this lightweight endpoint to confirm that the Espresso service is reachable before making intelligence requests. It returns service status only; it does not validate an API key, search data, or report dependency health.

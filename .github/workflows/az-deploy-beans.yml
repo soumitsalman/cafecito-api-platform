@@ -5,14 +5,13 @@ on:
     # Intentionally disabled: change this back to main to re-enable auto-deploys.
     branches: [__disabled__]
     paths:
+      # Shared image is apis/Dockerfile (there is no apis/beans/Dockerfile).
       - "apis/beans/**"
-      - "apis/internal/**"
       - "apis/go.mod"
       - "apis/go.sum"
       - "apis/Dockerfile"
       - "apis/.dockerignore"
       - "apis/entrypoint.sh"
-      - "apis/fly.beans.toml"
       - ".github/workflows/az-deploy-beans.yml"
   workflow_dispatch:
 
@@ -49,8 +48,8 @@ jobs:
                   env:
                   - name: PG_CONNECTION_STRING
                     secretRef: pg-connection-string
-                  - name: API_KEYS
-                    secretRef: api-keys
+                  - name: API_KEY
+                    secretRef: api-key
                   - name: MAX_CONCURRENT_REQUESTS
                     value: '512'
                   - name: EMBEDDER_BASE_URL
@@ -66,7 +65,8 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           appSourcePath: ${{ github.workspace }}/apis
-          dockerfilePath: beans/Dockerfile
+          # Shared Dockerfile requires --build-arg SERVICE=beans (not beans/Dockerfile).
+          dockerfilePath: Dockerfile
           registryUrl: docker.io
           registryUsername: ${{ secrets.CAFECITOBEANSAPI_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.CAFECITOBEANSAPI_REGISTRY_PASSWORD }}
@@ -74,5 +74,4 @@ jobs:
           resourceGroup: frontends-rg
           imageToBuild: soumitsr/beans-api:${{ github.sha }}
           yamlConfigPath: .github/containerapp/beans.rendered.yaml
-          _buildArgumentsKey_: |
-            _buildArgumentsValues_
+          buildArguments: SERVICE=beans

@@ -150,13 +150,17 @@ examples:
         data: |-
           {
             "data": [
-              {}
+              {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "kind": "signal",
+                "created_at": "2026-01-01T00:00:00Z",
+                "tags": []
+              }
             ],
             "meta": {
               "as_of": ""
             },
             "pagination": {
-              "cursor": "",
               "limit": 0,
               "next_cursor": "",
               "num_results": 0

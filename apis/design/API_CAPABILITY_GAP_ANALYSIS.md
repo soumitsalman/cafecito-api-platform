@@ -1,7 +1,15 @@
 # Beans & Espresso API Capability and Documentation Gap Analysis
 
-**Analysis date:** 2026-07-30  
-**Status:** Ideation only; no implementation, OpenAPI, or published documentation changes are included.
+| Field | Value |
+|---|---|
+| Status | **historical** |
+| Authority | Ideation snapshot (2026-07-30); not live contract |
+| Audience | Historical product-planning readers |
+| Last verified | 2026-08-25 |
+| Owner role | Product design (archival) |
+| Superseded by | [DOCUMENTATION_GAP_REPORT.md](DOCUMENTATION_GAP_REPORT.md), published OAS |
+
+**Analysis date:** 2026-07-30. Originally labeled ideation only. Published Beans envelope is `{ data, pagination.limit, pagination.num_results, pagination.next_cursor, meta.as_of }`. Do not implement storage names from this document in public docs.
 
 ## 1. Executive summary
 

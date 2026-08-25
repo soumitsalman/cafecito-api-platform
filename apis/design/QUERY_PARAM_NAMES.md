@@ -1,8 +1,15 @@
 # Query-Parameter Naming Design
 
-Status: Product design decision
-Scope: Beans and Espresso public APIs
-Reviewed: 2026-08-18
+| Field | Value |
+|---|---|
+| Status | **current** |
+| Authority | Public query-parameter name `q` for unstructured search on Beans and Espresso |
+| Audience | API and docs maintainers |
+| Last verified | 2026-08-25 |
+| Owner role | Product design |
+| Superseded by | n/a |
+
+Scope: Beans and Espresso public APIs. There is no official SDK; REST and MCP clients use `q` the same way.
 
 ## Decision
 
@@ -31,8 +38,9 @@ Users and AI clients learn one simple rule: put flexible search text in `q`.
 This avoids requiring clients to guess whether a route uses `name`, `prefix`,
 `search`, `prompt`, or another provider-specific name.
 
-Uniform naming also lets common SDKs and agent tools expose the same input field
-across Articles, Events, Signals, Sources, Stories, and discovery resources.
+Uniform naming lets REST, MCP, and third-party client wrappers expose the same
+input field across Articles, Events, Signals, Sources, Stories, and discovery
+resources. Cafecito does not ship an official SDK.
 
 The market references show that `q` is widely used for general text search,
 including PredictHQ Events and Places and Perigon article and story routes. They

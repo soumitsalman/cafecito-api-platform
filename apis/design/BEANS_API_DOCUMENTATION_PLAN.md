@@ -1,14 +1,20 @@
 # Beans API Documentation Plan
 
-Status: Documentation implementation plan
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None; portal and gateway OAS have shipped |
+| Audience | Historical docs-planning readers |
+| Last verified | 2026-08-25 |
+| Owner role | Documentation steward (archival) |
+| Superseded by | [`docs/pages/products/beans/`](../../docs/pages/products/beans/), [`config/beans.oas.json`](../../config/beans.oas.json) |
 
-Updated: 2026-08-19
+The route proposal is **not** live contract. Published collections include `pagination.num_results` and `meta.as_of` on every collection, not only selected routes. Industry comparison file is [NEWS_AND_BLOG_API_MARKET_REPORT.md](NEWS_AND_BLOG_API_MARKET_REPORT.md).
 
-References:
+Historical references:
 
-- Target contract: [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md)
-- Parallel documentation model: [ESPRESSO_API_DOCUMENTATION_PLAN.md](ESPRESSO_API_DOCUMENTATION_PLAN.md)
-- Industry comparison: [INDUSTRY_NEWS_API_ROUTE_REFERENCE.md](INDUSTRY_NEWS_API_ROUTE_REFERENCE.md)
+- Target contract (superseded): [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md)
+- Parallel plan (superseded): [ESPRESSO_API_DOCUMENTATION_PLAN.md](ESPRESSO_API_DOCUMENTATION_PLAN.md)
 
 ## 1. Authority and V1 scope
 
@@ -23,7 +29,7 @@ Omitting `content_type` includes all stored types. Provider labels such as `pr` 
 | Product boundary | Beans finds and verifies what publishers published. Espresso covers business intelligence Events and Signals. |
 | Article identity | Use `Article` and its UUID. Do not use storage names or imply durable Story membership. |
 | Content type | Use any of the 15 stored types; omission means all stored types. |
-| Pagination | `limit` is 1-100 with default 20. `cursor` is opaque and clients follow `pagination.next_cursor`. Do not document `offset` or `page`. |
+| Pagination | `limit` is 1-100 with default 20. Request `cursor` is opaque; responses include `pagination.limit`, `pagination.num_results` (this page), and `pagination.next_cursor`. Collections include `meta.as_of`. Do not document `offset` or `page`. |
 | Empty results | Collections return HTTP 200 with `data: []`, pagination, and meta. |
 | Dates | `from` and `to` use inclusive `YYYY-MM-DD` publication or observation bounds as described by the route. |
 | Search | `q` is natural-language search. `score_threshold` requires `q`. `ids` and `urls` are exact search filters. |

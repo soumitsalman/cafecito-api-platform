@@ -32,8 +32,8 @@ type stressEndpoint struct {
 
 var stress_endpoints = []stressEndpoint{
 	{path: ROUTE_SEARCH, accepts_q: true, accepts_tags: true, accepts_from: true},
-	{path: ROUTE_LATEST, accepts_q: true, accepts_tags: true, accepts_from: true},
-	{path: ROUTE_TRENDING, accepts_q: true, accepts_tags: true, accepts_from: true},
+	{path: ROUTE_LATEST, accepts_q: true, accepts_tags: true},
+	{path: ROUTE_TRENDING, accepts_q: true, accepts_tags: true},
 	{path: ROUTE_HEADLINES, accepts_q: true, accepts_tags: true},
 	{path: ROUTE_SOURCES, accepts_q: true},
 	{path: ROUTE_CATEGORIES, accepts_q: true},

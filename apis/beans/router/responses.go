@@ -10,15 +10,19 @@ import (
 	datautils "github.com/soumitsalman/data-utils"
 )
 
-// CursorPagination is the target Beans collection pagination envelope.
+// Pagination is the public collection pagination envelope.
 type Pagination struct {
-	Limit      int     `json:"limit" binding:"required"`
-	NumResults int     `json:"num_results" binding:"required"`
+	// Limit is the requested page size for this response.
+	Limit int `json:"limit" binding:"required" example:"20"`
+	// NumResults is the number of records in this page, not a total-match count.
+	NumResults int `json:"num_results" binding:"required" example:"20"`
+	// NextCursor is an opaque token. Send it unchanged as the next request cursor. Null when there is no next page.
 	NextCursor *string `json:"next_cursor" binding:"required"`
 }
 
 // ResponseMeta contains freshness metadata for changing collections.
 type ResponseMeta struct {
+	// AsOf is the UTC time this collection snapshot was produced.
 	AsOf time.Time `json:"as_of"`
 }
 
@@ -34,9 +38,20 @@ type DetailResponse[T any] struct {
 	Data T `json:"data" binding:"required"`
 }
 
-// ErrorResponse is the canonical target error envelope.
+// ErrorBody is the structured error payload.
+type ErrorBody struct {
+	Code    string `json:"code" example:"invalid_request"`
+	Message string `json:"message" example:"Unknown or unsupported query parameter: offset"`
+}
+
+// ErrorResponse is the canonical error envelope.
 type ErrorResponse struct {
-	Error error `json:"error"`
+	Error ErrorBody `json:"error"`
+}
+
+// HealthResponse is the unauthenticated liveness payload.
+type HealthResponse struct {
+	Status string `json:"status" binding:"required" example:"alive" enums:"alive"`
 }
 
 // SourceDocument is the Source collection/detail payload.
@@ -88,6 +103,7 @@ type Trend struct {
 type ArticleDocument struct {
 	ID         uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
 	URL        string          `json:"url"`
+	// Kind is the stored Article type. post may appear in responses but is not a valid request filter.
 	Kind       string          `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
 	Created    time.Time       `json:"published_at" swaggertype:"string" format:"date-time"`
 	Author     *string         `json:"author"`

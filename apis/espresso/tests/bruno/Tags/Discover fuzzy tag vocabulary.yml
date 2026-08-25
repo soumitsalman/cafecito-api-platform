@@ -111,7 +111,6 @@ examples:
               "as_of": ""
             },
             "pagination": {
-              "cursor": "",
               "limit": 0,
               "next_cursor": "",
               "num_results": 0

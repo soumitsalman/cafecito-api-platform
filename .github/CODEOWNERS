@@ -1,0 +1,23 @@
+# Default owner for every path.
+* @soumitsalman
+
+# CI, governance, and contract cascade.
+/.github/ @soumitsalman
+/CODEOWNERS @soumitsalman
+/AGENTS.md @soumitsalman
+/apis/AGENTS.md @soumitsalman
+/package.json @soumitsalman
+/scripts/ @soumitsalman
+
+# Public contracts and portal.
+/config/*.oas.json @soumitsalman
+/config/policies.json @soumitsalman
+/config/api-contract-exceptions.json @soumitsalman
+/docs/ @soumitsalman
+/modules/ @soumitsalman
+
+# Service-local HTTP contracts.
+/apis/beans/router/ @soumitsalman
+/apis/espresso/router/ @soumitsalman
+/apis/beans/docs/ @soumitsalman
+/apis/espresso/docs/ @soumitsalman

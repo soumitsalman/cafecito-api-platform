@@ -1,65 +1,42 @@
 ---
-title: Pricing
-description: Launch-preview pricing, rate limits, and quotas for Cafecito APIs and MCP servers.
+title: Pricing and limits
+description: Ongoing free-tier rate limits and monthly quotas for Cafecito REST APIs and MCP servers.
 ---
 
-# Pricing and Limits
+# Pricing and limits
 
-:::tip
-**🚀 FREE Launch Preview until June 30, 2026.** [Sign up](/settings/api-keys) costs nothing. APIs & MCPs cost nothing. Go Loco!
-:::
+**Last updated:** 2026-08-25
 
-## Beans Pricing
-We like simple.
+Beans and Espresso remain on an **ongoing free tier**. There is no launch-preview end date. Cortado and Latte are future products and are not metered because they have no public API.
 
 | | |
 | --- | --- |
 | **Price** | $0 |
-| **Rate limit** | 100 requests / minute |
-| **Quota** | 50 000 requests / month |
+| **Rate limit** | 100 requests per minute |
+| **Monthly quota** | 50,000 requests per month |
 
-You can create unlimited API keys — they all count toward the same meter.
+Limits apply **per authenticated user**, not per API key. Every key you create shares the same 100/min and 50,000/month budget. REST and MCP calls use **the same meter**.
 
-> After the launch preview ends, we'll announce paid plans. We'll keep it straightforward — no point systems, no surprise surcharges, no PhD required to read the pricing page.
+## What is included
 
-### What's Included (all of it)
+- Beans publisher-content REST and MCP
+- Espresso market and business intelligence REST and MCP
+- Keyword and semantic search on documented collection routes
+- Source, discovery, and related-resource routes documented for each product
+- API key management in the developer portal
 
-- Keyword search and semantic / vector search
-- Metadata endpoints (categories, entities, regions, sources)
-- Social engagement and trend-aware ranking
-- Publisher metadata and related-article discovery
-- MCP server access for AI agent integration
-- API key management via the developer portal
+## How metering works
 
-All of that. For free. During the preview.
+- Each successful API or MCP call counts as one request, regardless of payload size or `num_results`.
+- Empty successful collections (`200` with `data: []`) count.
+- REST and MCP share the user meter.
+- **Not metered:** public `/health` checks and API-key creation in the portal.
+- **Not metered:** HTTP `4xx` and `5xx` responses.
 
-## How Metering Works
-- Metering is **per API call**. One request = one tick on the meter.
-- Response size, number of returned items — **doesn't matter**. Same cost.
-- MCP calls count the same as regular API calls.
-- Semantic / vector search costs the same as keyword search.
-- Requests that return zero results still count. (Sorry, empty queries aren't free.)
-- **Free calls that don't tick the meter:** `/health` checks and [API key](/settings/api-keys) creation. Ping us all day, we don't care.
-- **Failed requests don't count either.** If you get a 4xx or 5xx status code, that's on us (or your typo) — it won't tick the meter.
+When the per-minute limit is exceeded, the gateway returns HTTP `429`. When the monthly quota is exhausted, further authenticated calls return `429` until the next monthly window. There is no soft overage.
 
-<Callout type="info" title="Separate Metering per Product">
-    Metering buckets are separate for each product. Even with the same API key, we track usage separately for each product. Beans API & MCP metering is separate from Cortado or Espresso.
-</Callout>
+Paid plans may be announced later. Until then, the free-tier numbers on this page apply.
 
-## How to Increase Rate Limit Quota
-Upgrade to the next tier. Upgrade options will exist after the launch preview.
+## If you hit a limit
 
-- **Rate limit exceeded?** Back off for a second, err make it a minute.
-- **Quota exhausted?** You're done until the next billing month. 
-
-There's **no soft limit** — when you hit it, you hit it.
-
-## Post-preview plans
-
-We're still figuring out exact pricing tiers for after June 30. Expect something like:
-
-- A **free tier** with lower limits for tire-kickers
-- A **paid tier** with higher limit for production workloads
-- Nothing absurd. We're bootstrapped, not delusional.
-
-Stay tuned. We'll update this page when we nail it down.
+Back off on `429` as described in [API conventions](/guides/api-conventions). For operational recovery, see [Troubleshooting](/guides/troubleshooting).

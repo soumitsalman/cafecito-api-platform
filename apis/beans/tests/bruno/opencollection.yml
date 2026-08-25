@@ -15,7 +15,7 @@ config:
       bypassProxy: ""
 
 docs:
-  content: Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, stable UUID-identified Stories, similar publisher reading, external Article mentions, and normalized filter discovery. Use GET /stories to select a Story UUID, then GET /stories/{id} or GET /stories/{id}/articles for the selected Story.
+  content: Beans returns citable publisher Articles, Source metadata, attention-ranked feeds, Stories, similar reading, mentions, and filter discovery. Public gateway paths add the /beans prefix. GET /top-headlines is the backend path for public GET /beans/articles/top-headlines. Do not send content_type, ids, urls, from, or to on that route. content_type=post is not a request filter.
   type: text/markdown
 bundled: false
 extensions:

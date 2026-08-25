@@ -1,5 +1,6 @@
 ---
-description: Use Espresso to find concrete Events, interpret Signals, inspect evidence, and build efficient AI-agent workflows.
+title: Espresso Events and Signals API
+description: Market, business, event, and news intelligence API for searching Events, interpreting Signals, and tracing evidence and Sources.
 ---
 import { Badge } from "zudoku/ui/Badge";
 import { Button } from "zudoku/ui/Button";
@@ -10,7 +11,9 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v0.5</Badge><Badge className="badge-live">Live</Badge>
 
-**In one line:** The Espresso API is a read-only API providing searchable business intelligence through concrete Events, synthesized Signals, evidence, and Sources for research, monitoring, and AI-agent applications.
+**In one line:** Espresso is a market and business intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources for monitoring, research, risk analysis, and AI-agent workflows.
+
+Use it as event intelligence and news intelligence: what happened, what it may mean for a company or market, and what evidence supports that view. Cafecito resource names remain Events, Signals, Evidence, and Sources. Cortado and Latte are future products and are not live APIs. There is no official SDK; integrate over REST or MCP.
 
 - **Events** are concrete developments.
 - **Signals** are synthesized conclusions about developments and their potential impact.
@@ -44,14 +47,13 @@ A good agent workflow uses the smallest useful filter set, selects IDs from `dat
   <a href="/settings/api-keys">Get API Key</a>
 </Button>
 
-All gateway routes use the `/espresso` prefix and the same Bearer API key used by other Cafecito products.
+All gateway routes use the `/espresso` prefix. REST operations require `Authorization: Bearer <api_key>`. `GET /espresso/health` does not. Gateway `401` is the engine response for a missing or invalid public key. Product application errors use `{ "error": { "code": "...", "message": "..." } }`. Empty collections are HTTP `200` with `data: []`. A missing Event, Signal, or Source detail is HTTP `404`.
 
 ```bash
 BASE_URL="https://api.cafecito.tech"
 API_KEY="YOUR-API-KEY"
 
-curl -s "${BASE_URL}/espresso/health" \
-  -H "Authorization: Bearer ${API_KEY}"
+curl -s "${BASE_URL}/espresso/health"
 ```
 
 ```http
@@ -131,13 +133,13 @@ Collection routes return a stable envelope:
       "id": "EVENT_UUID",
       "kind": "event",
       "created_at": "2026-05-19T06:00:00Z",
+      "tags": ["supply_chain"],
       "summary": "A concrete development"
     }
   ],
   "pagination": {
     "limit": 20,
     "num_results": 1,
-    "cursor": null,
     "next_cursor": "OPAQUE_TOKEN_OR_NULL"
   },
   "meta": {}
@@ -145,10 +147,56 @@ Collection routes return a stable envelope:
 ```
 
 - Preserve IDs exactly. Event, Signal, and Source IDs are UUIDs used by follow-up routes.
+- Collections do not return a `pagination.cursor` field. Continue with `pagination.next_cursor` only.
 - `pagination.num_results` is the count in this page. It is not the total number of possible matches.
 - If `pagination.next_cursor` is non-null, send that exact value as the next request `cursor`. Do not create, decode, modify, or sort cursor tokens.
 - Empty collections are successful HTTP `200` responses with `data: []`.
 - Detail routes return `{ "data": { ... } }`. A missing detail record returns HTTP `404`.
+
+## Event and Signal fields
+
+Every Event and Signal has a stable core. Other keys may be absent or added over time. Clients must ignore unknown extension fields.
+
+| Role | Fields | Client rule |
+| --- | --- | --- |
+| Stable core | `id`, `kind`, `created_at`, `tags` | Always present. Parse these first. |
+| Conditional | `summary`, `source`, `links`, `counts` | May be omitted. Do not require them. |
+| Extension | any other keys (for example `event_type`, `impact_level`, `forecast`) | Optional. Ignore unknown keys. |
+
+`kind` is `event` or `signal`. JSON, YAML, and TOON are projections of the same logical payload.
+
+## Public route matrix
+
+Default `limit` is 20 (maximum 100). Empty collections return HTTP `200`. Missing detail returns HTTP `404`. REST and MCP share the same operations except health, which is REST-only.
+
+| Intent | Route | Required | Filters | Envelope | Typical next call |
+| --- | --- | --- | --- | --- | --- |
+| What happened? | `GET /espresso/events` | — | `q`, tags, structured Event filters, `from`/`to`, `cursor` | collection | Event detail, evidence, or Signals |
+| Inspect one Event | `GET /espresso/events/{event_id}` | path UUID | `response_type` | detail | evidence or related Signals |
+| Supporting context | `GET /espresso/events/{event_id}/evidence` | path UUID | Event filters, `cursor` | collection | Source detail |
+| Related conclusions | `GET /espresso/events/{event_id}/signals` | path UUID | Signal filters, `cursor` | collection | Signal detail |
+| What does it mean? | `GET /espresso/signals` | — | `q`, tags, Signal filters, `from`/`to`, `cursor` | collection | Signal detail or supporting Events |
+| Inspect one Signal | `GET /espresso/signals/{signal_id}` | path UUID | `response_type` | detail | supporting Events |
+| Support for a Signal | `GET /espresso/signals/{signal_id}/events` | path UUID | Event filters, `cursor` | collection | Event evidence |
+| Source catalog | `GET /espresso/sources` | — | `q`, `domains`, `cursor` | collection | Source detail or Event `source_ids` |
+| One Source | `GET /espresso/sources/{source_id}` | path UUID | `response_type` | detail | Event search |
+| Fuzzy tag vocabulary | `GET /espresso/tags` | — | `q`, `resource`, `cursor` | collection | Event or Signal search |
+| Entity vocabulary | `GET /espresso/entities` | — | `q`, `types`, `cursor` | collection | Event search |
+| Region vocabulary | `GET /espresso/regions` | — | `q`, `cursor` | collection | Event search |
+| Event-type vocabulary | `GET /espresso/event-types` | — | `q`, `cursor` | collection | Event search |
+| Liveness | `GET /espresso/health` | — | — | `{ status }` | none |
+
+Runnable requests live in the maintained Bruno collection under `apis/espresso/tests/bruno`.
+
+## What are you trying to understand?
+
+| User question | Espresso path |
+| --- | --- |
+| What happened? | Search Events |
+| What is the likely business or market implication? | Search Signals |
+| What evidence supports that implication? | Signal-linked Events, then Event evidence |
+| Which companies, people, products, or regions are affected? | Structured filters and discovery |
+| Is this a one-off or a developing pattern? | Compare related Events, Signals, Sources, and `meta.as_of` |
 
 ## Query and filter rules
 
@@ -273,7 +321,6 @@ The following excerpts use real values from a one-Event response returned by `GE
   "pagination": {
     "limit": 1,
     "num_results": 1,
-    "cursor": null,
     "next_cursor": null
   },
   "meta": {
@@ -316,16 +363,15 @@ data:
 pagination:
   limit: 1
   num_results: 1
-  page: null
   next_cursor: null
 meta:
-  as_of: 2026-08-14T17:44:34.897815116Z
+  as_of: 2026-08-14T17:44:34.874458971Z
 ```
 
 ```text title="TOON"
 data[1]:
   - activities[2]: 2026-08-13 NDC president Peter Obi declares Nigerian youths great assets,2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors
-    created_at: "2026-08-13T06:30:04Z"
+    created_at: "2026-08-13T02:30:04-04:00"
     event_type: youth_empowerment_declaration
     forecast: Increased public funding directed at youth programs within six months
     id: 9cefc4ae-cad9-548e-9f5f-28ef22327a13
@@ -341,14 +387,13 @@ data[1]:
 pagination:
   limit: 1
   num_results: 1
-  page: null
   next_cursor: null
 meta:
-  as_of: "2026-08-14T17:44:34.912410727Z"
+  as_of: "2026-08-14T17:44:34.874458971Z"
 ```
 </CodeTabs>
 
-Use JSON when a client needs strict JSON parsing. Use YAML when readable indentation is more useful. Use TOON when an agent needs the same fields in the most compact representation. `pagination.next_cursor` remains opaque in every format: send it unchanged as the next request `cursor`.
+Use JSON when a client needs strict JSON parsing. Use YAML when readable indentation is more useful. Use TOON when an agent needs the same fields in the most compact representation. Collection pagination is `limit`, `num_results`, and `next_cursor` in every format. Send `pagination.next_cursor` unchanged as the next request `cursor`.
 
 MCP clients can connect to `https://api.cafecito.tech/espresso/mcp` with the same API key. See [MCP & AI agents](/guides/mcp-ai-agents) for the tool list and agent operating guidance.
 

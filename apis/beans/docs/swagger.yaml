@@ -25,6 +25,8 @@ definitions:
       content:
         type: string
       content_type:
+        description: Kind is the stored Article type. post may appear in responses
+          but is not a valid request filter.
         enum:
         - blog
         - contract
@@ -100,6 +102,8 @@ definitions:
       content:
         type: string
       content_type:
+        description: Kind is the stored Article type. post may appear in responses
+          but is not a valid request filter.
         enum:
         - blog
         - contract
@@ -164,9 +168,29 @@ definitions:
       story:
         type: string
     type: object
+  router.ErrorBody:
+    properties:
+      code:
+        example: invalid_request
+        type: string
+      message:
+        example: 'Unknown or unsupported query parameter: offset'
+        type: string
+    type: object
   router.ErrorResponse:
     properties:
-      error: {}
+      error:
+        $ref: '#/definitions/router.ErrorBody'
+    type: object
+  router.HealthResponse:
+    properties:
+      status:
+        enum:
+        - alive
+        example: alive
+        type: string
+    required:
+    - status
     type: object
   router.MentionCollectionResponse:
     properties:
@@ -209,10 +233,17 @@ definitions:
   router.Pagination:
     properties:
       limit:
+        description: Limit is the requested page size for this response.
+        example: 20
         type: integer
       next_cursor:
+        description: NextCursor is an opaque token. Send it unchanged as the next
+          request cursor. Null when there is no next page.
         type: string
       num_results:
+        description: NumResults is the number of records in this page, not a total-match
+          count.
+        example: 20
         type: integer
     required:
     - limit
@@ -222,6 +253,7 @@ definitions:
   router.ResponseMeta:
     properties:
       as_of:
+        description: AsOf is the UTC time this collection snapshot was produced.
         type: string
     type: object
   router.SourceCollectionResponse:
@@ -428,7 +460,7 @@ definitions:
     type: object
   router.Trend:
     properties:
-      audience:
+      audiences:
         type: integer
       comments:
         type: integer
@@ -446,9 +478,11 @@ info:
     email: soumitsrah@cafecito.tech
     name: Project Cafecito
     url: https://cafecito.tech
-  description: Beans finds and verifies what publishers published. It returns citable
-    Articles, Source metadata, attention-ranked feeds, similar publisher reading,
-    external Article mentions, and normalized filter discovery.
+  description: |-
+    Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+    Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
+    `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
+    Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
   license:
     name: MIT
   title: Beans News API & MCP
@@ -498,6 +532,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Get an Article
       tags:
       - Articles
@@ -576,6 +612,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List Article mentions
       tags:
       - Articles
@@ -591,7 +629,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -602,7 +640,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -742,6 +779,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List related Articles
       tags:
       - Articles
@@ -762,7 +801,7 @@ paths:
         minimum: 0
         name: score_threshold
         type: number
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -773,7 +812,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -899,6 +937,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List latest Articles
       tags:
       - Articles
@@ -933,7 +973,7 @@ paths:
           type: string
         name: urls
         type: array
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -944,7 +984,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -1080,6 +1119,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Search Articles
       tags:
       - Articles
@@ -1101,7 +1142,7 @@ paths:
         minimum: 0
         name: score_threshold
         type: number
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -1112,7 +1153,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -1238,6 +1278,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List trending Articles
       tags:
       - Articles
@@ -1286,6 +1328,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List category labels
       tags:
       - Discovery
@@ -1334,13 +1378,14 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List entity labels
       tags:
       - Discovery
   /health:
     get:
-      description: Lightweight liveness probe. Use before other tools to confirm the
-        service is reachable. No authentication required when API keys are disabled.
+      description: Lightweight liveness probe. No authentication required.
       operationId: healthCheck
       produces:
       - application/json
@@ -1348,9 +1393,7 @@ paths:
         "200":
           description: status alive
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/router.HealthResponse'
       summary: Check API health
       tags:
       - Health
@@ -1399,6 +1442,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List region labels
       tags:
       - Discovery
@@ -1447,6 +1492,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List sentiment labels
       tags:
       - Discovery
@@ -1461,6 +1508,13 @@ paths:
         maxLength: 512
         name: q
         type: string
+      - collectionFormat: csv
+        description: Source ids (CSV).
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
       - collectionFormat: csv
         description: Source domains (CSV).
         in: query
@@ -1503,6 +1557,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List Sources
       tags:
       - Sources
@@ -1544,6 +1600,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Get a Source
       tags:
       - Sources
@@ -1564,7 +1622,7 @@ paths:
         minimum: 0
         name: score_threshold
         type: number
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -1575,7 +1633,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -1712,6 +1769,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List Stories
       tags:
       - Stories
@@ -1754,6 +1813,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: Get a Story
       tags:
       - Stories
@@ -1769,7 +1830,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Stored Article type.
+      - description: Filterable Article type. post is response-only and returns 400.
         enum:
         - blog
         - contract
@@ -1780,7 +1841,6 @@ paths:
         - news
         - official_statement
         - podcast
-        - post
         - press_release
         - research_paper
         - site
@@ -1920,6 +1980,8 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List Story Articles
       tags:
       - Stories
@@ -2058,9 +2120,16 @@ paths:
           description: Service unavailable
           schema:
             $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
       summary: List top headlines
       tags:
       - Articles
 schemes:
 - https
+securityDefinitions:
+  BackendAPIKey:
+    in: header
+    name: X-API-KEY
+    type: apiKey
 swagger: "2.0"

@@ -1,0 +1,91 @@
+{
+  "description": "Negative fixtures: each case must produce a failing check. Do not use these as live docs.",
+  "cases": [
+    {
+      "id": "examples-unknown-path",
+      "check": "examples",
+      "dir": "examples-unknown-path",
+      "expect": "not in gateway OpenAPI"
+    },
+    {
+      "id": "examples-unknown-query",
+      "check": "examples",
+      "dir": "examples-unknown-query",
+      "expect": "query parameter made_up_filter"
+    },
+    {
+      "id": "examples-envelope",
+      "check": "examples",
+      "dir": "examples-envelope",
+      "expect": "collection pagination missing num_results"
+    },
+    {
+      "id": "examples-bruno-path",
+      "check": "examples",
+      "dir": "examples-bruno-path",
+      "expect": "not in gateway OpenAPI"
+    },
+    {
+      "id": "examples-mcp-tool",
+      "check": "examples",
+      "dir": "examples-mcp-tool",
+      "expect": "MCP tool inventWidgets is not exported"
+    },
+    {
+      "id": "terms-forbidden",
+      "check": "terms",
+      "dir": "terms-forbidden",
+      "expect": "forbidden public term (cupboard)"
+    },
+    {
+      "id": "terms-stale-path",
+      "check": "terms",
+      "dir": "terms-stale-path",
+      "expect": "stale public path"
+    },
+    {
+      "id": "lifecycle-missing",
+      "check": "lifecycle",
+      "dir": "lifecycle-missing",
+      "expect": "missing lifecycle field"
+    },
+    {
+      "id": "lifecycle-stale-date",
+      "check": "lifecycle",
+      "dir": "lifecycle-stale-date",
+      "expect": "older than"
+    },
+    {
+      "id": "links-broken",
+      "check": "links",
+      "dir": "links-broken",
+      "expect": "broken relative link"
+    },
+    {
+      "id": "inventory-orphan",
+      "check": "inventory",
+      "dir": "inventory-orphan",
+      "expect": "not listed in zudoku navigation"
+    },
+    {
+      "id": "inventory-missing-nav",
+      "check": "inventory",
+      "dir": "inventory-missing-nav",
+      "expect": "has no matching docs/pages source"
+    },
+    {
+      "id": "generated-llms",
+      "check": "generated",
+      "dir": "generated-llms",
+      "requireGenerated": true,
+      "expect": "forbidden public term in generated output"
+    },
+    {
+      "id": "generated-missing-pages",
+      "check": "generated",
+      "dir": "generated-missing-pages",
+      "requireGenerated": true,
+      "expect": "generated output missing required page /products/beans"
+    }
+  ]
+}

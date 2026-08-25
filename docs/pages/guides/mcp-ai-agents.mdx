@@ -1,61 +1,129 @@
 ---
-description: Connect Cafecito Beans and Espresso MCP servers to AI-agent clients.
+title: MCP and AI agents
+description: Hosted Beans and Espresso MCP servers, exported tools, Bearer auth, REST equivalents, and tool sequencing. No official SDK.
 ---
 
-# MCP Integration
+# MCP and AI agents
 
-Beans and Espresso use the same API-key authentication, but they answer different questions.
+Cafecito hosts two Model Context Protocol (MCP) servers. They use the **same API key** as REST. There is **no official SDK**; connect any MCP client that can send `Authorization: Bearer` to the hosted URLs.
 
-- Beans finds and verifies what publishers published.
-- Espresso explains what happened and what it may mean.
+- **Beans MCP** answers publisher coverage: Articles, Sources, Stories, and discovery vocabularies.
+- **Espresso MCP** answers structured intelligence: Events, Signals, evidence, and intelligence Sources.
 
-## Authentication
+Do not use Beans tools for Event or Signal questions. Do not use Espresso tools when the user needs Article URLs, publisher text, Story membership, or source-coverage counts from Beans.
 
-<Button className="btn-with-link" asChild>
-  <a href="/settings/api-keys">Get API Key</a>
-</Button>
+Health is **not** an MCP tool. Probe `GET /beans/health` and `GET /espresso/health` over REST with no key.
 
-Use the key as a Bearer token when connecting to https://api.cafecito.tech/beans/mcp or https://api.cafecito.tech/espresso/mcp.
+Cross-product sequencing (Beans coverage → Espresso evidence) is on [Cross-product workflow](/guides/cross-product-workflow). Shared HTTP rules are on [API conventions](/guides/api-conventions). Limits apply to REST and MCP together; see [Pricing and limits](/guides/pricing-limits).
 
-## Beans tool selection
+## Transport and authentication
 
-Start with the tool that matches the literal question.
+| Item | Value |
+| --- | --- |
+| Beans MCP | `https://api.cafecito.tech/beans/mcp` |
+| Espresso MCP | `https://api.cafecito.tech/espresso/mcp` |
+| Method | HTTP `POST` JSON-RPC (MCP) |
+| Auth | `Authorization: Bearer YOUR-API-KEY` |
+| Health | REST only; not exported as MCP tools |
 
-| Tool | REST path | Answers |
+Create a key from the portal ([API keys](/start/api-keys)). One key works on both MCP servers and both REST APIs. Store it in the client's secret store; never commit it.
+
+Example MCP client config (replace the key; this is not an SDK):
+
+```json
+{
+  "mcpServers": {
+    "cafecito-beans": {
+      "url": "https://api.cafecito.tech/beans/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR-API-KEY"
+      }
+    },
+    "cafecito-espresso": {
+      "url": "https://api.cafecito.tech/espresso/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR-API-KEY"
+      }
+    }
+  }
+}
+```
+
+Missing or invalid keys return HTTP `401` on MCP the same as REST. Rate and monthly quota apply to MCP tool calls the same as REST.
+
+## Beans MCP catalog
+
+Exported tools are exactly the `operationId` values listed on `/beans/mcp`. `healthCheck` and `beansMcp` are **not** tools.
+
+| Tool | REST equivalent | Use when |
 | --- | --- | --- |
-| searchArticles | GET /beans/articles/search | Which publisher Articles match this topic or filter? |
-| getArticle | `GET /beans/articles/{id}` | What did this known Article say? |
-| getLatestArticles | GET /beans/articles/latest | What was published most recently? |
-| getTopHeadlines | GET /beans/articles/top-headlines | What is attracting attention in the fixed recent window? |
-| getTrendingArticles | GET /beans/articles/trending | Which Articles are gaining attention? |
-| getSimilarArticles | `GET /beans/articles/{id}/similar` | What related publisher reading exists? |
-| getArticleMentions | `GET /beans/articles/{id}/mentions` | Where was this Article URL observed externally? |
-| listSources / getSource | `GET /beans/sources` and `GET /beans/sources/{id}` | Which publisher metadata applies? |
-| listCategories / listEntities / listRegions / listSentiments | GET /beans/categories, /entities, /regions, /sentiments | Which normalized filter values are accepted? |
+| `listCategories` | `GET /beans/categories` | Discover accepted category filter values. |
+| `listEntities` | `GET /beans/entities` | Discover accepted entity filter values. |
+| `listRegions` | `GET /beans/regions` | Discover accepted region filter values. |
+| `getTopHeadlines` | `GET /beans/articles/top-headlines` | What is attracting attention in the fixed recent window? |
+| `getLatestArticles` | `GET /beans/articles/latest` | What was published most recently? |
+| `getTrendingArticles` | `GET /beans/articles/trending` | Which Articles are gaining attention? |
+| `searchArticles` | `GET /beans/articles/search` | Which publisher Articles match this topic or filter? |
+| `listSources` | `GET /beans/sources` | Which publisher Sources match metadata filters? |
+| `getArticleMentions` | `GET /beans/articles/{id}/mentions` | Where was this Article URL observed externally? |
+| `getArticle` | `GET /beans/articles/{id}` | What did this known Article say? (`full_content=true` requests body when available.) |
+| `getSimilarArticles` | `GET /beans/articles/{id}/similar` | What related publisher reading exists? |
+| `getSource` | `GET /beans/sources/{id}` | What metadata applies to this Source UUID? |
+| `listSentiments` | `GET /beans/sentiments` | Discover accepted sentiment filter values. |
+| `listStories` | `GET /beans/stories` | Which Stories (stable UUIDs) match this topic or filter? |
+| `getStory` | `GET /beans/stories/{id}` | What is this Story, including member-Article path metadata? |
+| `listStoryArticles` | `GET /beans/stories/{id}/articles` | Which member Articles belong to this Story? |
 
-Recommended Beans workflow:
+`content_type` filters Articles by type. `post` is response-only: it may appear on returned Articles, but `content_type=post` is rejected with HTTP `400`. The other 14 types remain valid filters. Omit `content_type` to include all types.
 
-1. Discover a filter value only when its spelling is unknown.
-2. Search or select a feed based on the question.
-3. Read the selected Article UUID from data[].id.
-4. Retrieve detail only for selected Articles.
-5. Follow similar or mentions only when the question needs them.
-6. Send pagination.next_cursor unchanged as cursor.
+### Beans tool sequencing
 
-content_type accepts every stored type listed in the Beans contract. Omit it to include all stored types; provider-only pr is not a Beans alias.
+1. Call `listCategories`, `listEntities`, `listRegions`, or `listSentiments` only when a filter spelling is unknown.
+2. Choose a collection: `searchArticles`, `getLatestArticles`, `getTopHeadlines`, `getTrendingArticles`, or `listStories`.
+3. Read selected UUIDs from `data[].id`.
+4. Call `getArticle` or `getStory` only for selected IDs.
+5. Call `listStoryArticles` after a Story UUID when the user needs member Articles.
+6. Call `getSimilarArticles` or `getArticleMentions` only when the question needs related reading or external observations.
+7. Call `listSources` / `getSource` for publisher metadata, not for Article bodies.
+8. Send `pagination.next_cursor` unchanged as the next `cursor` on the same tool with the same filters. Beans collections do not serialize `pagination.cursor`.
 
-## Espresso tool selection
+## Espresso MCP catalog
 
-Use Espresso when the user asks what happened, what it means, impact, outlook, or supporting evidence.
+Exported tools are exactly the 13 operations on `/espresso/mcp`. `healthCheck` and `espressoMcp` are **not** tools.
 
-| Tool | REST path | Answers |
+| Tool | REST equivalent | Use when |
 | --- | --- | --- |
-| searchEvents | GET /espresso/events | Which concrete developments match? |
-| getEvent | `GET /espresso/events/{event_id}` | What is this selected Event? |
-| getEventEvidence | `GET /espresso/events/{event_id}/evidence` | What supports this Event? |
-| getEventSignals | `GET /espresso/events/{event_id}/signals` | Which Signals are related? |
-| searchSignals | GET /espresso/signals | Which conclusions or outlooks match? |
-| getSignal | `GET /espresso/signals/{signal_id}` | What is this Signal? |
-| getSignalEvents | `GET /espresso/signals/{signal_id}/events` | Which Events support it? |
+| `searchEvents` | `GET /espresso/events` | Which concrete developments match? (what happened) |
+| `getEvent` | `GET /espresso/events/{event_id}` | What is this selected Event? |
+| `getEventEvidence` | `GET /espresso/events/{event_id}/evidence` | What supports this Event? |
+| `getEventSignals` | `GET /espresso/events/{event_id}/signals` | Which Signals are related to this Event? |
+| `searchSignals` | `GET /espresso/signals` | Which conclusions, impact, or outlooks match? |
+| `getSignal` | `GET /espresso/signals/{signal_id}` | What is this Signal? |
+| `getSignalEvents` | `GET /espresso/signals/{signal_id}/events` | Which Events support this Signal? |
+| `listIntelligenceSources` | `GET /espresso/sources` | Which intelligence Sources match metadata? |
+| `getIntelligenceSource` | `GET /espresso/sources/{source_id}` | What is this Source UUID? |
+| `listIntelligenceTags` | `GET /espresso/tags` | Discover fuzzy tag vocabulary for Event and Signal filters. |
+| `listIntelligenceEntities` | `GET /espresso/entities` | Discover exact company or people filter values. |
+| `listIntelligenceRegions` | `GET /espresso/regions` | Discover exact region filter values. |
+| `listIntelligenceEventTypes` | `GET /espresso/event-types` | Discover exact `event_types` filter values. |
 
-Do not use Beans to answer a structured Event or Signal question. Do not use Espresso when the user needs Article URLs, publisher text, or source coverage.
+`categories` is not an alias for `event_types`. Espresso `from` / `to` bound record `created_at`. JSON, YAML, and TOON collection payloads share the same fields, including pagination.
+
+### Espresso tool sequencing
+
+1. Call `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, or `listIntelligenceTags` only when a filter value is unknown.
+2. If the user asks what **happened**, call `searchEvents`. If they ask what it **means**, impact, or outlook, call `searchSignals`.
+3. Read selected UUIDs from `data[].id`.
+4. Call `getEvent` or `getSignal` only for selected IDs.
+5. Call `getEventEvidence` after an Event UUID when the user needs supporting context or available URLs.
+6. Call `getEventSignals` or `getSignalEvents` to walk Event ↔ Signal links.
+7. Call `listIntelligenceSources` / `getIntelligenceSource` for provenance metadata, not for Event bodies.
+8. Continue pages by sending `pagination.next_cursor` unchanged as `cursor`. Espresso collections do not serialize `pagination.cursor`.
+
+## Agent rules
+
+- Prefer the hosted MCP tools above over inventing REST paths. Tool names must match this catalog.
+- Carry IDs exactly as returned (RFC 4122 UUIDs). Do not invent IDs.
+- Empty collections are success with `data: []`. Missing detail IDs are not found.
+- Cite Beans Article `url` for publisher reading. Cite Espresso evidence URLs and Source IDs for structured claims.
+- Do not claim an official Cafecito SDK or client library.

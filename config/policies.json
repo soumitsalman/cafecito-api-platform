@@ -5,7 +5,7 @@
         "export": "ApiKeyInboundPolicy",
         "module": "$import(@zuplo/runtime)",
         "options": {
-          "allowUnauthenticatedRequests": true,
+          "allowUnauthenticatedRequests": false,
           "cacheTtlSeconds": 300
         }
       },
@@ -38,8 +38,8 @@
         "export": "RateLimitInboundPolicy",
         "module": "$import(@zuplo/runtime)",
         "options": {
-          "rateLimitBy": "user",
-          "requestsAllowed": 10,
+          "rateLimitBy": "function",
+          "requestsAllowed": 100,
           "timeWindowMinutes": 1,
           "identifier": {
             "export": "rateLimit",
@@ -47,7 +47,7 @@
           }
         }
       },
-      "name": "paiduser-rate-limit-inbound",
+      "name": "freeuser-rate-limit-inbound",
       "policyType": "rate-limit-inbound"
     },
     {
@@ -65,6 +65,23 @@
       },
       "name": "freeuser-quota-inbound",
       "policyType": "quota-inbound"
+    },
+    {
+      "handler": {
+        "export": "RateLimitInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "rateLimitBy": "function",
+          "requestsAllowed": 1000,
+          "timeWindowMinutes": 1,
+          "identifier": {
+            "export": "rateLimit",
+            "module": "$import(./modules/tiered-rate-limit)"
+          }
+        }
+      },
+      "name": "paiduser-rate-limit-inbound",
+      "policyType": "rate-limit-inbound"
     },
     {
       "handler": {
@@ -93,19 +110,6 @@
         }
       },
       "name": "infra-rate-limit-inbound",
-      "policyType": "rate-limit-inbound"
-    },
-    {
-      "handler": {
-        "export": "RateLimitInboundPolicy",
-        "module": "$import(@zuplo/runtime)",
-        "options": {
-          "rateLimitBy": "user",
-          "requestsAllowed": 100,
-          "timeWindowMinutes": 1
-        }
-      },
-      "name": "freeuser-rate-limit-inbound",
       "policyType": "rate-limit-inbound"
     }
   ]

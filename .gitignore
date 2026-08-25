@@ -41,4 +41,5 @@ skills-lock.json
 
 __pycache__
 
-scripts
+# Optional local dumps from contract verifiers (scripts/*.mjs stay tracked)
+scripts/*.report.json

@@ -17,6 +17,12 @@ const clerkJwtTemplateName =
  * https://zuplo.com/docs/dev-portal/zudoku/configuration/overview
  */
 const config: ZudokuConfig = {
+  canonicalUrlOrigin: "https://developer.cafecito.tech",
+  sitemap: {
+    siteUrl: "https://developer.cafecito.tech",
+    changefreq: "weekly",
+    exclude: ["/account", "/settings", "/oauth/callback", "/404"],
+  },
   site: {
     title: "Cafecito Developer Portal",
     logo: {
@@ -46,10 +52,42 @@ const config: ZudokuConfig = {
     },
   },
   metadata: {
-    title: "Cafecito Developer Portal",
-    description: "Developer documentation for Cafecito APIs & MCPs. Project Cafecito offers AI tools to automate business tasks like news, PR and medical billing.",
-    keywords: ["AI automation", "business tools", "billing software", "PR management", "news api", "news mcp", "market intelligence", "tech startup"],
+    title: "%s | Cafecito Developer Portal",
+    description:
+      "Developer docs for Cafecito REST APIs and MCP servers. Beans is a news and publisher-content API. Espresso is a market, business, event, and news intelligence API. One API key; Cortado and Latte are future products.",
+    applicationName: "Cafecito Developer Portal",
+    logo: "https://developer.cafecito.tech/cafecito-banner.png",
     favicon: "/cafecito-dark.png",
+    keywords: [
+      "news API",
+      "blog API",
+      "publisher content API",
+      "article search API",
+      "earnings reports API",
+      "financial reports API",
+      "lawsuit monitoring",
+      "litigation news",
+      "press releases",
+      "official statements",
+      "research papers",
+      "technical documents",
+      "story clustering",
+      "news MCP",
+      "market intelligence API",
+      "business intelligence API",
+      "event intelligence API",
+      "news intelligence API",
+      "event monitoring",
+      "company monitoring",
+      "impact",
+      "outlook",
+      "evidence",
+      "provenance",
+      "GDELT comparison",
+      "Perigon comparison",
+      "MCP tools",
+      "AI research workflows",
+    ],
   },
   theme: {
     light: {
@@ -199,7 +237,10 @@ const config: ZudokuConfig = {
           collapsed: true,
           items: [
             { type: "doc", file: "guides/mcp-ai-agents", path: "/guides/mcp-ai-agents" },
+            { type: "doc", file: "guides/cross-product-workflow", path: "/guides/cross-product-workflow" },
             { type: "doc", file: "guides/api-conventions", path: "/guides/api-conventions" },
+            { type: "doc", file: "guides/client-patterns", path: "/guides/client-patterns" },
+            { type: "doc", file: "guides/troubleshooting", path: "/guides/troubleshooting" },
             { type: "doc", file: "guides/pricing-limits", path: "/guides/pricing-limits" },
           ],
         },
@@ -250,6 +291,8 @@ const config: ZudokuConfig = {
     { from: "/howtos/cortado-howto", to: "/products/cortado" },
     { from: "/howtos/mcp-howto", to: "/guides/mcp-ai-agents" },
     { from: "/pricing", to: "/guides/pricing-limits" },
+    { from: "/guides/cross-product-workflows", to: "/guides/cross-product-workflow" },
+    { from: "/start/troubleshooting", to: "/guides/troubleshooting" },
   ],
   apis: [
     {

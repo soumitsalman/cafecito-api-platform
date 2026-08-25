@@ -1,33 +1,48 @@
 ---
-title: Migration
-description: Migrate article, news, blog, and publisher workflows to the Beans Article and Source API.
+title: Migrate to the Beans Publisher Content API
+description: Map TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io workflows to Beans Articles, Sources, Stories, and feeds.
 ---
 
 # Migrate to Beans
 
-Beans is a read-only publisher-content API for finding, checking, and citing Articles. It is designed for workflows that need publisher text and metadata. It is not a business-intelligence API; use [Espresso](/products/espresso) for Events, Signals, evidence, and synthesized conclusions.
+Beans is a read-only publisher-content API for news, blogs, earnings and financial reports, litigation, official statements, research, technical documents, and coverage context. It is designed for workflows that need publisher text and metadata. It is not a business-intelligence API; use [Espresso](/products/espresso) for Events, Signals, evidence, and synthesized conclusions.
+
+These provider names are comparison patterns, not a claim of identical fields or content rights.
 
 ## Choose the right target
 
 | If your current workflow needs | Use Beans | Notes |
 | --- | --- | --- |
 | Topic, identity, Source, or URL search | `GET /beans/articles/search` | Use `q` for natural-language search, `ids` or `urls` for exact lookup, and Article filters for narrowing. |
-| A newest-first publication feed | `GET /beans/articles/latest` | Use inclusive `from` and `to` dates when the recent default window is not sufficient. |
-| A fixed recent headline feed | `GET /beans/articles/top-headlines` | This route uses a fixed recent window and does not accept custom date bounds. |
-| Attention-ranked Articles | `GET /beans/articles/trending` | Use the date window and follow cursor pagination. Trend metrics may be absent. |
-| Detail for one selected Article | `GET /beans/articles/{id}` | Use after a collection result provides the Article UUID. Request `full_content=true` only when the body is needed. |
+| A newest-first publication feed | `GET /beans/articles/latest` | Does not accept `ids`, `urls`, `from`, or `to`. |
+| A fixed recent headline feed | `GET /beans/articles/top-headlines` | Fixed 24-hour news window. Does not accept `content_type`, `ids`, `urls`, `from`, or `to`. |
+| Attention-ranked Articles | `GET /beans/articles/trending` | Does not accept `ids`, `urls`, `from`, or `to`. Trend metrics may be absent. |
+| Detail for one selected Article | `GET /beans/articles/{id}` | Use after a collection result provides the Article UUID. Request `full_content=true` only when the body is needed; availability is not guaranteed. |
 | Related publisher reading | `GET /beans/articles/{id}/similar` | Results are related reading and are not a guarantee of durable Story membership. |
 | External observations about an Article URL | `GET /beans/articles/{id}/mentions` | Mentions are observations on external platforms, not publisher Articles. |
 | Publisher metadata | `GET /beans/sources` or `GET /beans/sources/{id}` | Resolve Source UUIDs for citations or Article Source filters. |
 | Normalized filter values | `GET /beans/categories`, `/entities`, `/regions`, or `/sentiments` | Discover values before sending Article filters. |
 
+## Provider migration matrix
+
+| Coming from | Typical task | Beans replacement |
+| --- | --- | --- |
+| TheNewsAPI | Article cards, source catalog, related articles | Article search, Sources, Similar Articles |
+| World News API | Search, top news, entity and source filters | Article search, top-headlines, discovery, Source filters |
+| GNews | Search, latest, ranked headlines | Article search, latest, top-headlines |
+| finlight | Financial news and company-related monitoring | Article search with `earnings_report` or `financial_report`, entities, Sources |
+| NewsAPI.ai / Event Registry | News/blog selection, concepts, categories, duplicates, analysis | Article search, filterable content types, labels, Stories, related coverage. Synthesized analysis belongs in Espresso. |
+| NewsData.io | Search, continuation, AI tags, sentiment, full content | Article search, cursor pagination, normalized labels, `full_content=true` when available |
+
+Behavioral differences: Beans uses cursor pagination, UUID identifiers, strict query validation (unknown parameters return HTTP 400), and response-only `post`. Full-content is requested, not guaranteed.
+
 ## Public content types
 
-Beans V1 exposes all stored public `content_type` values:
+Request `content_type` accepts:
 
-`blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `post`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`
+`blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`
 
-Omit `content_type` to include all stored types. Provider labels such as `pr` are not aliases.
+`post` may appear on Article responses. `content_type=post` returns HTTP 400. Omit `content_type` to include all stored types. Provider labels such as `pr` are not aliases.
 
 ## Translate the data model
 
@@ -60,11 +75,11 @@ Do not fetch detail for every search result. Collection items are intended to he
 | Natural-language topic search | `q` on search or feed routes | Semantic search. |
 | Search strictness | `score_threshold` with `q` | Requires `q`; higher values are stricter. |
 | Exact Article lookup | `ids` or `urls` on search | Exact UUID or URL matching. |
-| Public content type | `content_type` | Any stored type listed above; omission means all stored types. |
+| Public content type | `content_type` | One of the 14 filterable types. `post` is response-only. |
 | Publisher or domain narrowing | `sources`, `domains`, `exclude_sources`, or `exclude_domains` | Use Source UUIDs or domain values as documented by the route. |
 | Article labels | `authors`, `categories`, `exclude_categories`, `entities`, `regions`, `sentiments`, or `tags` | Include values within one field use OR; different fields combine with AND. |
-| Publication bounds | `from` and `to` | Inclusive `YYYY-MM-DD` bounds on routes that support them. |
-| Larger Article projection | `full_content=true` | Requests available body content and may increase payload size. |
+| Publication bounds | `from` and `to` | Inclusive `YYYY-MM-DD` bounds on search, similar, Stories, Story Articles, and mention `observed_at`. Not accepted on latest, trending, or top-headlines. |
+| Larger Article projection | `full_content=true` | Requests body content when Beans has it. Handle missing `content` and cite `url`. |
 
 ## Adapt pagination and responses
 
@@ -89,7 +104,8 @@ Beans collections use one stable JSON envelope:
 - An empty collection is a successful HTTP 200 response with `data: []`.
 - Detail routes return `{ "data": { ... } }`; a missing Article, Source, or Story returns HTTP 404.
 - Do not construct an `offset` or `page` parameter. Beans V1 uses cursor pagination.
-- Error responses use the standard error envelope with HTTP 400, 401, 404, 429, or 500 as applicable.
+- Error responses use `{ "error": { "code", "message" } }` with HTTP 400, 401, 404, 429, or 500 as applicable.
+- Extra query parameters that a previous provider ignored now return HTTP 400 on Beans.
 
 ## Migration checklist
 
@@ -97,10 +113,11 @@ Beans collections use one stable JSON envelope:
 2. Change collection parsing to read `data`, `pagination`, and `meta`.
 3. Store Article, Source, and Story UUIDs as opaque identifiers.
 4. Replace offset or page construction with pass-through use of `pagination.next_cursor`.
-5. Accept every stored type listed above; do not translate stored kinds or provider `pr` labels into Beans values.
-6. Treat `from` and `to` as route-specific date bounds in `YYYY-MM-DD` form.
+5. Use only the 14 filterable request types; treat `post` as a response value.
+6. Treat `from` and `to` as route-specific date bounds in `YYYY-MM-DD` form. Do not send them on feed routes.
 7. Fetch Article detail, similar Articles, or mentions only after a collection call selects an Article; fetch Story detail and member Articles only after a Story collection selects a Story UUID.
 8. Keep Espresso Events, Signals, and evidence workflows on the Espresso product.
+9. Stop sending undocumented query keys.
 
 ## Next steps
 

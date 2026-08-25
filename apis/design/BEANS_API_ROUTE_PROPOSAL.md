@@ -1,10 +1,33 @@
 # Beans API Target Design and Implementation Specification
 
-Status: Target design and implementation specification  
-Updated: 2026-08-17  
-Scope: Beans News, Blogs, and Publisher Content API only  
-Excluded: Espresso Events and Signals API  
-Comparison baseline: [NEWS_AND_BLOG_API_MARKET_REPORT.md](NEWS_AND_BLOG_API_MARKET_REPORT.md)
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None for live API behavior |
+| Audience | Historical design readers |
+| Last verified | 2026-08-25 |
+| Owner role | Product design (archival) |
+| Superseded by | [`config/beans.oas.json`](../../config/beans.oas.json) and portal `/api/beans` |
+
+**Published V1 collection envelope (authoritative; do not implement the narrower examples below as live contract):**
+
+```json
+{
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "num_results": 0,
+    "next_cursor": null
+  },
+  "meta": {
+    "as_of": "2026-08-25T00:00:00Z"
+  }
+}
+```
+
+`pagination.num_results` is this page only. `meta.as_of` is present on collection responses. Empty collections are HTTP 200 with `data: []`. JSON blocks later in this file that omit `num_results` or restrict `as_of` to selected routes are **historical target sketches**.
+
+Scope: Beans News, Blogs, and Publisher Content API only. Excluded: Espresso. Comparison baseline: [NEWS_AND_BLOG_API_MARKET_REPORT.md](NEWS_AND_BLOG_API_MARKET_REPORT.md).
 
 ## 1. Purpose and product boundary
 
@@ -247,30 +270,35 @@ are not accepted as query parameters.
 
 ### 3.3 Collection, detail, and error responses
 
-Collections use:
+**Published collections** (this document is superseded; keep this block aligned with OAS):
 
 ~~~json
 {
+  "data": [],
   "pagination": {
     "limit": 20,
-    "next_cursor": "opaque-token-or-null"
+    "num_results": 0,
+    "next_cursor": null
   },
-  "data": []
+  "meta": {
+    "as_of": "2026-08-25T00:00:00Z"
+  }
 }
 ~~~
 
 Rules:
 
 - `pagination.limit` echoes the effective request value.
+- `pagination.num_results` is the number of records **in this page**, not a
+  total-match count.
 - `pagination.next_cursor` is an opaque string when another page is available;
   clients send it back unchanged as `cursor`. It is `null` when traversal is
   complete.
 - Beans does not return `found`, `returned`, `page`, `next_page`, or an exact
-  total in collection responses. The number of records in the current response
-  is `data.length`.
+  collection total.
 - Empty collections return HTTP 200 with `data: []` and `next_cursor: null`.
-- `meta.as_of` is included when a response depends on changing trend, Story, or
-  mention observations. It is omitted for direct Article and Source reads.
+- `meta.as_of` is the UTC time this collection snapshot was produced. It is
+  present on collection responses.
 
 The cursor is bound to the result ordering, filters, and effective limit. A
 client that changes any of these begins a new traversal without a cursor. This
@@ -779,7 +807,7 @@ The B09 top-level response contains exactly these fields:
 | Field | Rule |
 |---|---|
 | data | Required array of the canonical Story objects defined in Section 3.6. B09 items do not contain `links`. |
-| pagination | Required object containing exactly `limit` and `next_cursor`. |
+| pagination | Required object containing `limit`, `num_results` (this page), and `next_cursor`. |
 | meta | Required object containing exactly `as_of`. |
 
 The response does not contain `success`, `status`, `results`, `news`,
@@ -906,7 +934,7 @@ The B11 top-level response contains exactly these fields:
 | Field | Rule |
 |---|---|
 | data | Required array of member Article objects. |
-| pagination | Required object containing exactly `limit` and `next_cursor`. |
+| pagination | Required object containing `limit`, `num_results` (this page), and `next_cursor`. |
 | meta | Required object containing exactly `story_id` and `as_of`. |
 
 Each B11 `data` item contains exactly the following Article fields:

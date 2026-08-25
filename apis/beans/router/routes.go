@@ -1,3 +1,17 @@
+// @title 			Beans News API & MCP
+// @version 		1.0
+// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+// @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
+// @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
+// @description Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
+// @schemes 		https
+// @license.name 	MIT
+// @contact.name 	Project Cafecito
+// @contact.url  	https://cafecito.tech
+// @contact.email 	soumitsrah@cafecito.tech
+// @securityDefinitions.apikey BackendAPIKey
+// @in header
+// @name X-API-KEY
 package router
 
 import (
@@ -77,6 +91,27 @@ func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*
 		Entities:          utils.NormalizeTags(p.Entities),
 		Regions:           utils.NormalizeTags(p.Regions),
 		FullContent:       p.FullContent,
+	}
+	return &filters, nil
+}
+
+func (p *topHeadlinesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters := db.BeanFilters{
+		Sources:           p.Sources,
+		ExcludeSources:    p.ExcludeSources,
+		Domains:           utils.NormalizeTexts(p.Domains),
+		ExcludeDomains:    utils.NormalizeTexts(p.ExcludeDomains),
+		Authors:           p.Authors,
+		Tags:              utils.NormalizeTags(p.Tags),
+		Categories:        utils.NormalizeTags(p.Categories),
+		ExcludeCategories: utils.NormalizeTags(p.ExcludeCategories),
+		Sentiments:        utils.NormalizeTags(p.Sentiments),
+		Entities:          utils.NormalizeTags(p.Entities),
+		Regions:           utils.NormalizeTags(p.Regions),
+		FullContent:       p.FullContent,
+	}
+	if err := p.vectorSearchParams.attachToFilters(c, r, &filters); err != nil {
+		return nil, err
 	}
 	return &filters, nil
 }
@@ -203,39 +238,45 @@ func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next
 // Uses InternalServerError for DB, Embedding, Encoding errors and default cases
 func writeError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
+	body := ErrorBody{Code: utils.API_ERROR_DB_ERROR, Message: err.Error()}
 	if api_err, ok := err.(utils.APIError); ok {
+		body.Code = api_err.Code
+		body.Message = api_err.Message
 		switch api_err.Code {
 		case utils.API_ERROR_INVALID_REQUEST:
 			status = http.StatusBadRequest
 		case utils.API_ERROR_NOT_FOUND:
 			status = http.StatusNotFound
+		case utils.API_ERROR_UNAUTHORIZED:
+			status = http.StatusUnauthorized
 		}
 	}
-	c.AbortWithStatusJSON(status, ErrorResponse{Error: err})
+	c.AbortWithStatusJSON(status, ErrorResponse{Error: body})
 }
 
 // health godoc
 // @Summary Check API health
-// @Description Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.
+// @Description Lightweight liveness probe. No authentication required.
 // @Tags Health
 // @Produce json
-// @Success 200 {object} map[string]string "status alive"
+// @Success 200 {object} HealthResponse "status alive"
 // @ID healthCheck
 // @Router /health [get]
 func (r *Configuration) health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	c.JSON(http.StatusOK, HealthResponse{Status: "alive"})
 }
 
 // searchArticles godoc
 // @Summary Search Articles
 // @Description Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional relevance query." maxlength(512)
 // @Param score_threshold query number false "Optional relevance threshold used with q." minimum(0) maximum(1)
 // @Param ids query []string false "Exact Article UUIDs (CSV)." collectionFormat(csv)
 // @Param urls query []string false "Exact Article URLs (CSV)." collectionFormat(csv)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -289,10 +330,11 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Summary List latest Articles
 // @Description Returns Articles ordered newest first. Date bounds are not accepted.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
 // @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -353,10 +395,11 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @Summary List trending Articles
 // @Description Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
 // @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -421,6 +464,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Summary List top headlines
 // @Description Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
 // @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
@@ -446,7 +490,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @ID getTopHeadlines
 // @Router /top-headlines [get]
 func (r *Configuration) getTopHeadlines(c *gin.Context) {
-	var params articleFeedParams
+	var params topHeadlinesParams
 	if err := params.shouldBind(c); err != nil {
 		writeError(c, err)
 		return
@@ -479,6 +523,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 // @Summary Get an Article
 // @Description Returns one Article selected by UUID. Set full_content=true to request content when available.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Article UUID." format(uuid)
 // @Param full_content query bool false "Include content when available." default(false)
@@ -513,9 +558,10 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // @Summary List related Articles
 // @Description Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Article UUID." format(uuid)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -574,6 +620,7 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 // @Summary List Article mentions
 // @Description Returns external platform or forum observations for an Article UUID, ordered by observation time.
 // @Tags Articles
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Article UUID." format(uuid)
 // @Param platforms query []string false "Mention platforms (CSV)." collectionFormat(csv)
@@ -623,6 +670,7 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 // @Summary List Sources
 // @Description Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.
 // @Tags Sources
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional Source prefix query." maxlength(512)
 // @Param ids query []string false "Source ids (CSV)." collectionFormat(csv)
@@ -665,6 +713,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 // @Summary Get a Source
 // @Description Returns one publisher Source selected by UUID.
 // @Tags Sources
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Source UUID." format(uuid)
 // @Success 200 {object} SourceDetailResponse
@@ -699,6 +748,7 @@ func (r *Configuration) getSource(c *gin.Context) {
 // @Summary List entity labels
 // @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
@@ -718,6 +768,7 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @Summary List region labels
 // @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
@@ -737,6 +788,7 @@ func (r *Configuration) getRegions(c *gin.Context) {
 // @Summary List category labels
 // @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
@@ -756,6 +808,7 @@ func (r *Configuration) getCategories(c *gin.Context) {
 // @Summary List sentiment labels
 // @Description Lists values accepted by the corresponding Article filter.
 // @Tags Discovery
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
@@ -796,10 +849,11 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 // @Summary List Stories
 // @Description Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.
 // @Tags Stories
+// @Security BackendAPIKey
 // @Produce json
 // @Param q query string false "Optional Story relevance query." maxlength(512)
 // @Param score_threshold query number false "Optional Story relevance threshold; requires q." minimum(0) maximum(1)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -877,6 +931,7 @@ func (r *Configuration) getStories(c *gin.Context) {
 // @Summary Get a Story
 // @Description Returns one Story selected by its stable UUID, including a link to its paginated member Articles.
 // @Tags Stories
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Story UUID." format(uuid)
 // @Success 200 {object} StoryDetailResponse "Story detail envelope"
@@ -910,9 +965,10 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @Summary List Story Articles
 // @Description Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.
 // @Tags Stories
+// @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Story UUID." format(uuid)
-// @Param content_type query string false "Stored Article type." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
 // @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
 // @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
 // @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
@@ -1047,7 +1103,7 @@ func (r *Configuration) apiKeyMiddleware(c *gin.Context) {
 			return
 		}
 	}
-	writeError(c, utils.NewAPIError(utils.API_ERROR_UNAUTHORIZED, "Missing API Key"))
+	writeError(c, utils.NewAPIError(utils.API_ERROR_UNAUTHORIZED, "Missing or invalid API key"))
 }
 
 // requestLogger logs request path, query parameters, status and latency in JSON via zerolog

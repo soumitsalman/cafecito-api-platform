@@ -1,9 +1,11 @@
 ---
-title: Workflows
-description: Compose Espresso Events, Signals, evidence, Sources, discovery, and pagination into multi-call agent workflows.
+title: Espresso Workflows for Evidence and Business Intelligence
+description: Compose Espresso Events, Signals, evidence, and pagination into monitoring, research-brief, and early-warning workflows.
 ---
 
 # Espresso for Your Workflows
+
+Espresso is market and event intelligence: Events for what happened, Signals for impact or outlook, evidence for why you should trust the conclusion.
 
 Espresso answers richer questions through a small sequence of focused calls. Start with the route that matches the user question, carry forward only returned IDs or filter values, and stop once the answer has enough support.
 
@@ -17,7 +19,7 @@ Every REST scenario includes a complete JavaScript and Python implementation alo
 | Read IDs from `data[].id` and preserve them exactly. | Event, Signal, and Source UUIDs are the handoff between calls. |
 | Use discovery only when an exact value is unknown. | Known normalized values can go directly into a search. |
 | Keep fuzzy `tags` separate from exact structured filters. | `categories`, `event_types`, `companies`, `people`, `products`, and `regions` use exact snake_case values. |
-| Treat `pagination.next_cursor` as opaque. | Send it back unchanged as `cursor`; `num_results` is only the count for the current page. |
+| Treat `pagination.next_cursor` as opaque. | First page `cursor` is null. Later pages echo the request cursor. Send `next_cursor` unchanged as `cursor`. |
 | Request detail, evidence, or support only for selected records. | This keeps agent context small and the answer traceable. |
 
 ## Scenario 1: Discover vocabulary, find Events, then inspect evidence
@@ -640,9 +642,88 @@ curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
 ```
 </CodeTabs>
 
-`pagination.num_results` is not a total-match count. Do not infer a global total from it or attempt to manufacture the next token.
+`pagination.num_results` is not a total-match count. Do not infer a global total from it or attempt to manufacture the next token. Collections do not return `pagination.cursor`; send `pagination.next_cursor` unchanged as the next request `cursor`.
 
-## Scenario 6: Use MCP with token-optimized results
+## Scenario 6: Company or sector monitor
+
+**Use when:** You need a repeating watch on a company, sector, region, or topic.
+
+**Call sequence:**
+
+1. Discover filter values only if spelling is unknown (`/entities`, `/regions`, `/event-types`, `/tags`).
+2. Search Events with the smallest useful filter set and a bounded `from`.
+3. Continue pagination while `next_cursor` is non-null, keeping filters unchanged.
+4. Enrich Event detail or evidence only for new or high-impact IDs.
+
+```bash
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "companies=nvidia" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "limit=20"
+
+# Next page: echo pagination.next_cursor as cursor.
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "companies=nvidia" \
+  --data-urlencode "from=2026-08-01" \
+  --data-urlencode "cursor=OPAQUE_NEXT_CURSOR" \
+  --data-urlencode "limit=20"
+```
+
+## Scenario 7: Evidence-backed market brief
+
+**Use when:** The user needs an outlook or implication with citations.
+
+**Call sequence:**
+
+1. Search Signals for the market, policy, or risk question.
+2. Retrieve Signal detail for one selected ID.
+3. List supporting Events, then inspect evidence and Sources for the Events you will cite.
+4. Present `meta.as_of` as freshness.
+
+```bash
+curl -s --get "${BASE_URL}/espresso/signals" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=semiconductor export controls" \
+  --data-urlencode "limit=5"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID/events?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+## Scenario 8: Early-warning workflow
+
+**Use when:** You want to alert only after a development has supporting evidence.
+
+**Call sequence:**
+
+1. Search Events for a bounded topic or region.
+2. Compare related Signals for the selected Event.
+3. Retain Event and Signal IDs and pagination cursors.
+4. Alert only after evidence is available for the selected Event.
+
+```bash
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "regions=gulf" \
+  --data-urlencode "q=shipping disruption" \
+  --data-urlencode "limit=10"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/signals?limit=10" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+## Scenario 9: Use MCP with token-optimized results
 
 **Use when:** An AI agent uses the hosted MCP server and must keep intermediate context compact.
 

@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "description": "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
+    "description": "Espresso is a market and business intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Errors** use `{ \"error\": { \"code\", \"message\" } }` for 400, 401, 404, 429, and 500.\n**Authentication**: REST operations (except `/espresso/health`) require `Authorization: Bearer <api_key>`.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.\n**Event and Signal fields**: Stable core is `id`, `kind`, `created_at`, and `tags`. `summary`, `source`, `links`, and `counts` are conditional. All other keys are extension fields; clients must ignore unknown extension fields.",
     "title": "Espresso API & MCP",
     "contact": {
       "name": "Project Cafecito",
@@ -31,8 +31,16 @@
       "description": "Persisted tag vocabulary for filtering Events and Signals"
     },
     {
+      "name": "Discovery",
+      "description": "Exact filter-value discovery for entities, regions, and event types"
+    },
+    {
       "name": "Health",
       "description": "Service health and liveness endpoints"
+    },
+    {
+      "name": "MCP",
+      "description": "Model Context Protocol endpoint and exported tools"
     },
     {
       "name": "General",
@@ -43,20 +51,35 @@
     "schemas": {
       "APIError": {
         "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "Machine-readable error code such as invalid_request, unauthorized, or not_found."
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable explanation of the failure."
           }
         }
       },
       "ErrorResponse": {
         "type": "object",
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "$ref": "#/components/schemas/APIError"
+          }
+        },
+        "example": {
+          "error": {
+            "code": "invalid_request",
+            "message": "Malformed cursor token"
           }
         }
       },
@@ -98,23 +121,22 @@
         "required": [
           "limit",
           "num_results",
-          "cursor",
           "next_cursor"
         ],
+        "description": "Collection pagination. Send next_cursor unchanged as the next request cursor. The response does not include a cursor echo field.",
         "properties": {
           "limit": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Page size requested for this response."
+          },
+          "num_results": {
+            "type": "integer",
+            "description": "Count of records in this page, not a total-match count."
           },
           "next_cursor": {
             "type": "string",
-            "nullable": true
-          },
-          "num_results": {
-            "type": "integer"
-          },
-          "cursor": {
-            "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Opaque continuation token. Send unchanged as the next request cursor."
           }
         }
       },
@@ -220,7 +242,62 @@
       },
       "EventDocument": {
         "type": "object",
-        "additionalProperties": {}
+        "description": "Public Event record. Stable core fields are always present. Conditional fields may be absent. Additional properties are extension fields; clients must ignore unknown extension fields.",
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "tags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable Event identifier."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "event"
+            ],
+            "description": "Resource kind. Always event for Event records."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Record creation time, not occurrence or publication time."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stable tag list used for fuzzy filtering."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Conditional short description of the Event."
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceDocument",
+            "description": "Conditional Source provenance when available."
+          },
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Conditional follow-up paths such as evidence or related Signals."
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Conditional related-record counts."
+          }
+        },
+        "additionalProperties": true
       },
       "EventEvidence": {
         "type": "object",
@@ -278,7 +355,62 @@
       },
       "SignalDocument": {
         "type": "object",
-        "additionalProperties": {}
+        "description": "Public Signal record. Stable core fields are always present. Conditional fields may be absent. Additional properties are extension fields; clients must ignore unknown extension fields.",
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "tags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable Signal identifier."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "signal"
+            ],
+            "description": "Resource kind. Always signal for Signal records."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Record creation time, not forecast or occurrence time."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stable tag list used for fuzzy filtering."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Conditional short description of the Signal."
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceDocument",
+            "description": "Conditional Source provenance when available."
+          },
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Conditional follow-up paths such as supporting Events."
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Conditional related-record counts."
+          }
+        },
+        "additionalProperties": true
       },
       "SourceDocument": {
         "type": "object",
@@ -320,6 +452,43 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SourceDocument"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API key",
+        "description": "Send `Authorization: Bearer <api_key>`. Health is unauthenticated."
+      }
+    },
+    "examples": {
+      "ErrorInvalidRequest": {
+        "summary": "Invalid request",
+        "value": {
+          "error": {
+            "code": "invalid_request",
+            "message": "Malformed cursor token"
+          }
+        }
+      },
+      "ErrorUnauthorized": {
+        "summary": "Missing or invalid API key",
+        "value": {
+          "error": {
+            "code": "unauthorized",
+            "message": "Missing API Key"
+          }
+        }
+      },
+      "ErrorNotFound": {
+        "summary": "Missing detail resource",
+        "value": {
+          "error": {
+            "code": "not_found",
+            "message": "EVENT with this ID not found"
           }
         }
       }
@@ -622,11 +791,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/EventCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - UAE AI Programme adding Agentic AI focus\n  - Enclave42 launching verifiable AI inference service\n  - Syira AI expanding international presence with Doha office\n  event_type: ai_sector_expansion_in_middle_east\n  future_outlook: Continued expansion of AI infrastructure across GCC nations with\n    increased investment in agentic systems\n  id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n  impact_level: high\n  impacted_domains:\n  - artificial_intelligence\n  - technology\n  - business_development\n  - regional_economic_growth\n  impacts:\n  - Increased agentic AI adoption in UAE\n  - New AI inference capabilities deployed in Dubai\n  - International market entry by Syira AI\n  key_points:\n  - UAE AI Programme adds Agentic AI focus\n  - Enclave42 launches verifiable AI inference in Dubai\n  - Syira AI opens new Doha Office\n  kind: event\n  people:\n  - carrington_malin\n  summary: 'The Middle East AI News Minute highlights three major developments: UAE''s\n    AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable\n    AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate\n    accelerating AI adoption across regional markets. The UAE programme represents\n    a strategic shift toward autonomous AI applications, while Enclave42''s launch\n    addresses verification needs in enterprise settings. Syira''s expansion signals\n    growing foreign direct investment in AI talent and operations within the region.'\n  tags:\n  - artificial_intelligence\n  - regional_economic_growth\n  - business_development\n  - carrington_malin\n  - generative_ai_and_foundation_models\n  - artificial_intelligence_and_machine_learning\n  - ai_sector_expansion_in_middle_east\n  - technology\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:36:18.204225338Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - UAE AI Programme adding Agentic AI focus\n      - Enclave42 launching verifiable AI inference service\n      - Syira AI expanding international presence with Doha office\n    event_type: ai_sector_expansion_in_middle_east\n    future_outlook: Continued expansion of AI infrastructure across GCC nations with increased investment in agentic systems\n    id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n    impact_level: high\n    impacted_domains:\n      - artificial_intelligence\n      - technology\n      - business_development\n      - regional_economic_growth\n    impacts:\n      - Increased agentic AI adoption in UAE\n      - New AI inference capabilities deployed in Dubai\n      - International market entry by Syira AI\n    key_points:\n      - UAE AI Programme adds Agentic AI focus\n      - Enclave42 launches verifiable AI inference in Dubai\n      - Syira AI opens new Doha Office\n    kind: event\n    people:\n      - carrington_malin\n    summary: \"The Middle East AI News Minute highlights three major developments: UAE's AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate accelerating AI adoption across regional markets. The UAE programme represents a strategic shift toward autonomous AI applications, while Enclave42's launch addresses verification needs in enterprise settings. Syira's expansion signals growing foreign direct investment in AI talent and operations within the region.\"\n    tags:\n      - artificial_intelligence\n      - regional_economic_growth\n      - business_development\n      - carrington_malin\n      - generative_ai_and_foundation_models\n      - artificial_intelligence_and_machine_learning\n      - ai_sector_expansion_in_middle_east\n      - technology\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:36:18.204225338Z\"\n"
+                  }
                 }
               }
             }
@@ -637,6 +818,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -647,6 +833,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -662,7 +853,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -688,6 +879,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "searchEvents",
+            "description": "Search concrete Events. Use when the user asks what happened.",
+            "enabled": true
           }
         }
       }
@@ -820,6 +1017,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -830,6 +1032,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -840,6 +1047,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -855,7 +1067,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -881,6 +1093,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getEvent",
+            "description": "Retrieve one Event by UUID, including conditional source, links, and counts.",
+            "enabled": true
           }
         }
       }
@@ -1029,11 +1247,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/EventEvidenceCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n  kind: event\n  created_at: '2026-08-23T22:00:43-04:00'\n  tags:\n  - artificial_intelligence\n  - regional_economic_growth\n  - business_development\n  - carrington_malin\n  - generative_ai_and_foundation_models\n  - artificial_intelligence_and_machine_learning\n  - ai_sector_expansion_in_middle_east\n  - technology\n  source_id: 8d47f649-a937-5b3e-b912-23495c6a8c4d\n  url: https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai\n  base_url: www.middleeastainews.com\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:38:44.456102494Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n    kind: event\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    tags:\n      - artificial_intelligence\n      - regional_economic_growth\n      - business_development\n      - carrington_malin\n      - generative_ai_and_foundation_models\n      - artificial_intelligence_and_machine_learning\n      - ai_sector_expansion_in_middle_east\n      - technology\n    source_id: 8d47f649-a937-5b3e-b912-23495c6a8c4d\n    url: \"https://www.middleeastainews.com/p/uae-ai-programme-adds-agentic-ai\"\n    base_url: www.middleeastainews.com\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:38:44.456102494Z\"\n"
+                  }
                 }
               }
             }
@@ -1044,6 +1274,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -1054,6 +1289,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -1064,6 +1304,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -1079,7 +1324,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1105,6 +1350,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getEventEvidence",
+            "description": "List evidence supporting a selected Event.",
+            "enabled": true
           }
         }
       }
@@ -1302,7 +1553,7 @@
                             "riyadh",
                             "abu_dhabi"
                           ],
-                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                           "tags": [
                             "oman",
                             "riyadh",
@@ -1346,11 +1597,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/SignalCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: '2026-08-24T20:38:44.504323225Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: \"2026-08-24T20:38:44.504323225Z\"\n"
+                  }
                 }
               }
             }
@@ -1361,6 +1624,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -1371,6 +1639,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -1381,6 +1654,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -1396,7 +1674,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1422,6 +1700,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getEventSignals",
+            "description": "List Signals related to a selected Event.",
+            "enabled": true
           }
         }
       }
@@ -1473,7 +1757,8 @@
           }
         },
         "operationId": "healthCheck",
-        "parameters": []
+        "parameters": [],
+        "security": []
       }
     },
     "/espresso/signals": {
@@ -1679,7 +1964,7 @@
                             "riyadh",
                             "abu_dhabi"
                           ],
-                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                           "tags": [
                             "oman",
                             "riyadh",
@@ -1723,11 +2008,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/SignalCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:36:18.229694905Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:36:18.229694905Z\"\n"
+                  }
                 }
               }
             }
@@ -1738,6 +2035,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -1748,6 +2050,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -1763,7 +2070,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1789,6 +2096,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "searchSignals",
+            "description": "Search synthesized Signals. Use when the user asks what it means, impact, or outlook.",
+            "enabled": true
           }
         }
       }
@@ -1904,7 +2217,7 @@
                           "abu_dhabi"
                         ],
                         "source_id": null,
-                        "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                        "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                         "tags": [
                           "oman",
                           "riyadh",
@@ -1955,6 +2268,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -1965,6 +2283,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -1975,6 +2298,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -1990,7 +2318,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2016,6 +2344,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getSignal",
+            "description": "Retrieve one Signal by UUID.",
+            "enabled": true
           }
         }
       }
@@ -2306,11 +2640,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/EventCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - UAE AI Programme adding Agentic AI focus\n  - Enclave42 launching verifiable AI inference service\n  - Syira AI expanding international presence with Doha office\n  event_type: ai_sector_expansion_in_middle_east\n  future_outlook: Continued expansion of AI infrastructure across GCC nations with\n    increased investment in agentic systems\n  id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n  impact_level: high\n  impacted_domains:\n  - artificial_intelligence\n  - technology\n  - business_development\n  - regional_economic_growth\n  impacts:\n  - Increased agentic AI adoption in UAE\n  - New AI inference capabilities deployed in Dubai\n  - International market entry by Syira AI\n  key_points:\n  - UAE AI Programme adds Agentic AI focus\n  - Enclave42 launches verifiable AI inference in Dubai\n  - Syira AI opens new Doha Office\n  kind: event\n  people:\n  - carrington_malin\n  summary: 'The Middle East AI News Minute highlights three major developments: UAE''s\n    AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable\n    AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate\n    accelerating AI adoption across regional markets. The UAE programme represents\n    a strategic shift toward autonomous AI applications, while Enclave42''s launch\n    addresses verification needs in enterprise settings. Syira''s expansion signals\n    growing foreign direct investment in AI talent and operations within the region.'\n  tags:\n  - artificial_intelligence\n  - regional_economic_growth\n  - business_development\n  - carrington_malin\n  - generative_ai_and_foundation_models\n  - artificial_intelligence_and_machine_learning\n  - ai_sector_expansion_in_middle_east\n  - technology\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:38:44.545869075Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - UAE AI Programme adding Agentic AI focus\n      - Enclave42 launching verifiable AI inference service\n      - Syira AI expanding international presence with Doha office\n    event_type: ai_sector_expansion_in_middle_east\n    future_outlook: Continued expansion of AI infrastructure across GCC nations with increased investment in agentic systems\n    id: 3a479e3c-a87d-591e-bb6c-5c83c03b6a40\n    impact_level: high\n    impacted_domains:\n      - artificial_intelligence\n      - technology\n      - business_development\n      - regional_economic_growth\n    impacts:\n      - Increased agentic AI adoption in UAE\n      - New AI inference capabilities deployed in Dubai\n      - International market entry by Syira AI\n    key_points:\n      - UAE AI Programme adds Agentic AI focus\n      - Enclave42 launches verifiable AI inference in Dubai\n      - Syira AI opens new Doha Office\n    kind: event\n    people:\n      - carrington_malin\n    summary: \"The Middle East AI News Minute highlights three major developments: UAE's AI Programme now emphasizes agentic AI capabilities, Enclave42 has launched verifiable AI inference in Dubai, and Syira AI opened a new office in Doha. These moves indicate accelerating AI adoption across regional markets. The UAE programme represents a strategic shift toward autonomous AI applications, while Enclave42's launch addresses verification needs in enterprise settings. Syira's expansion signals growing foreign direct investment in AI talent and operations within the region.\"\n    tags:\n      - artificial_intelligence\n      - regional_economic_growth\n      - business_development\n      - carrington_malin\n      - generative_ai_and_foundation_models\n      - artificial_intelligence_and_machine_learning\n      - ai_sector_expansion_in_middle_east\n      - technology\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjNhNDc5ZTNjLWE4N2QtNTkxZS1iYjZjLTVjODNjMDNiNmE0MCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:38:44.545869075Z\"\n"
+                  }
                 }
               }
             }
@@ -2321,6 +2667,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -2331,6 +2682,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -2341,6 +2697,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -2356,7 +2717,7 @@
             }
           },
           "500": {
-            "description": "Database or embedder unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2382,6 +2743,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getSignalEvents",
+            "description": "List Events that support a selected Signal.",
+            "enabled": true
           }
         }
       }
@@ -2486,11 +2853,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- id: 8d47f649-a937-5b3e-b912-23495c6a8c4d\n  url: www.middleeastainews.com\n  domain: middleeastainews\n  name: null\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: '2026-08-24T20:38:45.111260573Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    id: 8d47f649-a937-5b3e-b912-23495c6a8c4d\n    url: www.middleeastainews.com\n    domain: middleeastainews\n    name: null\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: \"2026-08-24T20:38:45.111260573Z\"\n"
+                  }
                 }
               }
             }
@@ -2501,6 +2880,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -2511,6 +2895,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -2526,7 +2915,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2552,6 +2941,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "listIntelligenceSources",
+            "description": "Discover Source metadata for provenance.",
+            "enabled": true
           }
         }
       }
@@ -2630,6 +3025,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -2640,6 +3040,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -2650,6 +3055,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
                 }
               }
             }
@@ -2665,7 +3075,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2691,6 +3101,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "getIntelligenceSource",
+            "description": "Retrieve one Source by UUID.",
+            "enabled": true
           }
         }
       }
@@ -2797,11 +3213,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- value: microsoft\n  type: company\n- value: sam_altman\n  type: people\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwMDdfZmlyc3RfbGlnaHQiLCJ0eXBlIjoiY29tcGFueSJ9fQ\nmeta:\n  as_of: '2026-08-24T20:38:09.860031881Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    value: microsoft\n    type: company\n  -\n    value: sam_altman\n    type: people\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwMDdfZmlyc3RfbGlnaHQiLCJ0eXBlIjoiY29tcGFueSJ9fQ\nmeta:\n  as_of: \"2026-08-24T20:38:09.860031881Z\"\n"
+                  }
                 }
               }
             }
@@ -2812,16 +3240,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -2843,6 +3291,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "listIntelligenceEntities",
+            "description": "Discover exact company or people filter values.",
+            "enabled": true
           }
         }
       }
@@ -2932,11 +3386,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- value: north_america\n  type: region\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwIiwidHlwZSI6InJlZ2lvbiJ9fQ\nmeta:\n  as_of: '2026-08-24T20:38:12.441502467Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    value: north_america\n    type: region\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwIiwidHlwZSI6InJlZ2lvbiJ9fQ\nmeta:\n  as_of: \"2026-08-24T20:38:12.441502467Z\"\n"
+                  }
                 }
               }
             }
@@ -2947,16 +3413,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -2978,6 +3464,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "listIntelligenceRegions",
+            "description": "Discover exact region filter values.",
+            "enabled": true
           }
         }
       }
@@ -3067,11 +3559,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- value: price_increase\n  type: event_type\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwXzYwX21waF9hY2NlbGVyYXRpb24iLCJ0eXBlIjoiZXZlbnRfdHlwZSJ9fQ\nmeta:\n  as_of: '2026-08-24T20:38:23.220950257Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    value: price_increase\n    type: event_type\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiZXQiOnsidmFsdWUiOiIwXzYwX21waF9hY2NlbGVyYXRpb24iLCJ0eXBlIjoiZXZlbnRfdHlwZSJ9fQ\nmeta:\n  as_of: \"2026-08-24T20:38:23.220950257Z\"\n"
+                  }
                 }
               }
             }
@@ -3082,16 +3586,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -3113,6 +3637,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "listIntelligenceEventTypes",
+            "description": "Discover exact event_types filter values.",
+            "enabled": true
           }
         }
       }
@@ -3214,11 +3744,23 @@
               "application/yaml": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscoveryValueCollectionResponse"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n- value: startups\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiayI6IlxuXG5teV93aWZlX3F1aXR0ZXJfam9iX2VwaXNvZGVfc2NyaXB0X2FuYWx5c2lzIn0\nmeta:\n  as_of: '2026-08-24T20:36:55.938524571Z'\n"
+                  }
                 }
               },
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "live": {
+                    "summary": "Same payload as JSON",
+                    "value": "data:\n  -\n    value: startups\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6bnVsbCwiayI6IlxuXG5teV93aWZlX3F1aXR0ZXJfam9iX2VwaXNvZGVfc2NyaXB0X2FuYWx5c2lzIn0\nmeta:\n  as_of: \"2026-08-24T20:36:55.938524571Z\"\n"
+                  }
                 }
               }
             }
@@ -3229,6 +3771,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "$ref": "#/components/examples/ErrorInvalidRequest"
+                  }
                 }
               }
             }
@@ -3239,6 +3786,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
                 }
               }
             }
@@ -3254,7 +3806,7 @@
             }
           },
           "500": {
-            "description": "Database unavailable; retry",
+            "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3280,6 +3832,12 @@
               "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
+          },
+          "mcp": {
+            "type": "tool",
+            "name": "listIntelligenceTags",
+            "description": "Discover fuzzy tag vocabulary for Event and Signal filters.",
+            "enabled": true
           }
         }
       }
@@ -3287,9 +3845,9 @@
     "/espresso/mcp": {
       "post": {
         "summary": "Espresso MCP server",
-        "description": "Model Context Protocol (MCP) endpoint for the Espresso service. Exposes Espresso tools to MCP-compatible clients such as AI agents and LLM-powered applications.",
+        "description": "Model Context Protocol endpoint for Espresso. Authenticate with `Authorization: Bearer <api_key>`.\nExported tools (13): searchEvents, getEvent, getEventEvidence, getEventSignals, searchSignals, getSignal, getSignalEvents, listIntelligenceSources, getIntelligenceSource, listIntelligenceTags, listIntelligenceEntities, listIntelligenceRegions, listIntelligenceEventTypes.\nJSON, YAML, and TOON collection payloads share the same fields, including pagination.next_cursor.",
         "tags": [
-          "General"
+          "MCP"
         ],
         "requestBody": {
           "required": true,
@@ -3325,6 +3883,31 @@
                     "value": "404 page not found"
                   }
                 }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "$ref": "#/components/examples/ErrorNotFound"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "$ref": "#/components/examples/ErrorUnauthorized"
+                  }
+                }
               }
             }
           }
@@ -3340,55 +3923,81 @@
               "operations": [
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "searchEvents"
+                  "id": "searchEvents",
+                  "name": "searchEvents",
+                  "description": "Search concrete Events. Use when the user asks what happened."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getEvent"
+                  "id": "getEvent",
+                  "name": "getEvent",
+                  "description": "Retrieve one Event by UUID, including conditional source, links, and counts."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getEventEvidence"
+                  "id": "getEventEvidence",
+                  "name": "getEventEvidence",
+                  "description": "List evidence supporting a selected Event."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getEventSignals"
+                  "id": "getEventSignals",
+                  "name": "getEventSignals",
+                  "description": "List Signals related to a selected Event."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "searchSignals"
+                  "id": "searchSignals",
+                  "name": "searchSignals",
+                  "description": "Search synthesized Signals. Use when the user asks what it means, impact, or outlook."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getSignal"
+                  "id": "getSignal",
+                  "name": "getSignal",
+                  "description": "Retrieve one Signal by UUID."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getSignalEvents"
+                  "id": "getSignalEvents",
+                  "name": "getSignalEvents",
+                  "description": "List Events that support a selected Signal."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listIntelligenceSources"
+                  "id": "listIntelligenceSources",
+                  "name": "listIntelligenceSources",
+                  "description": "Discover Source metadata for provenance."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "getIntelligenceSource"
+                  "id": "getIntelligenceSource",
+                  "name": "getIntelligenceSource",
+                  "description": "Retrieve one Source by UUID."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listIntelligenceTags"
+                  "id": "listIntelligenceTags",
+                  "name": "listIntelligenceTags",
+                  "description": "Discover fuzzy tag vocabulary for Event and Signal filters."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listIntelligenceEntities"
+                  "id": "listIntelligenceEntities",
+                  "name": "listIntelligenceEntities",
+                  "description": "Discover exact company or people filter values."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listIntelligenceRegions"
+                  "id": "listIntelligenceRegions",
+                  "name": "listIntelligenceRegions",
+                  "description": "Discover exact region filter values."
                 },
                 {
                   "file": "./config/espresso.oas.json",
-                  "id": "listIntelligenceEventTypes"
+                  "id": "listIntelligenceEventTypes",
+                  "name": "listIntelligenceEventTypes",
+                  "description": "Discover exact event_types filter values."
                 }
               ]
             }
@@ -3396,12 +4005,31 @@
           "policies": {
             "inbound": [
               "zuplo-api-key-inbound",
-              "gate-auth"
+              "gate-auth",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
             ]
           }
         },
-        "operationId": "espressoMcp"
+        "operationId": "espressoMcp",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "https://api.cafecito.tech",
+      "description": "Cafecito production API"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
 }

@@ -1,13 +1,20 @@
 # Espresso API Documentation Plan
 
-Status: Documentation implementation plan
+| Field | Value |
+|---|---|
+| Status | **superseded** |
+| Authority | None; portal and gateway OAS have shipped |
+| Audience | Historical docs-planning readers |
+| Last verified | 2026-08-25 |
+| Owner role | Documentation steward (archival) |
+| Superseded by | [`docs/pages/products/espresso/`](../../docs/pages/products/espresso/), [`config/espresso.oas.json`](../../config/espresso.oas.json) |
 
-Updated: 2026-08-14
+Published collections include `pagination.num_results` and `meta.as_of`. The route proposal is not live contract.
 
-References:
+Historical references:
 
-- Target contract: [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md)
-- V1 readiness: [ESPRESSO_API_GAP_ANALYSIS.md](ESPRESSO_API_GAP_ANALYSIS.md)
+- Target contract (superseded): [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md)
+- V1 readiness (historical): [ESPRESSO_API_GAP_ANALYSIS.md](ESPRESSO_API_GAP_ANALYSIS.md)
 - Industry comparison: [INDUSTRY_EVENT_API_ROUTE_REFERENCE.md](INDUSTRY_EVENT_API_ROUTE_REFERENCE.md)
 
 ## 1. Documentation authority and V1 scope

@@ -24,6 +24,11 @@ const docTemplate = `{
     "paths": {
         "/articles/latest": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns Articles ordered newest first. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
@@ -60,7 +65,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -68,7 +72,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -241,6 +245,11 @@ const docTemplate = `{
         },
         "/articles/search": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.",
                 "produces": [
                     "application/json"
@@ -297,7 +306,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -305,7 +313,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -492,6 +500,11 @@ const docTemplate = `{
         },
         "/articles/trending": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
@@ -528,7 +541,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -536,7 +548,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -709,6 +721,11 @@ const docTemplate = `{
         },
         "/articles/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
                 "produces": [
                     "application/json"
@@ -777,6 +794,11 @@ const docTemplate = `{
         },
         "/articles/{id}/mentions": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns external platform or forum observations for an Article UUID, ordered by observation time.",
                 "produces": [
                     "application/json"
@@ -887,6 +909,11 @@ const docTemplate = `{
         },
         "/articles/{id}/similar": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.",
                 "produces": [
                     "application/json"
@@ -916,7 +943,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -924,7 +950,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -1117,6 +1143,11 @@ const docTemplate = `{
         },
         "/categories": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
@@ -1186,6 +1217,11 @@ const docTemplate = `{
         },
         "/entities": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
@@ -1255,7 +1291,7 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.",
+                "description": "Lightweight liveness probe. No authentication required.",
                 "produces": [
                     "application/json"
                 ],
@@ -1268,10 +1304,7 @@ const docTemplate = `{
                     "200": {
                         "description": "status alive",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.HealthResponse"
                         }
                     }
                 }
@@ -1279,6 +1312,11 @@ const docTemplate = `{
         },
         "/regions": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
@@ -1348,6 +1386,11 @@ const docTemplate = `{
         },
         "/sentiments": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Lists values accepted by the corresponding Article filter.",
                 "produces": [
                     "application/json"
@@ -1417,6 +1460,11 @@ const docTemplate = `{
         },
         "/sources": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.",
                 "produces": [
                     "application/json"
@@ -1432,6 +1480,16 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Optional Source prefix query.",
                         "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source ids (CSV).",
+                        "name": "ids",
                         "in": "query"
                     },
                     {
@@ -1496,6 +1554,11 @@ const docTemplate = `{
         },
         "/sources/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns one publisher Source selected by UUID.",
                 "produces": [
                     "application/json"
@@ -1557,6 +1620,11 @@ const docTemplate = `{
         },
         "/stories": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.",
                 "produces": [
                     "application/json"
@@ -1593,7 +1661,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -1601,7 +1668,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -1789,6 +1856,11 @@ const docTemplate = `{
         },
         "/stories/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns one Story selected by its stable UUID, including a link to its paginated member Articles.",
                 "produces": [
                     "application/json"
@@ -1850,6 +1922,11 @@ const docTemplate = `{
         },
         "/stories/{id}/articles": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.",
                 "produces": [
                     "application/json"
@@ -1879,7 +1956,6 @@ const docTemplate = `{
                             "news",
                             "official_statement",
                             "podcast",
-                            "post",
                             "press_release",
                             "research_paper",
                             "site",
@@ -1887,7 +1963,7 @@ const docTemplate = `{
                             "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Stored Article type.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -2080,6 +2156,11 @@ const docTemplate = `{
         },
         "/top-headlines": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.",
                 "produces": [
                     "application/json"
@@ -2312,6 +2393,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "content_type": {
+                    "description": "Kind is the stored Article type. post may appear in responses but is not a valid request filter.",
                     "type": "string",
                     "enum": [
                         "blog",
@@ -2417,6 +2499,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "content_type": {
+                    "description": "Kind is the stored Article type. post may appear in responses but is not a valid request filter.",
                     "type": "string",
                     "enum": [
                         "blog",
@@ -2506,10 +2589,40 @@ const docTemplate = `{
                 }
             }
         },
+        "router.ErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "invalid_request"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Unknown or unsupported query parameter: offset"
+                }
+            }
+        },
         "router.ErrorResponse": {
             "type": "object",
             "properties": {
-                "error": {}
+                "error": {
+                    "$ref": "#/definitions/router.ErrorBody"
+                }
+            }
+        },
+        "router.HealthResponse": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "alive"
+                    ],
+                    "example": "alive"
+                }
             }
         },
         "router.MentionCollectionResponse": {
@@ -2578,13 +2691,18 @@ const docTemplate = `{
             ],
             "properties": {
                 "limit": {
-                    "type": "integer"
+                    "description": "Limit is the requested page size for this response.",
+                    "type": "integer",
+                    "example": 20
                 },
                 "next_cursor": {
+                    "description": "NextCursor is an opaque token. Send it unchanged as the next request cursor. Null when there is no next page.",
                     "type": "string"
                 },
                 "num_results": {
-                    "type": "integer"
+                    "description": "NumResults is the number of records in this page, not a total-match count.",
+                    "type": "integer",
+                    "example": 20
                 }
             }
         },
@@ -2592,6 +2710,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "as_of": {
+                    "description": "AsOf is the UTC time this collection snapshot was produced.",
                     "type": "string"
                 }
             }
@@ -2901,7 +3020,7 @@ const docTemplate = `{
         "router.Trend": {
             "type": "object",
             "properties": {
-                "audience": {
+                "audiences": {
                     "type": "integer"
                 },
                 "comments": {
@@ -2921,6 +3040,13 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BackendAPIKey": {
+            "type": "apiKey",
+            "name": "X-API-KEY",
+            "in": "header"
+        }
     }
 }`
 
@@ -2931,7 +3057,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Beans News API & MCP",
-	Description:      "Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.",
+	Description:      "Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

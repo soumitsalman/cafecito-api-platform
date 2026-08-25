@@ -9,14 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {
-            "name": "Project Cafecito",
-            "url": "http://cafecito.tech",
-            "email": "soumitsrah@cafecito.tech"
-        },
-        "license": {
-            "name": "MIT"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -24,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/entities": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use only when an agent needs available company or people names before applying an exact Event filter. Returned values are normalized snake_case filter strings, not canonical entity IDs or profiles.\nIf a known normalized value is already available, query Events directly. Use ` + "`" + `types=company` + "`" + ` or ` + "`" + `types=people` + "`" + ` to reduce the returned vocabulary.",
                 "produces": [
                     "application/json"
@@ -92,8 +90,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -103,6 +107,11 @@ const docTemplate = `{
         },
         "/event-types": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use only when an agent needs available values before applying the exact ` + "`" + `event_types` + "`" + ` Event filter. Returned values are normalized snake_case filter strings.\n` + "`" + `event_types` + "`" + ` and ` + "`" + `categories` + "`" + ` filter different Event fields. If a known normalized value is already available, query Events directly.",
                 "produces": [
                     "application/json"
@@ -161,8 +170,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -172,6 +187,11 @@ const docTemplate = `{
         },
         "/events": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use when the user asks what happened to a company, person, product, region, or topic. Returns concrete Event records, not article bodies and not synthesized conclusions.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Event detail, evidence, or related-Signals routes. Use ` + "`" + `tags` + "`" + ` for fuzzy concepts; use structured filters for exact normalized values. ` + "`" + `categories` + "`" + ` is not an alias for ` + "`" + `event_types` + "`" + `.\nSearch Signals instead when the user asks for meaning, implication, or outlook. ` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` bound record ` + "`" + `created_at` + "`" + `, not occurrence or publication time.",
                 "produces": [
                     "application/json"
@@ -376,7 +396,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -386,6 +406,11 @@ const docTemplate = `{
         },
         "/events/{event_id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use after selecting an Event from a collection. Returns its complete public view, optional Source provenance, and links/counts for available evidence and related Signals.\nCarry the Event ID to ` + "`" + `/events/{event_id}/evidence` + "`" + ` for supporting context or source coverage, or to ` + "`" + `/events/{event_id}/signals` + "`" + ` for associated higher-level conclusions. ` + "`" + `created_at` + "`" + ` is record creation time, not Event occurrence time.",
                 "produces": [
                     "application/json"
@@ -449,7 +474,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -459,6 +484,11 @@ const docTemplate = `{
         },
         "/events/{event_id}/evidence": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use after selecting an Event when the user needs supporting context, available source coverage, or traceability. Returns directly related evidence records with identity, creation time, tags, Source IDs, and available URLs.\nThis is not an article-body endpoint, a story-clustering endpoint, or a complete record-history export. An empty collection means no evidence records are available for this Event under the supplied filters.",
                 "produces": [
                     "application/json"
@@ -571,7 +601,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -581,6 +611,11 @@ const docTemplate = `{
         },
         "/events/{event_id}/signals": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use after selecting an Event to find higher-level conclusions associated with that development. Returns Signal records that can be inspected individually or followed to their supporting Events.\nAn empty collection means Espresso has no available Signal connected to this Event; it does not invalidate the Event. This route narrows associated Signals; use ` + "`" + `/signals` + "`" + ` for a new Signal search.",
                 "produces": [
                     "application/json"
@@ -713,7 +748,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -747,6 +782,11 @@ const docTemplate = `{
         },
         "/regions": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use only when an agent needs available region values before applying the exact ` + "`" + `regions` + "`" + ` Event filter. Returned values are normalized snake_case filter strings, not canonical places, coordinates, or structured geography.\nIf a known normalized value is already available, query Events directly.",
                 "produces": [
                     "application/json"
@@ -805,8 +845,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -816,6 +862,11 @@ const docTemplate = `{
         },
         "/signals": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use when the user asks what a set of developments means, what impact is expected, or what broader conclusion Espresso has produced. Returns synthesized Signals, not raw observations or article content.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Signal detail, then list supporting Events when the conclusion needs substantiation. Search Events instead when the user needs a concrete development rather than an interpretation.\n` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` bound Signal ` + "`" + `created_at` + "`" + `; tags are fuzzy text matches, while impact levels and impacted domains are exact normalized values.",
                 "produces": [
                     "application/json"
@@ -950,7 +1001,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -960,6 +1011,11 @@ const docTemplate = `{
         },
         "/signals/{signal_id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use after selecting a Signal from a collection. Returns its complete public fields, optional Source provenance, and a link/count for Events that support the conclusion.\nCarry the Signal ID to ` + "`" + `/signals/{signal_id}/events` + "`" + ` when an answer needs concrete supporting developments. ` + "`" + `created_at` + "`" + ` is record creation time.",
                 "produces": [
                     "application/json"
@@ -1023,7 +1079,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1033,6 +1089,11 @@ const docTemplate = `{
         },
         "/signals/{signal_id}/events": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use after selecting a Signal when an agent must explain, verify, or cite the concrete developments behind its conclusion. Returns Events that support the Signal.\nApply Event filters only to narrow this existing support set. This route does not perform a new semantic search and does not return unrelated Events. An empty collection means no supporting Events match the supplied filters.",
                 "produces": [
                     "application/json"
@@ -1235,7 +1296,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1245,6 +1306,11 @@ const docTemplate = `{
         },
         "/sources": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use to discover or resolve provenance Sources before filtering Events by ` + "`" + `source_ids` + "`" + `, or when an answer needs source metadata for citation. ` + "`" + `q` + "`" + ` performs case-insensitive metadata matching across source domain, name, and URL; it is not semantic search.\nCarry a selected ` + "`" + `data[].id` + "`" + ` into Source detail or ` + "`" + `GET /events?source_ids={source_id}` + "`" + `. Source results describe publishers and provenance; they do not contain Events.",
                 "produces": [
                     "application/json"
@@ -1326,7 +1392,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1336,6 +1402,11 @@ const docTemplate = `{
         },
         "/sources/{source_id}": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Returns provenance metadata for one Source. Use this route to enrich a citation or inspect publisher metadata, not to retrieve published Events.\nTo find Events from this Source, call ` + "`" + `GET /events?source_ids={source_id}` + "`" + `. Optional description, favicon, and RSS feed fields can be absent when unavailable.",
                 "produces": [
                     "application/json"
@@ -1399,7 +1470,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1409,6 +1480,11 @@ const docTemplate = `{
         },
         "/tags": {
             "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
                 "description": "Use only when an agent needs vocabulary for a fuzzy ` + "`" + `tags` + "`" + ` query. Returns persisted labels for Event and Signal filtering; tags are not a fixed taxonomy or exact-only values.\nIf a useful tag is already known, search Events or Signals directly instead of making a discovery request. Use ` + "`" + `resource` + "`" + ` to limit discovery to Event or Signal labels.",
                 "produces": [
                     "application/json"
@@ -1490,7 +1566,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable; retry.",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1500,7 +1576,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "db.TagValue": {
+        "db.Tag": {
             "type": "object",
             "properties": {
                 "type": {
@@ -1523,6 +1599,23 @@ const docTemplate = `{
                 }
             }
         },
+        "router.Counts": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "integer"
+                },
+                "events": {
+                    "type": "integer"
+                },
+                "evidence": {
+                    "type": "integer"
+                },
+                "signals": {
+                    "type": "integer"
+                }
+            }
+        },
         "router.DiscoveryValueCollectionResponse": {
             "type": "object",
             "required": [
@@ -1534,7 +1627,7 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/db.TagValue"
+                        "$ref": "#/definitions/db.Tag"
                     }
                 },
                 "meta": {
@@ -1588,7 +1681,45 @@ const docTemplate = `{
         },
         "router.EventDocument": {
             "type": "object",
-            "additionalProperties": {}
+            "required": [
+                "created_at",
+                "id",
+                "kind",
+                "tags"
+            ],
+            "properties": {
+                "counts": {
+                    "$ref": "#/definitions/router.Counts"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "event"
+                    ]
+                },
+                "links": {
+                    "$ref": "#/definitions/router.Links"
+                },
+                "source": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
         },
         "router.EventEvidence": {
             "type": "object",
@@ -1641,23 +1772,32 @@ const docTemplate = `{
                 }
             }
         },
-        "router.Pagination": {
+        "router.Links": {
             "type": "object",
-            "required": [
-                "cursor",
-                "limit",
-                "next_cursor",
-                "num_results"
-            ],
             "properties": {
-                "cursor": {
+                "actions": {
                     "type": "string"
                 },
+                "events": {
+                    "type": "string"
+                },
+                "evidence": {
+                    "type": "string"
+                },
+                "signals": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.Pagination": {
+            "type": "object",
+            "properties": {
                 "limit": {
                     "type": "integer"
                 },
                 "next_cursor": {
-                    "type": "string"
+                    "type": "string",
+                    "x-nullable": true
                 },
                 "num_results": {
                     "type": "integer"
@@ -1666,9 +1806,6 @@ const docTemplate = `{
         },
         "router.ResponseMeta": {
             "type": "object",
-            "required": [
-                "as_of"
-            ],
             "properties": {
                 "as_of": {
                     "type": "string"
@@ -1710,7 +1847,45 @@ const docTemplate = `{
         },
         "router.SignalDocument": {
             "type": "object",
-            "additionalProperties": {}
+            "required": [
+                "created_at",
+                "id",
+                "kind",
+                "tags"
+            ],
+            "properties": {
+                "counts": {
+                    "$ref": "#/definitions/router.Counts"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "signal"
+                    ]
+                },
+                "links": {
+                    "$ref": "#/definitions/router.Links"
+                },
+                "source": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
         },
         "router.SourceCollectionResponse": {
             "type": "object",
@@ -1772,6 +1947,13 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BackendAPIKey": {
+            "type": "apiKey",
+            "name": "X-API-KEY",
+            "in": "header"
+        }
     }
 }`
 
@@ -1782,7 +1964,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Espresso API & MCP",
-	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. `pagination.num_results` is the count in the current page, not a total-match count. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
+	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404. Errors use `{ \"error\": { \"code\", \"message\" } }`. Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`); `/health` does not. Public clients send Bearer keys to the gateway, not this service.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

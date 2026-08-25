@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "Beans News API & MCP",
-    "description": "Read-only API for publisher Articles, Sources, related Articles, and external Article mentions. Collections return data, pagination, and meta.",
+    "description": "Read-only publisher-content API for Articles, Sources, Stories, related reading, and external mentions. Collections return `{data, pagination, meta}` with `pagination.limit`, `pagination.num_results` (this page only), `pagination.next_cursor`, and `meta.as_of`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`. Unknown or route-inapplicable query parameters return HTTP 400. `content_type=post` is not a valid request filter and returns HTTP 400; `post` may still appear on Article responses. REST and MCP operations require `Authorization: Bearer <api-key>` except `/beans/health`.",
     "version": "1.0",
     "contact": {
       "name": "Project Cafecito",
@@ -27,6 +27,10 @@
       "description": "Normalized Article filter-value discovery."
     },
     {
+      "name": "Stories",
+      "description": "Story grouping of related publisher Articles."
+    },
+    {
       "name": "Health",
       "description": "Service liveness."
     },
@@ -44,7 +48,7 @@
           "type": "string",
           "maxLength": 512
         },
-        "description": "Optional relevance query. On Sources and label routes, a case-insensitive prefix query."
+        "description": "Optional relevance query. When supplied, score_threshold may be omitted. score_threshold without q returns HTTP 400. On Sources and label routes, a case-insensitive prefix query."
       },
       "score_threshold": {
         "name": "score_threshold",
@@ -54,7 +58,7 @@
           "minimum": 0,
           "maximum": 1
         },
-        "description": "Optional relevance threshold. Used only with q."
+        "description": "Optional relevance threshold used only with q. Rejected when q is absent."
       },
       "ids": {
         "name": "ids",
@@ -70,6 +74,21 @@
           "maxItems": 100
         },
         "description": "Exact Article UUIDs (CSV)."
+      },
+      "sourceIds": {
+        "name": "ids",
+        "in": "query",
+        "style": "form",
+        "explode": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxItems": 100
+        },
+        "description": "Source ids (CSV)."
       },
       "urls": {
         "name": "urls",
@@ -101,7 +120,6 @@
             "news",
             "official_statement",
             "podcast",
-            "post",
             "press_release",
             "research_paper",
             "site",
@@ -109,7 +127,7 @@
             "whitepaper"
           ]
         },
-        "description": "One stored Article type. Omit to include every stored type."
+        "description": "Filterable Article type. `post` is response-only: `content_type=post` returns HTTP 400. The other 14 stored types remain filterable. Omit to include every stored type."
       },
       "sources": {
         "name": "sources",
@@ -292,7 +310,7 @@
           "type": "boolean",
           "default": false
         },
-        "description": "Include content when available."
+        "description": "Request body content when available. This does not guarantee a full publisher copy for every Article. Handle a missing content value and use the canonical url for attribution."
       },
       "limit": {
         "name": "limit",
@@ -312,7 +330,7 @@
         "schema": {
           "type": "string"
         },
-        "description": "Opaque continuation token from pagination.next_cursor."
+        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged as the next request cursor. Never construct or decode cursor tokens."
       },
       "id": {
         "name": "id",
@@ -413,17 +431,19 @@
         ],
         "properties": {
           "limit": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Requested page size for this response."
           },
           "num_results": {
             "type": "integer",
-            "description": "Records in this response page."
+            "description": "Number of records in this page, not a total-match count."
           },
           "next_cursor": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Opaque next-page token, or null when there is no next page."
           }
         }
       },
@@ -435,7 +455,8 @@
         "properties": {
           "as_of": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "UTC time this collection snapshot was produced."
           }
         }
       },
@@ -487,14 +508,15 @@
           "mentions": {
             "type": "integer"
           },
-          "audience": {
-            "type": "integer"
-          },
           "related": {
             "type": "integer"
           },
           "trend_score": {
             "type": "number"
+          },
+          "audiences": {
+            "type": "integer",
+            "description": "Observed audience size when available."
           }
         }
       },
@@ -542,7 +564,8 @@
               "site",
               "technical_documentation",
               "whitepaper"
-            ]
+            ],
+            "description": "Stored Article type. `post` may appear here but is not a valid request filter."
           },
           "published_at": {
             "type": "string",
@@ -574,7 +597,7 @@
           },
           "content": {
             "type": "string",
-            "description": "Present only with full_content=true when available."
+            "description": "Present only when full_content=true and Beans has body content available. Not a universal full-text guarantee."
           },
           "categories": {
             "type": [
@@ -1072,13 +1095,21 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API key",
+        "description": "API key in the Authorization header as `Bearer <api-key>`."
+      }
     }
   },
   "paths": {
     "/beans/health": {
       "get": {
-        "summary": "Check health",
-        "description": "Returns status alive when the service is reachable.",
+        "summary": "Check API health",
+        "description": "Lightweight liveness probe. No authentication required.",
         "tags": [
           "Health"
         ],
@@ -1097,46 +1128,6 @@
                       "status": "alive"
                     }
                   }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid path or query parameter.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Service unavailable; retry.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1159,7 +1150,8 @@
           }
         },
         "operationId": "healthCheck",
-        "parameters": []
+        "parameters": [],
+        "security": []
       }
     },
     "/beans/categories": {
@@ -1469,7 +1461,6 @@
                     }
                   }
                 }
-              
               }
             }
           },
@@ -1556,7 +1547,7 @@
     "/beans/articles/top-headlines": {
       "get": {
         "summary": "List top headlines",
-        "description": "Returns news Articles from the recent 24-hour publication and attention window, ordered by attention. It does not accept content_type or date bounds.",
+        "description": "Returns news Articles from the recent 24-hour window, ordered by attention. Fixed to news; does not accept content_type, ids, urls, from, or to. Unknown or inapplicable query parameters return HTTP 400.",
         "tags": [
           "Articles"
         ],
@@ -1718,7 +1709,7 @@
             "export": "urlRewriteHandler",
             "module": "$import(@zuplo/runtime)",
             "options": {
-              "rewritePattern": "${env.BEANS_BASE_URL}/articles/top-headlines"
+              "rewritePattern": "${env.BEANS_BASE_URL}/top-headlines"
             }
           },
           "policies": {
@@ -1736,7 +1727,7 @@
     "/beans/articles/latest": {
       "get": {
         "summary": "List latest Articles",
-        "description": "Returns Articles ordered newest first. This route does not accept date bounds.",
+        "description": "Returns Articles ordered newest first. Does not accept ids, urls, from, or to. Unknown or inapplicable query parameters return HTTP 400.",
         "tags": [
           "Articles"
         ],
@@ -1915,7 +1906,7 @@
     "/beans/articles/trending": {
       "get": {
         "summary": "List trending Articles",
-        "description": "Returns attention-ranked Articles with trend metrics when available. This route does not accept date bounds.",
+        "description": "Returns attention-ranked Articles with trend metrics when available. Does not accept ids, urls, from, or to. Unknown or inapplicable query parameters return HTTP 400.",
         "tags": [
           "Articles"
         ],
@@ -2104,7 +2095,7 @@
     "/beans/articles/search": {
       "get": {
         "summary": "Search Articles",
-        "description": "Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.",
+        "description": "Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first. `content_type=post` returns HTTP 400. Unknown query parameters return HTTP 400.",
         "tags": [
           "Articles"
         ],
@@ -2304,6 +2295,9 @@
             "$ref": "#/components/parameters/q"
           },
           {
+            "$ref": "#/components/parameters/sourceIds"
+          },
+          {
             "$ref": "#/components/parameters/domains"
           },
           {
@@ -2412,9 +2406,9 @@
     "/beans/mcp": {
       "post": {
         "summary": "Beans MCP server",
-        "description": "Model Context Protocol (MCP) endpoint for the Beans service. Exposes Beans tools to MCP-compatible clients such as AI agents and LLM-powered applications.",
+        "description": "Model Context Protocol endpoint for Beans. REST and MCP require Bearer authentication. Includes Story tools listStories, getStory, and listStoryArticles.",
         "tags": [
-          "General"
+          "MCP"
         ],
         "requestBody": {
           "required": true,
@@ -2498,6 +2492,18 @@
                 {
                   "file": "./config/beans.oas.json",
                   "id": "listSentiments"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "listStories"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "getStory"
+                },
+                {
+                  "file": "./config/beans.oas.json",
+                  "id": "listStoryArticles"
                 }
               ]
             }
@@ -2505,11 +2511,19 @@
           "policies": {
             "inbound": [
               "zuplo-api-key-inbound",
-              "gate-auth"
+              "gate-auth",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
             ]
           }
         },
-        "operationId": "beansMcp"
+        "operationId": "beansMcp",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/beans/articles/{id}": {
@@ -3754,12 +3768,13 @@
   },
   "servers": [
     {
-      "url": "https://api.cafecito.tech"
+      "url": "https://api.cafecito.tech",
+      "description": "Production Beans API"
     }
   ],
   "security": [
     {
-      "ApiKeyAuth": []
+      "BearerAuth": []
     }
   ]
 }
