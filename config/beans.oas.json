@@ -2510,9 +2510,6 @@
           }
         },
         "operationId": "beansMcp"
-      },
-      "get": {
-        "parameters": null
       }
     },
     "/beans/articles/{id}": {
