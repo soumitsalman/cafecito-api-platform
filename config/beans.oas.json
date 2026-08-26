@@ -1383,30 +1383,11 @@
             "inbound": [
               "zuplo-api-key-inbound",
               "freeuser-rate-limit-inbound",
-              "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
           }
         },
         "operationId": "listCategories"
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/categories"
-          }
-        },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
-        }
       }
     },
     "/beans/entities": {
@@ -1499,30 +1480,11 @@
             "inbound": [
               "zuplo-api-key-inbound",
               "freeuser-rate-limit-inbound",
-              "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
           }
         },
         "operationId": "listEntities"
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/entities"
-          }
-        },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
-        }
       }
     },
     "/beans/regions": {
@@ -1615,30 +1577,11 @@
             "inbound": [
               "zuplo-api-key-inbound",
               "freeuser-rate-limit-inbound",
-              "freeuser-quota-inbound",
               "backend-api-key-inbound"
             ]
           }
         },
         "operationId": "listRegions"
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/regions"
-          }
-        },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
-        }
       }
     },
     "/beans/news/top-headlines": {
@@ -2671,24 +2614,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -2803,24 +2746,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/similar"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/similar"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -2918,24 +2861,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/mentions"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/mentions"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -3013,24 +2956,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/sources/${params.id}"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/sources/${params.id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -3111,24 +3054,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/sentiments"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/sentiments"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -3324,24 +3267,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/stories"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/stories"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -3486,24 +3429,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     },
@@ -3665,24 +3608,24 @@
               }
             }
           }
-        }
-      },
-      "x-zuplo-route": {
-        "corsPolicy": "none",
-        "handler": {
-          "export": "urlRewriteHandler",
-          "module": "$import(@zuplo/runtime)",
-          "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}/articles"
-          }
         },
-        "policies": {
-          "inbound": [
-            "zuplo-api-key-inbound",
-            "freeuser-rate-limit-inbound",
-            "freeuser-quota-inbound",
-            "backend-api-key-inbound"
-          ]
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlRewriteHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}/articles"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "zuplo-api-key-inbound",
+              "freeuser-rate-limit-inbound",
+              "freeuser-quota-inbound",
+              "backend-api-key-inbound"
+            ]
+          }
         }
       }
     }
