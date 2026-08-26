@@ -55,7 +55,7 @@ Auth/gateway behavior:
 Docs/products:
 
 - Live products in docs: Beans and Espresso.
-- Future/reserved products: Cortado and Latte.
+- Future/reserved products: Cortado.
 - MCP docs point to hosted endpoints such as `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`.
 
 ## Documentation dependency map

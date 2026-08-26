@@ -9,7 +9,6 @@
 | **Beans** | Live | News and publisher-content REST API and MCP (`apis/beans/`) |
 | **Espresso** | Live | Market Intelligence events and signals REST API and MCP (`apis/espresso/`) |
 | **Cortado** | Future | Reserved; not a live API |
-| **Latte** | Future | Reserved; not a live API |
 
 There is **no official SDK**. Integrate with REST (`https://api.cafecito.tech`) or MCP (`/beans/mcp`, `/espresso/mcp`) using a Bearer API key.
 
@@ -49,7 +48,7 @@ Product route files in `config/`:
 
 - `config/beans.oas.json` (live)
 - `config/espresso.oas.json` (live)
-- `config/cortado.oas.json` and `config/latte.oas.json` (future placeholders)
+- `config/cortado.oas.json` (future placeholders)
 
 ## Developer portal (Zudoku)
 

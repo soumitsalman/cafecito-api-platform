@@ -9,9 +9,8 @@ Hosted at [developer.cafecito.tech](https://developer.cafecito.tech). Built on [
 | Product | Status | Public surface |
 | --- | --- | --- |
 | **Beans** | Live | Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. |
-| **Espresso** | Live | Espresso is a market, business, event, and news intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources. GDELT and Perigon are comparison patterns, not claims of route-for-route equivalence. |
+| **Espresso** | Live | Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence. |
 | **Cortado** | Future | No public API |
-| **Latte** | Future | No public API |
 
 One API key authenticates every live product. There is no official SDK. Gateway: `https://api.cafecito.tech`. Limits: ongoing free tier, 100 requests/min and 50,000/month per user (see [Pricing and limits](pages/guides/pricing-limits.mdx)).
 
@@ -23,7 +22,7 @@ Approved one-liners are on [Getting started](pages/start/overview.mdx).
 
 | Page | File | Summary |
 |------|------|---------|
-| Overview | `start/overview.mdx` | Product chooser: Beans and Espresso live; Cortado and Latte future. |
+| Overview | `start/overview.mdx` | Product chooser: Beans and Espresso live; Cortado coming soon. |
 | API Keys | `start/api-keys.mdx` | Create keys in the portal; one key for live REST and MCP. Bearer auth. Health is public. |
 | First API call | `start/first-api-call.mdx` | First Beans and Espresso requests. |
 

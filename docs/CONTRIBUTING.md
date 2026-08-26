@@ -9,7 +9,7 @@ This file covers **how to change documentation**. Public pages themselves live u
 ## Product status to keep consistent
 
 - **Live:** Beans and Espresso REST plus MCP.
-- **Future:** Cortado and Latte are reserved; they are not live APIs.
+- **Future:** Cortado is reserved; they are not live APIs.
 - **SDK:** there is **no official Cafecito SDK**. Document REST and MCP only.
 
 ## Where each fact is authoritative

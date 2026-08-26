@@ -30,7 +30,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 
@@ -319,7 +318,7 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryBeans")
+		utils.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -382,7 +381,7 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryBeans")
+		utils.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -445,7 +444,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryTrendingBeans")
+		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -506,7 +505,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryTrendingBeans")
+		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -535,7 +534,7 @@ func (r *Configuration) getArticle(c *gin.Context) {
 	}
 	bean, err := r.DB.GetBean(c.Request.Context(), params.ID, params.FullContent)
 	if err != nil {
-		shared.LogError(err, "[ERROR] GetBean")
+		utils.LogError(err, "[ERROR] GetBean")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -595,7 +594,7 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QuerySimilarBeans")
+		utils.LogError(err, "[ERROR] QuerySimilarBeans")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -643,7 +642,7 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryMentions")
+		utils.LogError(err, "[ERROR] QueryMentions")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -688,7 +687,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 	}
 	page_out, err := r.DB.QuerySources(c.Request.Context(), *filters, *page_req, db.SOURCE_COLUMNS_BASE)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QuerySources")
+		utils.LogError(err, "[ERROR] QuerySources")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -717,7 +716,7 @@ func (r *Configuration) getSource(c *gin.Context) {
 
 	source, err := r.DB.GetSource(c.Request.Context(), params.ID)
 	if err != nil {
-		shared.LogError(err, "[ERROR] GetSource")
+		utils.LogError(err, "[ERROR] GetSource")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SOURCE_NOT_FOUND))
 		} else {
@@ -814,7 +813,7 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 
 	page_out, err := r.DB.QueryTags(c.Request.Context(), strings.ToLower(strings.TrimSpace(params.Q)), db_tag_type, *page)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryTags")
+		utils.LogError(err, "[ERROR] QueryTags")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -870,36 +869,12 @@ func (r *Configuration) getStories(c *gin.Context) {
 
 	page_out, err := r.DB.QueryClusters(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		shared.LogError(err, "[ERROR] QueryClusters")
+		utils.LogError(err, "[ERROR] QueryClusters")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
 	writeCollection(c, toStoryDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
-
-// func (r *Configuration) dispatchStory(c *gin.Context) {
-// 	raw := strings.TrimSpace(strings.TrimPrefix(c.Param("story_id"), "/"))
-// 	if raw == "" {
-// 		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required"))
-// 		return
-// 	}
-// 	if strings.HasSuffix(raw, "/articles") {
-// 		candidate := strings.TrimSuffix(raw, "/articles")
-// 		exists, err := r.DB.StoryExists(c.Request.Context(), raw)
-// 		if err != nil {
-// 			shared.LogError(err, "[ERROR] StoryExists")
-// 			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-// 			return
-// 		}
-// 		if !exists && candidate != "" {
-// 			c.Params = gin.Params{{Key: "story_id", Value: candidate}}
-// 			r.getStoryArticles(c)
-// 			return
-// 		}
-// 	}
-// 	c.Params = gin.Params{{Key: "story_id", Value: raw}}
-// 	r.getStory(c)
-// }
 
 // getStory godoc
 // @Summary Get a Story
@@ -922,7 +897,7 @@ func (r *Configuration) getStory(c *gin.Context) {
 	}
 	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
 	if err != nil {
-		shared.LogError(err, "[ERROR] GetCluster")
+		utils.LogError(err, "[ERROR] GetCluster")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		} else {
@@ -971,7 +946,7 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 	}
 	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
 	if err != nil {
-		shared.LogError(err, "[ERROR] ClusterExists")
+		utils.LogError(err, "[ERROR] ClusterExists")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}

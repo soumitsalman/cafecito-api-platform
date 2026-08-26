@@ -29,7 +29,6 @@ Project Cafecito is a media product suite with real APIs that real developers ca
 - **Beans** — news and publisher-content API (live)
 - **Espresso** — market and business intelligence API for Events and Signals (live)
 - **Cortado** — social media management (future; no public API)
-- **Latte** — reserved future product (no public API)
 
 ## Links
 

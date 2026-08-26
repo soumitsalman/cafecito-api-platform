@@ -1,7 +1,6 @@
 // @title             Espresso API & MCP
 // @version           0.5
-// @description       Espresso is a market, business, event, and news intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources.
-// @description       GDELT and Perigon are comparison patterns, not claims of route-for-route equivalence.
+// @description       Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence.
 // @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
 // @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
 // @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.

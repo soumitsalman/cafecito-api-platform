@@ -1,9 +1,0 @@
-{
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Cafecito - Latte API & MCP",
-    "description": "Latte API & MCP is a future Cafecito product. This OpenAPI file is reserved for Latte routes and tools.",
-    "version": "0.1.0-draft"
-  },
-  "paths": {}
-}

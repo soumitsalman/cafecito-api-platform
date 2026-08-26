@@ -5,9 +5,7 @@ const POSITIONING = {
   beans:
     "Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.",
   espresso:
-    "Espresso is a market, business, event, and news intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources.",
-  boundary:
-    "GDELT and Perigon are comparison patterns, not claims of route-for-route equivalence.",
+    "Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence.",
 };
 
 const SITE_METADATA = {
