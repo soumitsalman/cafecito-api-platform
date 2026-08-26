@@ -148,7 +148,6 @@ export async function checkExamples(ctx) {
       const { method, url } = brunoMethodUrl(yaml);
       if (!method || !url) continue;
       let path = gatewayPathFromBruno(url, prefix);
-      if (path === "/beans/top-headlines") path = "/beans/articles/top-headlines";
       if (SKIP_PATHS.has(path)) continue;
       const op = findOperation(ops, method, path);
       if (!op) {

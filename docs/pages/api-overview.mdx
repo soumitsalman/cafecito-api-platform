@@ -29,7 +29,7 @@ Start from what the user asked. Then open the matching reference, or call the ma
 | --- | --- | --- | --- |
 | Service up? | Either | `GET /beans/health` or `GET /espresso/health` (no key) | *(not exported)* |
 | Latest publisher Articles | Beans | `GET /beans/articles/latest` | `getLatestArticles` |
-| Top headlines / trending Articles | Beans | `GET /beans/articles/top-headlines`, `GET /beans/articles/trending` | `getTopHeadlines`, `getTrendingArticles` |
+| Top headlines / trending Articles | Beans | `GET /beans/news/top-headlines`, `GET /beans/articles/trending` | `getTopHeadlines`, `getTrendingArticles` |
 | Search publisher Articles | Beans | `GET /beans/articles/search` | `searchArticles` |
 | One Article, similar, mentions | Beans | `GET /beans/articles/{id}`, `/similar`, `/mentions` | `getArticle`, `getSimilarArticles`, `getArticleMentions` |
 | Stories and member Articles | Beans | `GET /beans/stories`, `GET /beans/stories/{id}`, `GET /beans/stories/{id}/articles` | `listStories`, `getStory`, `listStoryArticles` |

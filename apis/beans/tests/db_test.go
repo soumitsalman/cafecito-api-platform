@@ -160,14 +160,15 @@ func TestQueryTrendingBeans(t *testing.T) {
 
 	page, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
 		CreatedFrom: testSearchFrom(),
-	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITH_TREND)
+	pp.Println("TRENDING", page.Items)
 	require.NoError(t, err)
 	assert.NotEmpty(t, page.Items)
 	for _, bean := range page.Items {
 		assert.NotEqual(t, uuid.Nil, bean.ID)
 		assert.True(t, bean.TrendScore.Valid)
 	}
-	pp.Println("TRENDING", page.Items)
+
 }
 
 func TestVectorSearchBeans(t *testing.T) {
@@ -447,7 +448,7 @@ func TestQueryMentionsCursor(t *testing.T) {
 	defer pg_sack.Close()
 
 	seed, err := pg_sack.QueryTrendingBeans(test_ctx, db.BeanFilters{
-		CreatedFrom: testSearchFrom(),
+		ObservedFrom: testSearchFrom(),
 	}, db.PageRequest{Limit: 20}, db.BEAN_COLUMNS_WITH_TREND)
 	require.NoError(t, err)
 

@@ -452,7 +452,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
-// getTopHeadlinesArticles is the B04 GET /articles/top-headlines target scaffold.
+// getTopHeadlinesArticles is the B04 GET /news/top-headlines target scaffold.
 // Primary difference between this and getTrendingArticles and getTopHeadlines is the window of time and content type.
 // getTopHeadlines is always fixed within the last 24 hours and `news` content type. The returned news are created and trending in the last 24 hours.
 // The result excludes content unless explicitly requested.
@@ -482,7 +482,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTopHeadlines
-// @Router /top-headlines [get]
+// @Router /news/top-headlines [get]
 func (r *Configuration) getTopHeadlines(c *gin.Context) {
 	var params topHeadlinesParams
 	if err := params.shouldBind(c); err != nil {
@@ -1051,7 +1051,7 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	protected.GET("/articles/:id/mentions", config.getArticleMentions)
 
 	// HEADLINES routes
-	protected.GET("/top-headlines", config.getTopHeadlines)
+	protected.GET("/news/top-headlines", config.getTopHeadlines)
 
 	// STORIES routes. Wildcard captures URL-like story IDs (slashes); trailing /articles is membership.
 	protected.GET("/stories", config.getStories)

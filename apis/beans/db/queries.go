@@ -404,13 +404,16 @@ func (b *PGSack) QueryMentions(ctx context.Context, id uuid.UUID, filters Mentio
 	query := fmt.Sprintf(`
 		WITH latest_chatters AS (
 			SELECT DISTINCT ON (ch.chatter_url)
-				ch.chatter_url, ch.platform, ch.forum, ch.collected as observed,
+				ch.chatter_url, ch.platform, ch.forum, ch.collected,
 				ch.likes, ch.comments, ch.subscribers
 			FROM chatters ch
 			WHERE %s
 			ORDER BY ch.chatter_url, ch.collected DESC
 		)
-		SELECT *
+		SELECT 
+			chatter_url, platform, forum, 
+			collected as observed,
+			likes, comments, subscribers
 		FROM latest_chatters
 		%s
 		ORDER BY observed DESC, chatter_url DESC
@@ -618,7 +621,7 @@ func (b *PGSack) QueryClusters(ctx context.Context, filters ClusterFilters, page
 func (b *PGSack) queryClustersByRecency(ctx context.Context, filters *ClusterFilters, page *PageRequest) ([]clusterBase, error) {
 	where, params := buildScalarWhere(&filters.BeanFilters)
 	cursor_where := ""
-	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.TextKey != nil {
+	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.ID != nil {
 		cursor_where = "WHERE (last_created, id) < (@cursor_created, @cursor_id)"
 		params["cursor_created"] = *page.Cursor.Created
 		params["cursor_id"] = *page.Cursor.ID
@@ -658,7 +661,7 @@ func (b *PGSack) queryClustersByRecency(ctx context.Context, filters *ClusterFil
 func (b *PGSack) queryClustersByKNNSearch(ctx context.Context, filters *ClusterFilters, page *PageRequest) ([]clusterBase, error) {
 	where, params := buildScalarWhere(&filters.BeanFilters)
 	cursor_where := ""
-	if page.Cursor != nil && page.Cursor.Distance != nil && page.Cursor.TextKey != nil {
+	if page.Cursor != nil && page.Cursor.Distance != nil && page.Cursor.ID != nil {
 		cursor_where = "WHERE (distance, id) > (@cursor_distance, @cursor_id)"
 		params["cursor_distance"] = *page.Cursor.Distance
 		params["cursor_id"] = *page.Cursor.ID

@@ -1334,6 +1334,138 @@ paths:
       summary: Check API health
       tags:
       - Health
+  /news/top-headlines:
+    get:
+      description: Returns news Articles from the recent 24-hour window, ordered by
+        attention. content_type and date bounds are not accepted.
+      operationId: getTopHeadlines
+      parameters:
+      - description: Optional relevance query. Requires score_threshold greater than
+          zero.
+        in: query
+        maxLength: 512
+        name: q
+        type: string
+      - description: Required when q is supplied.
+        in: query
+        maximum: 1
+        minimum: 0
+        name: score_threshold
+        type: number
+      - collectionFormat: csv
+        description: Source UUIDs to include (CSV).
+        in: query
+        items:
+          type: string
+        name: sources
+        type: array
+      - collectionFormat: csv
+        description: Source UUIDs to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_sources
+        type: array
+      - collectionFormat: csv
+        description: Source domains to include (CSV).
+        in: query
+        items:
+          type: string
+        name: domains
+        type: array
+      - collectionFormat: csv
+        description: Source domains to exclude (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_domains
+        type: array
+      - collectionFormat: csv
+        description: Author text filters (CSV).
+        in: query
+        items:
+          type: string
+        name: authors
+        type: array
+      - collectionFormat: csv
+        description: Category values (CSV).
+        in: query
+        items:
+          type: string
+        name: categories
+        type: array
+      - collectionFormat: csv
+        description: Excluded category values (CSV).
+        in: query
+        items:
+          type: string
+        name: exclude_categories
+        type: array
+      - collectionFormat: csv
+        description: Region values (CSV).
+        in: query
+        items:
+          type: string
+        name: regions
+        type: array
+      - collectionFormat: csv
+        description: Entity values (CSV).
+        in: query
+        items:
+          type: string
+        name: entities
+        type: array
+      - collectionFormat: csv
+        description: Sentiment values (CSV).
+        in: query
+        items:
+          type: string
+        name: sentiments
+        type: array
+      - collectionFormat: csv
+        description: Normalized tag terms (CSV).
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - default: false
+        description: Include content when available.
+        in: query
+        name: full_content
+        type: boolean
+      - default: 20
+        description: Maximum records per page. Default 20, max 100.
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Opaque continuation token from pagination.next_cursor. Send it
+          unchanged.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.ArticleCollectionResponse'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "500":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      security:
+      - BackendAPIKey: []
+      summary: List top headlines
+      tags:
+      - Articles
   /regions:
     get:
       description: Lists values accepted by the corresponding Article filter.
@@ -1866,138 +1998,6 @@ paths:
       summary: List Story Articles
       tags:
       - Stories
-  /top-headlines:
-    get:
-      description: Returns news Articles from the recent 24-hour window, ordered by
-        attention. content_type and date bounds are not accepted.
-      operationId: getTopHeadlines
-      parameters:
-      - description: Optional relevance query. Requires score_threshold greater than
-          zero.
-        in: query
-        maxLength: 512
-        name: q
-        type: string
-      - description: Required when q is supplied.
-        in: query
-        maximum: 1
-        minimum: 0
-        name: score_threshold
-        type: number
-      - collectionFormat: csv
-        description: Source UUIDs to include (CSV).
-        in: query
-        items:
-          type: string
-        name: sources
-        type: array
-      - collectionFormat: csv
-        description: Source UUIDs to exclude (CSV).
-        in: query
-        items:
-          type: string
-        name: exclude_sources
-        type: array
-      - collectionFormat: csv
-        description: Source domains to include (CSV).
-        in: query
-        items:
-          type: string
-        name: domains
-        type: array
-      - collectionFormat: csv
-        description: Source domains to exclude (CSV).
-        in: query
-        items:
-          type: string
-        name: exclude_domains
-        type: array
-      - collectionFormat: csv
-        description: Author text filters (CSV).
-        in: query
-        items:
-          type: string
-        name: authors
-        type: array
-      - collectionFormat: csv
-        description: Category values (CSV).
-        in: query
-        items:
-          type: string
-        name: categories
-        type: array
-      - collectionFormat: csv
-        description: Excluded category values (CSV).
-        in: query
-        items:
-          type: string
-        name: exclude_categories
-        type: array
-      - collectionFormat: csv
-        description: Region values (CSV).
-        in: query
-        items:
-          type: string
-        name: regions
-        type: array
-      - collectionFormat: csv
-        description: Entity values (CSV).
-        in: query
-        items:
-          type: string
-        name: entities
-        type: array
-      - collectionFormat: csv
-        description: Sentiment values (CSV).
-        in: query
-        items:
-          type: string
-        name: sentiments
-        type: array
-      - collectionFormat: csv
-        description: Normalized tag terms (CSV).
-        in: query
-        items:
-          type: string
-        name: tags
-        type: array
-      - default: false
-        description: Include content when available.
-        in: query
-        name: full_content
-        type: boolean
-      - default: 20
-        description: Maximum records per page. Default 20, max 100.
-        in: query
-        maximum: 100
-        minimum: 1
-        name: limit
-        type: integer
-      - description: Opaque continuation token from pagination.next_cursor. Send it
-          unchanged.
-        in: query
-        name: cursor
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/router.ArticleCollectionResponse'
-        "400":
-          description: Invalid parameters
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "500":
-          description: Service unavailable
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-      security:
-      - BackendAPIKey: []
-      summary: List top headlines
-      tags:
-      - Articles
 schemes:
 - https
 securityDefinitions:

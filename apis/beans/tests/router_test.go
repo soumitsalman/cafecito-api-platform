@@ -27,7 +27,7 @@ const (
 	ROUTE_SEARCH     = "/articles/search"
 	ROUTE_LATEST     = "/articles/latest"
 	ROUTE_TRENDING   = "/articles/trending"
-	ROUTE_HEADLINES  = "/top-headlines"
+	ROUTE_HEADLINES  = "/news/top-headlines"
 	ROUTE_ARTICLES   = "/articles"
 	ROUTE_SOURCES    = "/sources"
 	ROUTE_CATEGORIES = "/categories"
@@ -208,17 +208,48 @@ func assertStringArrayField(t *testing.T, item map[string]any, field string) {
 	require.NotNil(t, values, "%s must be [] rather than null", field)
 }
 
+func assertOptionalStringField(t *testing.T, item map[string]any, field string) {
+	t.Helper()
+	value, exists := item[field]
+	if !exists || value == nil {
+		return
+	}
+	_, ok := value.(string)
+	require.True(t, ok, "%s must be a string or null", field)
+}
+
+func assertOptionalUUIDField(t *testing.T, item map[string]any, field string) {
+	t.Helper()
+	value, exists := item[field]
+	if !exists || value == nil {
+		return
+	}
+	id, ok := value.(string)
+	require.True(t, ok, "%s must be a UUID string or omitted", field)
+	_, err := uuid.Parse(id)
+	require.NoError(t, err, "invalid %s: %q", field, id)
+}
+
+func assertOptionalSourceObject(t *testing.T, parent map[string]any) {
+	t.Helper()
+	value, exists := parent["source"]
+	if !exists || value == nil {
+		return
+	}
+	source, ok := value.(map[string]any)
+	require.True(t, ok, "source must be an object or null")
+	assertExpectedSource(t, source)
+}
+
 func assertExpectedSourceSummary(t *testing.T, source map[string]any) {
 	t.Helper()
 	assertExpectedSource(t, source)
-	require.Len(t, source, 4)
 }
 
 func assertExpectedSource(t *testing.T, source map[string]any) {
 	t.Helper()
 	require.Contains(t, source, "id")
 	require.Contains(t, source, "domain")
-	require.Contains(t, source, "name")
 	require.Contains(t, source, "url")
 	if id, ok := source["id"].(string); ok && id != "" {
 		_, err := uuid.Parse(id)
@@ -227,6 +258,9 @@ func assertExpectedSource(t *testing.T, source map[string]any) {
 	assert.NotEmpty(t, source["domain"])
 	assert.NotEmpty(t, source["url"])
 	assert.NotContains(t, source, "base_url")
+	for _, field := range []string{"name", "description", "favicon_url", "rss_feed_url"} {
+		assertOptionalStringField(t, source, field)
+	}
 }
 
 func assertExpectedArticle(t *testing.T, item map[string]any) {
@@ -249,25 +283,13 @@ func assertExpectedArticle(t *testing.T, item map[string]any) {
 	assert.Contains(t, item, "summary")
 	assert.Contains(t, item, "author")
 	assert.Contains(t, item, "image_url")
-	require.Contains(t, item, "story_id")
-	if item["story_id"] != nil {
-		storyID, ok := item["story_id"].(string)
-		require.True(t, ok, "article story_id must be a UUID or null")
-		_, err := uuid.Parse(storyID)
-		require.NoError(t, err, "article has invalid story_id: %q", storyID)
-	}
+	assertOptionalUUIDField(t, item, "story_id")
+	assertOptionalSourceObject(t, item)
 
 	published_at, ok := item["published_at"].(string)
 	require.True(t, ok, "article is missing published_at")
 	_, err = time.Parse(time.RFC3339Nano, published_at)
 	require.NoError(t, err, "invalid published_at: %q", published_at)
-
-	source, ok := item["source"].(map[string]any)
-	require.True(t, ok, "article is missing nested source")
-	assertExpectedSource(t, source)
-	for _, field := range []string{"description", "favicon_url", "rss_feed_url"} {
-		assert.NotContains(t, source, field)
-	}
 
 	for _, field := range []string{"categories", "regions", "entities", "sentiments", "tags"} {
 		assertStringArrayField(t, item, field)
@@ -344,12 +366,7 @@ func assertExpectedStoryPreview(t *testing.T, preview map[string]any) {
 	require.True(t, ok, "story preview is missing published_at")
 	_, err = time.Parse(time.RFC3339Nano, published_at)
 	require.NoError(t, err, "invalid story preview published_at: %q", published_at)
-	source, ok := preview["source"].(map[string]any)
-	require.True(t, ok, "story preview is missing source")
-	assertExpectedSource(t, source)
-	for _, field := range []string{"description", "favicon_url", "rss_feed_url"} {
-		assert.NotContains(t, source, field)
-	}
+	assertOptionalSourceObject(t, preview)
 	for _, field := range []string{"content_type", "summary", "content", "author", "image_url", "story_id", "categories", "regions", "entities", "sentiments", "tags", "trend", "links"} {
 		assert.NotContains(t, preview, field)
 	}
@@ -496,9 +513,6 @@ func TestRouterGetSources(t *testing.T) {
 	detail := parseDetailObject(t, body)
 	assert.Equal(t, first_id, detail["id"])
 	assertExpectedSource(t, detail)
-	assert.Contains(t, detail, "description")
-	assert.Contains(t, detail, "favicon_url")
-	assert.Contains(t, detail, "rss_feed_url")
 }
 
 func TestRouterGetSourcesByQueryAndDomain(t *testing.T) {

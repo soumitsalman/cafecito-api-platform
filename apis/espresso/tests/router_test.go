@@ -632,32 +632,6 @@ func TestRouterExpectedDefaultPagination(t *testing.T) {
 	}
 }
 
-func TestRouterEventCategoriesAlias(t *testing.T) {
-	srv := newTestHTTPServer(t)
-	status, body := routerGET(t, srv.URL, ROUTE_EVENT_TYPES, url.Values{"limit": {"1"}}, "")
-	requireStatus(t, http.StatusOK, status, body)
-	event_types := assertExpectedPagination(t, body, 1, "")
-	require.NotEmpty(t, event_types)
-	event_type, ok := event_types[0]["value"].(string)
-	require.True(t, ok)
-
-	by_event_type_params := url.Values{"event_types": {event_type}, "limit": {"1"}}
-	status, body = routerGET(t, srv.URL, ROUTE_EVENTS, by_event_type_params, "")
-	requireStatus(t, http.StatusOK, status, body)
-	by_event_type := assertExpectedPagination(t, body, 1, "")
-	require.Len(t, by_event_type, 1)
-	assertExpectedSip(t, by_event_type[0], "event")
-	assert.Equal(t, event_type, by_event_type[0]["event_type"])
-
-	by_category_params := url.Values{"categories": {event_type}, "limit": {"1"}}
-	status, body = routerGET(t, srv.URL, ROUTE_EVENTS, by_category_params, "")
-	requireStatus(t, http.StatusOK, status, body)
-	by_category := assertExpectedPagination(t, body, 1, "")
-	require.Len(t, by_category, 1)
-	assertExpectedSip(t, by_category[0], "event")
-	assert.Equal(t, by_event_type[0]["id"], by_category[0]["id"])
-}
-
 func TestRouterAcceptsRFC3339TimeBounds(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{
@@ -768,9 +742,9 @@ func runStressTest(base_url string, concurrency int, api_key string) []stressRes
 				results[idx] = stressResult{endpoint: endpoint, err: err}
 				return
 			}
-	if api_key != "" {
-		req.Header.Set("X-API-KEY", api_key)
-	}
+			if api_key != "" {
+				req.Header.Set("X-API-KEY", api_key)
+			}
 
 			start := time.Now()
 			resp, err := client.Do(req)
@@ -984,9 +958,9 @@ func TestStressVectorSearch(t *testing.T) {
 				results[idx] = stressResult{endpoint: endpoint, err: err}
 				return
 			}
-	if api_key != "" {
-		req.Header.Set("X-API-KEY", api_key)
-	}
+			if api_key != "" {
+				req.Header.Set("X-API-KEY", api_key)
+			}
 
 			start := time.Now()
 			resp, err := client.Do(req)

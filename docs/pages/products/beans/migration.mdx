@@ -1,5 +1,5 @@
 ---
-description: Migrate your news API stack to using Beans API. Map TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io workflows to Beans Articles, Sources, Stories, and feeds.
+description: Migrate your news API stack to Beans API. Map TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io workflows to Beans Articles, Sources, Stories, and feeds.
 ---
 
 # Migrate to Beans
@@ -15,7 +15,7 @@ Beans API out performs other news APIs on 2 distinctive features:
 | --- | --- | --- |
 | Topic, identity, Source, or URL search | `GET /beans/articles/search` | Use `q` for natural-language search, `ids` or `urls` for exact lookup, and Article filters for narrowing. |
 | A newest-first publication feed | `GET /beans/articles/latest` | Does not accept `ids`, `urls`, `from`, or `to`. |
-| A fixed recent headline feed | `GET /beans/articles/top-headlines` | Fixed 24-hour news window. Does not accept `content_type`, `ids`, `urls`, `from`, or `to`. |
+| A fixed recent headline feed | `GET /beans/news/top-headlines` | Fixed 24-hour news window. Does not accept `content_type`, `ids`, `urls`, `from`, or `to`. |
 | Attention-ranked Articles | `GET /beans/articles/trending` | Does not accept `ids`, `urls`, `from`, or `to`. Trend metrics may be absent. |
 | Detail for one selected Article | `GET /beans/articles/{id}` | Use after a collection result provides the Article UUID. Request `full_content=true` only when the body is needed; availability is not guaranteed. |
 | Related publisher reading | `GET /beans/articles/{id}/similar` | Results are related reading and are not a guarantee of durable Story membership. |
@@ -58,7 +58,7 @@ Request `content_type` accepts:
 | --- | --- |
 | Search an archive, then open one result | `GET /beans/articles/search` -> `GET /beans/articles/{id}` |
 | Build a newest-first feed | `GET /beans/articles/latest` -> follow `pagination.next_cursor` |
-| Build a headline or attention feed | `GET /beans/articles/top-headlines` or `GET /beans/articles/trending` |
+| Build a headline or attention feed | `GET /beans/news/top-headlines` or `GET /beans/articles/trending` |
 | Find related coverage after selecting an Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/similar` |
 | Check external discussion for a selected Article | `GET /beans/articles/{id}` -> `GET /beans/articles/{id}/mentions` |
 | Find a publisher, then filter its Articles | `GET /beans/sources?q=...` -> `GET /beans/articles/search?sources={source_id}` |

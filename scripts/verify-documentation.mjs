@@ -97,14 +97,14 @@ async function liveContext() {
     espressoOps: loadOperations(espressoOas),
     brunoCollections: [
       {
-        dir: join(ROOT, "apis/beans/tests/bruno"),
+        dir: join(ROOT, "apis/beans/bruno"),
         prefix: "/beans",
         product: "beans",
         ops: loadOperations(beansOas),
         oas: beansOas,
       },
       {
-        dir: join(ROOT, "apis/espresso/tests/bruno"),
+        dir: join(ROOT, "apis/espresso/bruno"),
         prefix: "/espresso",
         product: "espresso",
         ops: loadOperations(espressoOas),

@@ -8,7 +8,7 @@ Maintained executable examples for the Espresso REST contract. This collection i
 
 ## Setup
 
-1. Open `apis/espresso/tests/bruno` in Bruno.
+1. Open `apis/espresso/bruno` in Bruno.
 2. Set collection variables:
 
 | Variable | Example | Notes |

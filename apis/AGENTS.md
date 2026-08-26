@@ -764,7 +764,7 @@ For any update in public routes, params and responses
 1. Update Swagger annotations in `apis/<product>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`. Always include request, response and error type definiton for each route.
 2. Update api gateway definitions `../config/<product>.oas.json`'
 3. Update developer portal docs under `../docs/pages` e.g. ', `../docs/pages/products/<product>/`, and their effect on shared documents like `../docs/pages/start`, `../docs/pages/guides`. Always include sample params and responses
-4. Update corresponding Bruno definitions in `<product>/tests/bruno/`
+4. Update corresponding Bruno definitions in `<product>/bruno/`
 5. Close the Definition of Done in root `AGENTS.md` and `.github/pull_request_template.md`. Maintainer run/test/swag commands: [`README.md`](README.md). Frozen public policy: **100/min**, **50,000/month**, **Bearer** except health, no private backend headers in public docs. Contract/docs GitHub workflow is manual only and does not gate CI.
 
 ### Public documentation boundary

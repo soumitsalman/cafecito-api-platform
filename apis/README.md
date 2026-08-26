@@ -36,7 +36,7 @@ cd apis/beans && go test ./tests/...
 cd apis/espresso && go test ./tests/...
 ```
 
-Bruno collections: `apis/beans/tests/bruno/` and `apis/espresso/tests/bruno/`.
+Bruno collections: `apis/beans/bruno/` and `apis/espresso/bruno/`.
 
 ## Regenerate Swagger
 
@@ -62,7 +62,7 @@ Shared collection envelope (both products): `{ data, pagination, meta }` with `p
 
 Product-specific notes:
 
-- **Beans:** `meta.as_of` is required on collections. Feed routes (`/articles/latest`, `/articles/trending`, `/top-headlines`) reject `ids`, `urls`, `from`, and `to`. `/top-headlines` additionally rejects `content_type` and is fixed to news in a 24-hour window. Keep `GET /top-headlines` on the backend. `content_type=post` as a request filter returns 400; `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return 400.
+- **Beans:** `meta.as_of` is required on collections. Feed routes (`/articles/latest`, `/articles/trending`, `/news/top-headlines`) reject `ids`, `urls`, `from`, and `to`. `/news/top-headlines` additionally rejects `content_type` and is fixed to news in a 24-hour window. Keep `GET /news/top-headlines` on the backend. `content_type=post` as a request filter returns 400; `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return 400.
 - **Espresso:** Formats via `response_type`: `json` (default), `yaml`, `toon` (same logical payload). Event/Signal stable core: `id`, `kind`, `created_at`, `tags`. Conditional: `summary`, `source`, `links`, `counts`. Ignore unknown extension fields. There is no public Actions route.
 
 ## Layout
@@ -74,6 +74,7 @@ Product-specific notes:
 | `beans/db/`, `espresso/db/` | Persistence access |
 | `*/docs/` | Generated Swagger |
 | `*/tests/` | Contract, DB, and stress tests |
+| `*/bruno/` | Maintained executable HTTP examples (OpenCollection) |
 | `design/` | Internal design records (not public contract) |
 
 Internal persistence and retrieval details stay in each service `db/` package and `apis/AGENTS.md`. They are not public documentation.

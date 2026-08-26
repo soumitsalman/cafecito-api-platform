@@ -140,7 +140,7 @@ func (params *articleFeedParams) shouldBind(c *gin.Context) error {
 	return requireScoreThresholdNeedsQ(c, params.Q)
 }
 
-// topHeadlinesParams is GET /top-headlines. It rejects ids, urls, from, to, and content_type.
+// topHeadlinesParams is GET /news/top-headlines. It rejects ids, urls, from, to, and content_type.
 type topHeadlinesParams struct {
 	articleScopeParams
 	vectorSearchParams

@@ -17,19 +17,6 @@
       "review_due": "2026-11-25"
     },
     {
-      "id": "beans-top-headlines-path-rewrite",
-      "product": "beans",
-      "kind": "path_rewrite",
-      "method": "GET",
-      "backend_path": "/top-headlines",
-      "gateway_path": "/beans/articles/top-headlines",
-      "intentional_difference": "Public Beans top-headlines live under /beans/articles/top-headlines; the backend Swagger path remains /top-headlines and the gateway rewrites to that backend route.",
-      "owned_by": "gateway-contract-owner",
-      "reason": "Gateway product prefix plus the Articles collection grouping; backend registration is unprefixed /top-headlines.",
-      "reviewed_on": "2026-08-25",
-      "review_due": "2026-11-25"
-    },
-    {
       "id": "espresso-mcp-gateway-only",
       "product": "espresso",
       "kind": "gateway_only_path",

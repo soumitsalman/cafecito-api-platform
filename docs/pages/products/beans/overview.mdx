@@ -42,7 +42,7 @@ Beans is a publisher-content API for news, blogs, financial and earnings reports
 | --- | --- | --- | --- |
 | Publisher material about a topic, person, place, or organization | `GET /beans/articles/search` | Article detail, related Articles, mentions, Source detail, or Story detail | World News search-news, GNews search, NewsAPI.ai getArticles, NewsAPI.org everything |
 | The most recently published material | `GET /beans/articles/latest` | Continue with the returned cursor or inspect a selected Article | NewsData.io latest, Currents latest-news |
-| A current attention-ranked news set | `GET /beans/articles/top-headlines` | Article detail or related coverage for selected results | GNews and NewsAPI.org top-headlines |
+| A current attention-ranked news set | `GET /beans/news/top-headlines` | Article detail or related coverage for selected results | GNews and NewsAPI.org top-headlines |
 | The most attention-ranked coverage | `GET /beans/articles/trending` | Inspect available `trend` observations | World News top-news, TheNewsAPI top-news |
 | One known Article UUID | `GET /beans/articles/{id}` | Request content, related Articles, mentions, or the linked Story | TheNewsAPI UUID lookup, World News retrieve-news |
 | Related publisher reading for one Article | `GET /beans/articles/{id}/similar` | Inspect a selected related Article | TheNewsAPI similar-by-UUID |
@@ -141,7 +141,7 @@ curl -s --get "${BASE_URL}/beans/articles/search" \
 ```
 </CodeTabs>
 
-The three requests return the same JSON envelope. Use `GET /beans/articles/latest` for chronology, `GET /beans/articles/top-headlines` for recent attention-ranked news, and `GET /beans/articles/trending` for attention-ranked coverage rather than relevance search.
+The three requests return the same JSON envelope. Use `GET /beans/articles/latest` for chronology, `GET /beans/news/top-headlines` for recent attention-ranked news, and `GET /beans/articles/trending` for attention-ranked coverage rather than relevance search.
 
 ## Collections, IDs, and pagination
 
@@ -319,7 +319,7 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | --- | --- | --- |
 | `GET /beans/articles/search` | Article collection envelope | `q`, `score_threshold`, `ids`, `urls`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
 | `GET /beans/articles/latest` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
-| `GET /beans/articles/top-headlines` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
+| `GET /beans/news/top-headlines` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
 | `GET /beans/articles/trending` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
 | `GET /beans/articles/{id}` | Article detail envelope | `id` path parameter, `full_content` |
 | `GET /beans/articles/{id}/similar` | Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
@@ -368,7 +368,7 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | `min_article_count` | Minimum number of Articles in a Story. Default `2`, minimum `2`. | Story discovery only. |
 | `platforms`, `forums` | External observation platform or forum filters. | Article mentions only. |
 
-`GET /beans/articles/top-headlines` is a recent attention-ranked **news** route. It does not accept `content_type`, `ids`, `urls`, `from`, or `to`. The current public feed routes also do not accept custom date bounds; use Article search, similar Articles, Stories, or Story Articles when the workflow needs `from` and `to`.
+`GET /beans/news/top-headlines` is a recent attention-ranked **news** route. It does not accept `content_type`, `ids`, `urls`, `from`, or `to`. The current public feed routes also do not accept custom date bounds; use Article search, similar Articles, Stories, or Story Articles when the workflow needs `from` and `to`.
 
 ### Public content types
 
@@ -606,5 +606,4 @@ MCP clients connect to `https://api.cafecito.tech/beans/mcp` with the same API k
 - [Migrate to Beans](/products/beans/migration)
 - [Beans API reference](/api/beans)
 - [MCP & AI agents](/guides/mcp-ai-agents)
-
-Maintained executable requests for the local backend live in `apis/beans/tests/bruno/` in the repository. They are examples, not a second public contract.
+- [Bruno Examples](https://github.com/soumitsalman/cafecito-api-platform) in `apis/beans/bruno/`

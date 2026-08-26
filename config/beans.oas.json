@@ -1641,7 +1641,7 @@
         }
       }
     },
-    "/beans/articles/top-headlines": {
+    "/beans/news/top-headlines": {
       "get": {
         "summary": "List top headlines",
         "description": "Returns news Articles from the recent 24-hour window, ordered by attention. Fixed to news; does not accept content_type, ids, urls, from, or to. Unknown or inapplicable query parameters return HTTP 400.",
@@ -1792,7 +1792,7 @@
             "export": "urlRewriteHandler",
             "module": "$import(@zuplo/runtime)",
             "options": {
-              "rewritePattern": "${env.BEANS_BASE_URL}/top-headlines"
+              "rewritePattern": "${env.BEANS_BASE_URL}/news/top-headlines"
             }
           },
           "policies": {

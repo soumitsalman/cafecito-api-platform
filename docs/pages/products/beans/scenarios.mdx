@@ -59,7 +59,7 @@ async function beansGet(path, query = {}) {
 **Call sequence:** 3 independent calls
 
 1. `GET /beans/articles/latest` for chronological publication.
-2. `GET /beans/articles/top-headlines` for the fixed recent attention window (news only; no `content_type` or dates).
+2. `GET /beans/news/top-headlines` for the fixed recent attention window (news only; no `content_type` or dates).
 3. `GET /beans/articles/trending` for attention-ranked coverage (no `from` or `to`).
 
 ~~~js
@@ -68,7 +68,7 @@ const settled = await Promise.allSettled([
     content_type: "news",
     limit: 24,
   }),
-  beansGet("/beans/articles/top-headlines", {
+  beansGet("/beans/news/top-headlines", {
     limit: 12,
   }),
   beansGet("/beans/articles/trending", {
@@ -119,7 +119,7 @@ curl -s --get "$BASE_URL/beans/articles/latest" \
   --data-urlencode "content_type=news" \
   --data-urlencode "limit=24"
 
-curl -s --get "$BASE_URL/beans/articles/top-headlines" \
+curl -s --get "$BASE_URL/beans/news/top-headlines" \
   -H "Authorization: Bearer $API_KEY" \
   --data-urlencode "limit=12"
 

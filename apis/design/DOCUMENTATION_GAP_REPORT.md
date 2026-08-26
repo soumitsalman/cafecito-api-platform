@@ -1190,7 +1190,7 @@ New users know what integration surface to select and how to plan for contract c
 
 ### Gap
 
-Current Bruno collections under `apis/beans/tests/bruno` and `apis/espresso/tests/bruno` are valuable executable examples, but the public portal does not point users to them and there is no stated relationship between those examples and the public contract.
+Current Bruno collections under `apis/beans/bruno` and `apis/espresso/bruno` are valuable executable examples, but the public portal does not point users to them and there is no stated relationship between those examples and the public contract.
 
 ### Missing from
 
@@ -1799,8 +1799,8 @@ Add scripts/verify-doc-examples.mjs or equivalent behavior that:
 
 Use the Bruno collections as the executable source for representative requests where practical:
 
-- apis/beans/tests/bruno/**
-- apis/espresso/tests/bruno/**
+- apis/beans/bruno/**
+- apis/espresso/bruno/**
 
 Edit:
 

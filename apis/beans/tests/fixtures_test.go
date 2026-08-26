@@ -99,10 +99,10 @@ func seedCIFixtures() error {
 	}
 
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO related_beans (url, related_url, collected)
+		INSERT INTO related_beans (bean_id, related_bean_id, collected)
 		VALUES ($1, $2, NOW()), ($2, $3, NOW())
 		ON CONFLICT DO NOTHING
-	`, urls[0], urls[1], urls[2]); err != nil {
+	`, fixtureArticleIDs[0], fixtureArticleIDs[1], fixtureArticleIDs[2]); err != nil {
 		return fmt.Errorf("related_beans: %w", err)
 	}
 
