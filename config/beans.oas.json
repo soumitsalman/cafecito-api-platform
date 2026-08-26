@@ -1376,7 +1376,7 @@
             "export": "urlRewriteHandler",
             "module": "$import(@zuplo/runtime)",
             "options": {
-              "rewritePattern": "${env.BEANS_BASE_URL}/tags/categories"
+              "rewritePattern": "${env.BEANS_BASE_URL}/categories"
             }
           },
           "policies": {
@@ -1492,7 +1492,7 @@
             "export": "urlRewriteHandler",
             "module": "$import(@zuplo/runtime)",
             "options": {
-              "rewritePattern": "${env.BEANS_BASE_URL}/tags/entities"
+              "rewritePattern": "${env.BEANS_BASE_URL}/entities"
             }
           },
           "policies": {
@@ -1608,7 +1608,7 @@
             "export": "urlRewriteHandler",
             "module": "$import(@zuplo/runtime)",
             "options": {
-              "rewritePattern": "${env.BEANS_BASE_URL}/tags/regions"
+              "rewritePattern": "${env.BEANS_BASE_URL}/regions"
             }
           },
           "policies": {
@@ -2679,7 +2679,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/{id}"
+            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}"
           }
         },
         "policies": {
@@ -2811,7 +2811,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/{id}/similar"
+            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/similar"
           }
         },
         "policies": {
@@ -2926,7 +2926,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/articles/{id}/mentions"
+            "rewritePattern": "${env.BEANS_BASE_URL}/articles/${params.id}/mentions"
           }
         },
         "policies": {
@@ -3021,7 +3021,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/sources/{id}"
+            "rewritePattern": "${env.BEANS_BASE_URL}/sources/${params.id}"
           }
         },
         "policies": {
@@ -3494,7 +3494,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/stories/{id}"
+            "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}"
           }
         },
         "policies": {
@@ -3673,7 +3673,7 @@
           "export": "urlRewriteHandler",
           "module": "$import(@zuplo/runtime)",
           "options": {
-            "rewritePattern": "${env.BEANS_BASE_URL}/stories/{id}/articles"
+            "rewritePattern": "${env.BEANS_BASE_URL}/stories/${params.id}/articles"
           }
         },
         "policies": {
