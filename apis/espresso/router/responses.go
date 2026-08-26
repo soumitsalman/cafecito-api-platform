@@ -82,9 +82,6 @@ func NewDigestDocumentForSip(sip *db.Sip) DigestDocument {
 
 func NewDigestDocumentForExtendedSip(sip *db.ExtendedSip) DigestDocument {
 	doc := NewDigestDocumentForSip(&sip.Sip)
-	doc["url"] = nil
-	doc["base_url"] = nil
-	doc["source_id"] = nil
 
 	// override default values for non-signals
 	if sip.Kind != db.SIP_KIND_SIGNAL {

@@ -4,20 +4,23 @@ info:
   seq: 5
   tags:
     - Articles
+
 http:
   method: GET
   url: "{{baseUrl}}/articles/:id/mentions"
-  auth: inherit
   params:
     - name: id
-      value: e4270d59-2fd8-4a2f-90ce-b1a669bedb75
+      value: 865d1ebb-1d1f-5d91-92c1-fac05b3c4c38
       type: path
+  auth: inherit
+
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
+
 examples:
   - name: 200 Response
     description: OK
@@ -156,29 +159,14 @@ examples:
               "message": ""
             }
           }
-docs: >-
-  Answers: Where was this Article URL observed on external social or forum
-  platforms?
 
-  Returns: A cursor-paginated collection of external mention observations; a
-  mention is not another publisher Article.
-
-  Use when: external attention or discussion observations are needed for a known
-  Article.
-
-  Do not use when: publisher republication coverage or related reading is
-  needed.
-
-  Search/filter behavior: the path UUID is exact; optional platforms and forums
-  filters select mention metadata.
-
+docs: |-
+  Answers: Where was this Article URL observed on external social or forum platforms?
+  Returns: A cursor-paginated collection of external mention observations; a mention is not another publisher Article.
+  Use when: external attention or discussion observations are needed for a known Article.
+  Do not use when: publisher republication coverage or related reading is needed.
+  Search/filter behavior: the path UUID is exact; optional platforms and forums filters select mention metadata.
   Time: from and to are inclusive UTC observation-date bounds in YYYY-MM-DD.
-
-  Sort/pagination: observed-time order; follow pagination.next_cursor unchanged
-  as cursor. limit defaults to 20 and is capped at 100.
-
-  Missing fields: forum and engagement metrics may be null; empty results are
-  HTTP 200 with data: [].
-
-  Next step: use GET /articles/{id} to return to the Article citation or GET
-  /articles/trending for aggregate attention ranking.
+  Sort/pagination: observed-time order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
+  Missing fields: forum and engagement metrics may be null; empty results are HTTP 200 with data: [].
+  Next step: use GET /articles/{id} to return to the Article citation or GET /articles/trending for aggregate attention ranking.

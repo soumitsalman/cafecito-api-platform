@@ -7,17 +7,16 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/event-types"
+  url: "{{baseUrl}}/event-types?q=price"
   params:
+    - name: q
+      value: price
+      type: query
     - name: q
       value: ""
       type: query
       description: Case-insensitive substring filter.
       disabled: true
-    - name: response_type
-      value: json
-      type: query
-      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
     - name: response_type
       value: yaml
       type: query
@@ -28,10 +27,6 @@ http:
       type: query
       description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
       disabled: true
-    - name: limit
-      value: "20"
-      type: query
-      description: Maximum records per page. Default 20, max 100.
     - name: cursor
       value: ""
       type: query

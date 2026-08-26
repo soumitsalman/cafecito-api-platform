@@ -6,8 +6,8 @@
 
 | Product | Status | Notes |
 |---|---|---|
-| **Beans** | Live | News and publisher-content REST and MCP (`apis/beans/`) |
-| **Espresso** | Live | Events and Signals REST and MCP (`apis/espresso/`) |
+| **Beans** | Live | News and publisher-content REST API and MCP (`apis/beans/`) |
+| **Espresso** | Live | Market Intelligence events and signals REST API and MCP (`apis/espresso/`) |
 | **Cortado** | Future | Reserved; not a live API |
 | **Latte** | Future | Reserved; not a live API |
 

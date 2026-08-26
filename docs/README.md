@@ -8,14 +8,14 @@ Hosted at [developer.cafecito.tech](https://developer.cafecito.tech). Built on [
 
 | Product | Status | Public surface |
 | --- | --- | --- |
-| **Beans** | Live | News and publisher-content REST and MCP (`/beans`, `/beans/mcp`) |
-| **Espresso** | Live | Market/business/event intelligence REST and MCP (`/espresso`, `/espresso/mcp`) |
+| **Beans** | Live | Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. |
+| **Espresso** | Live | Espresso is a market, business, event, and news intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources. GDELT and Perigon are comparison patterns, not claims of route-for-route equivalence. |
 | **Cortado** | Future | No public API |
 | **Latte** | Future | No public API |
 
 One API key authenticates every live product. There is no official SDK. Gateway: `https://api.cafecito.tech`. Limits: ongoing free tier, 100 requests/min and 50,000/month per user (see [Pricing and limits](pages/guides/pricing-limits.mdx)).
 
-Approved one-liners live in [`src/product-status.tsx`](src/product-status.tsx) and are rendered on [Getting started](pages/start/overview.mdx).
+Approved one-liners are on [Getting started](pages/start/overview.mdx).
 
 ## Portal content summary
 

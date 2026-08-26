@@ -305,23 +305,22 @@ func (b *PGSack) QueryBeans(ctx context.Context, filters BeanFilters, page PageR
 	}), nil
 }
 
-func (b *PGSack) getBeanURL(ctx context.Context, id uuid.UUID) (string, error) {
-	seed_url, err := utils.FetchOneScalar[string](ctx, b.db,
-		"SELECT url FROM beans WHERE id = @id",
+func (b *PGSack) beanExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	return utils.FetchOneScalar[bool](ctx, b.db,
+		"SELECT EXISTS (SELECT 1 FROM beans WHERE id = @id LIMIT 1)",
 		pgx.NamedArgs{"id": id},
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNonExistentID
-	}
-	return seed_url, err
 }
 
 // QuerySimilarBeans returns known related publisher coverage for one Article UUID.
 // related_beans edges are treated as undirected. Missing IDs return ErrNonExistentID.
 func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters BeanFilters, page PageRequest, columns string) (Page[Bean], error) {
-	url, err := b.getBeanURL(ctx, id)
+	exists, err := b.beanExists(ctx, id)
 	if err != nil {
 		return Page[Bean]{}, err
+	}
+	if !exists {
+		return Page[Bean]{}, ErrNonExistentID
 	}
 
 	where, params := buildScalarWhere(&filters)
@@ -331,7 +330,6 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Be
 		params["cursor_id"] = *page.Cursor.ID
 	}
 	params["id"] = id
-	params["seed_url"] = url
 	params["limit"] = page.Limit + 1
 
 	where_expr := ""
@@ -339,14 +337,14 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Be
 		where_expr = " AND " + strings.Join(where, " AND ")
 	}
 	query := fmt.Sprintf(`
-		WITH target_urls AS (
-			SELECT related_url AS target_url
-			FROM related_beans
-			WHERE url = @seed_url		
+		WITH target_ids AS (
+			SELECT related_bean_id AS target_id FROM related_beans WHERE bean_id = @id
+			UNION
+			SELECT bean_id AS target_id FROM related_beans WHERE related_bean_id = @id
 		)
 		SELECT %s
-		FROM target_urls
-		INNER JOIN latest_beans_view ON url = target_url
+		FROM target_ids
+		INNER JOIN latest_beans_view ON id = target_id
 		WHERE id <> @id
 			%s -- additional where
 		ORDER BY created DESC, id DESC
@@ -366,15 +364,18 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Be
 // QueryMentions returns the latest observed social/forum posts linking an Article URL.
 // Missing IDs return ErrNonExistentID. Empty membership is an empty page.
 func (b *PGSack) QueryMentions(ctx context.Context, id uuid.UUID, filters MentionFilters, page PageRequest) (Page[Mention], error) {
-	seed_url, err := b.getBeanURL(ctx, id)
+	exists, err := b.beanExists(ctx, id)
 	if err != nil {
 		return Page[Mention]{}, err
 	}
+	if !exists {
+		return Page[Mention]{}, ErrNonExistentID
+	}
 
-	inner_where := []string{"ch.url = @url"}
+	inner_where := []string{"ch.bean_id = @bean_id"}
 	params := pgx.NamedArgs{
-		"url":   seed_url,
-		"limit": page.Limit + 1,
+		"bean_id": id,
+		"limit":   page.Limit + 1,
 	}
 	if len(filters.Platforms) > 0 {
 		inner_where = append(inner_where, "LOWER(ch.platform) = ANY(@platforms)")

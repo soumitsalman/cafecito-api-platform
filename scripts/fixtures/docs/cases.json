@@ -74,6 +74,12 @@
       "expect": "has no matching docs/pages source"
     },
     {
+      "id": "positioning-drift",
+      "check": "positioning",
+      "dir": "positioning-drift",
+      "expect": "missing canonical positioning: Espresso is a market, business, event, and news intelligence API"
+    },
+    {
       "id": "generated-llms",
       "check": "generated",
       "dir": "generated-llms",

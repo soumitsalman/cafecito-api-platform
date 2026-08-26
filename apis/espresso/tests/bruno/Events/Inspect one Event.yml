@@ -7,26 +7,26 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/events/:event_id"
+  url: "{{baseUrl}}/events/:event_id?response_type=yaml"
   params:
-    - name: event_id
-      value: ""
-      type: path
-      description: Event UUID (RFC 4122).
     - name: response_type
       value: json
       type: query
       description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
     - name: response_type
       value: yaml
       type: query
       description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
-      disabled: true
     - name: response_type
       value: toon
       type: query
       description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
       disabled: true
+    - name: event_id
+      value: cd04fe3d-5732-563f-b7ca-d7f2ef4ce887
+      type: path
+      description: Event UUID (RFC 4122).
   auth: inherit
 
 settings:

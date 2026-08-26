@@ -30,7 +30,7 @@ Stack:
 - Main scripts: `npm run dev`, `npm run test`, `npm run docs`, `npm run lint`, `npm run verify:api-contracts`, `npm run verify:docs`
 
 Key files:
-
+- `config` directly should ONLY be used for route definitions and route policies.
 - `config/beans.oas.json`: Beans public OpenAPI routes under `/beans`
 - `config/espresso.oas.json`: Espresso public OpenAPI routes under `/espresso`
 - `config/developer.oas.json`: developer API for key creation and Clerk webhooks

@@ -4,20 +4,26 @@ info:
   seq: 4
   tags:
     - Articles
+
 http:
   method: GET
-  url: "{{baseUrl}}/articles/:id"
+  url: "{{baseUrl}}/articles/:id?full_content=true"
   params:
+    - name: full_content
+      value: "true"
+      type: query
     - name: id
       value: ad5ea4c6-7e4d-538a-9268-d36450a70a44
       type: path
   auth: inherit
+
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
+
 examples:
   - name: 200 Response
     description: OK
@@ -174,27 +180,14 @@ examples:
               "message": ""
             }
           }
-docs: >-
+
+docs: |-
   Answers: What did this specific publisher Article say?
-
-  Returns: One Article detail record inside data, identified by the Article
-  UUID, with links for similar Articles and observed external mentions.
-
-  Use when: an agent already has an Article UUID and needs citable metadata,
-  Source context, or optional full content.
-
+  Returns: One Article detail record inside data, identified by the Article UUID, with links for similar Articles and observed external mentions.
+  Use when: an agent already has an Article UUID and needs citable metadata, Source context, or optional full content.
   Do not use when: the Article UUID is unknown; use search or a feed first.
-
-  Search/filter behavior: the path UUID is exact; full_content=true requests the
-  available body without changing identity.
-
-  Time: published_at is the publisher publication timestamp; this route has no
-  time window.
-
+  Search/filter behavior: the path UUID is exact; full_content=true requests the available body without changing identity.
+  Time: published_at is the publisher publication timestamp; this route has no time window.
   Sort/pagination: one detail record; no cursor or ordering applies.
-
-  Missing fields: title, summary, author, image, Source metadata, story_id, and
-  content may be null or omitted.
-
-  Next step: follow links.similar for ranked related reading or links.mentions
-  for external observations.
+  Missing fields: title, summary, author, image, Source metadata, story_id, and content may be null or omitted.
+  Next step: follow links.similar for ranked related reading or links.mentions for external observations.

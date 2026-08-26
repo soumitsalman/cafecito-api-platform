@@ -10,7 +10,7 @@ http:
   url: "{{baseUrl}}/signals/:signal_id"
   params:
     - name: signal_id
-      value: ""
+      value: 72f16578-f9b3-5921-b595-90977d00493d
       type: path
       description: Signal UUID (RFC 4122).
     - name: response_type

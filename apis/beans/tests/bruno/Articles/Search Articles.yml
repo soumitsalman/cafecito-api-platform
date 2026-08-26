@@ -4,16 +4,29 @@ info:
   seq: 2
   tags:
     - Articles
+
 http:
   method: GET
-  url: "{{baseUrl}}/articles/search"
+  url: "{{baseUrl}}/articles/search?q=topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice&limit=20&xxy=hello"
+  params:
+    - name: q
+      value: topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice
+      type: query
+    - name: limit
+      value: "20"
+      type: query
+    - name: xxy
+      value: hello
+      type: query
   auth: inherit
+
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false
+
 examples:
   - name: 200 Response
     description: OK
@@ -155,33 +168,14 @@ examples:
               "message": ""
             }
           }
-docs: >-
-  Answers: Which publisher Articles match this topic, identity, Source, label,
-  or publication-date query?
 
-  Returns: A cursor-paginated collection where each data item is one publisher
-  Article identified by UUID. Empty results are HTTP 200 with data: [].
-
-  Use when: broad Article retrieval, semantic topic search, exact Article IDs or
-  URLs, or combined Article filters are needed.
-
-  Do not use when: newest-only, headline-only, or attention-ranked results are
-  needed; use latest, top-headlines, or trending.
-
-  Search/filter behavior: q is semantic natural-language search; score_threshold
-  requires q. ids and urls are exact. Include values use OR within a field;
-  different fields combine with AND. full_content changes only the Article
-  projection.
-
-  Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD
-  form.
-
-  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit
-  defaults to 20 and is capped at 100. offset and page are not supported.
-
-  Missing fields: Article enrichment, Source metadata, story_id, content, and
-  trend may be null or omitted. Content requires full_content=true and source
-  availability.
-
-  Next step: use GET /articles/{id} for one selected Article, then follow its
-  similar or mentions link.
+docs: |-
+  Answers: Which publisher Articles match this topic, identity, Source, label, or publication-date query?
+  Returns: A cursor-paginated collection where each data item is one publisher Article identified by UUID. Empty results are HTTP 200 with data: [].
+  Use when: broad Article retrieval, semantic topic search, exact Article IDs or URLs, or combined Article filters are needed.
+  Do not use when: newest-only, headline-only, or attention-ranked results are needed; use latest, top-headlines, or trending.
+  Search/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.
+  Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD form.
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100. offset and page are not supported.
+  Missing fields: Article enrichment, Source metadata, story_id, content, and trend may be null or omitted. Content requires full_content=true and source availability.
+  Next step: use GET /articles/{id} for one selected Article, then follow its similar or mentions link.

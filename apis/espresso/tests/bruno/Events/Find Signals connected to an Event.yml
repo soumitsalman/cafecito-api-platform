@@ -10,7 +10,7 @@ http:
   url: "{{baseUrl}}/events/:event_id/signals"
   params:
     - name: event_id
-      value: ""
+      value: cd04fe3d-5732-563f-b7ca-d7f2ef4ce887
       type: path
       description: Event UUID (RFC 4122).
     - name: ids

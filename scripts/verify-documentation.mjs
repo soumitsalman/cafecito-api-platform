@@ -35,6 +35,7 @@ import { checkGenerated } from "./verify-doc-generated.mjs";
 import { checkInventory } from "./verify-doc-inventory.mjs";
 import { checkLifecycle } from "./verify-doc-lifecycle.mjs";
 import { checkLinks } from "./verify-doc-links.mjs";
+import { checkPositioning } from "./verify-doc-positioning.mjs";
 import { checkTerms } from "./verify-doc-terms.mjs";
 import {
   PORTAL_MOUNTS,
@@ -122,6 +123,7 @@ async function runAll(ctx) {
   const lifecycle = await checkLifecycle(ctx);
   const links = await checkLinks(ctx);
   const inventory = await checkInventory(ctx);
+  const positioning = await checkPositioning(ctx);
   const generated = await checkGenerated(ctx);
   return {
     examples,
@@ -129,6 +131,7 @@ async function runAll(ctx) {
     lifecycle,
     links,
     inventory,
+    positioning,
     generated: generated.issues,
     generatedSkipped: generated.skipped,
   };
@@ -165,6 +168,7 @@ async function selfTest() {
     else if (c.check === "lifecycle") list = await checkLifecycle(ctx);
     else if (c.check === "links") list = await checkLinks(ctx);
     else if (c.check === "inventory") list = await checkInventory(ctx);
+    else if (c.check === "positioning") list = await checkPositioning(ctx);
     else if (c.check === "generated") list = (await checkGenerated(ctx)).issues;
     const all = list;
     const matched = all.filter((i) => i.message.includes(c.expect));

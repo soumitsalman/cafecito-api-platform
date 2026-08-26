@@ -7,10 +7,10 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/signals"
+  url: "{{baseUrl}}/signals?score_threshold=0.5&response_type=json&limit=20"
   params:
     - name: q
-      value: ""
+      value: topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice
       type: query
       description: Optional natural-language semantic query. Max 1024 characters.
       disabled: true

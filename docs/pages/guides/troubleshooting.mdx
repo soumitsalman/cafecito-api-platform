@@ -1,4 +1,5 @@
 ---
+title: Cafecito API Troubleshooting
 description: Diagnose authentication, validation, pagination, rate-limit, empty-result, and service failures for Cafecito APIs and MCPs.
 ---
 
@@ -16,7 +17,7 @@ Use this table after a failed or surprising call. Shared contract detail lives i
 | HTTP `429` | User rate (100/min) or monthly quota (50,000) | Back off; wait for the next minute or month | Yes, after delay | [Pricing](/guides/pricing-limits) |
 | HTTP `5xx` | Temporary service failure | Bounded exponential backoff with jitter | Yes | Hit `/health` without a key, then retry |
 | Health check fails | Product gateway or service unavailable | Wait and retry health; do not send a key | Yes | `/beans/health` or `/espresso/health` |
-| HTTP `5xx` | Unsupported `response_type` | Use JSON | No | Espresso `response_type=json` |
+| HTTP `400` | Unsupported `response_type` | Use JSON | No | Espresso `response_type=json` |
 | MCP cannot connect | Wrong URL, missing Bearer, or tool not exported | Use hosted `/beans/mcp` or `/espresso/mcp` with the same key | After fixing config | [MCP and AI agents](/guides/mcp-ai-agents) |
 
 ## Operational recovery sequence

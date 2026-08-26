@@ -156,9 +156,10 @@ export async function checkExamples(ctx) {
         continue;
       }
       const allowed = queryParamNames(oas, op);
+      const documentsBadRequest = /^\s*status:\s*400\b/m.test(yaml);
       for (const q of brunoQueryNames(yaml)) {
         if (q.in !== "query") continue;
-        if (!allowed.has(q.name)) {
+        if (!allowed.has(q.name) && !documentsBadRequest) {
           issues.push(
             issue(check, loc, `Bruno query ${q.name} is not accepted on ${method} ${path}`),
           );

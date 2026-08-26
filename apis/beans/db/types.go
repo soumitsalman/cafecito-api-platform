@@ -162,7 +162,7 @@ type Mention struct {
 	URL         string         `db:"chatter_url"`
 	Platform    string         `db:"platform"`
 	Forum       sql.NullString `db:"forum"`
-	Observed    time.Time      `db:"collected"`
+	Observed    time.Time      `db:"observed"`
 	Likes       sql.NullInt64  `db:"likes"`
 	Comments    sql.NullInt64  `db:"comments"`
 	Subscribers sql.NullInt64  `db:"subscribers"`

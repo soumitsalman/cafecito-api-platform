@@ -40,14 +40,6 @@ Older route proposals and execution plans remain for history. They do **not** ov
 |---|---|---|
 | [BEANS_API_ROUTE_PROPOSAL.md](BEANS_API_ROUTE_PROPOSAL.md) | superseded | `config/beans.oas.json` |
 | [ESPRESSO_API_ROUTE_PROPOSAL.md](ESPRESSO_API_ROUTE_PROPOSAL.md) | superseded | `config/espresso.oas.json` |
-| [BEANS_API_DOCUMENTATION_PLAN.md](BEANS_API_DOCUMENTATION_PLAN.md) | superseded | shipped portal + gateway OAS |
-| [ESPRESSO_API_DOCUMENTATION_PLAN.md](ESPRESSO_API_DOCUMENTATION_PLAN.md) | superseded | shipped portal + gateway OAS |
-| [BEANS_ESPRESSO_DOCUMENTATION_PLAN.md](BEANS_ESPRESSO_DOCUMENTATION_PLAN.md) | superseded | shipped portal pages |
-| [BEANS_API_TEST_CRITERIA.md](BEANS_API_TEST_CRITERIA.md) | superseded | published envelope + `apis/beans/tests/` |
-| [BEANS_API_GAP_ANALYSIS.md](BEANS_API_GAP_ANALYSIS.md) | historical | scored against the superseded proposal |
-| [ESPRESSO_API_GAP_ANALYSIS.md](ESPRESSO_API_GAP_ANALYSIS.md) | historical | scored against the superseded proposal |
-| [API_ROUTE_DECISION_RATIONALE.md](API_ROUTE_DECISION_RATIONALE.md) | historical | rationale for superseded proposals |
-| [API_CAPABILITY_GAP_ANALYSIS.md](API_CAPABILITY_GAP_ANALYSIS.md) | historical | later audits and shipped APIs |
 
 ## Public documentation boundary
 

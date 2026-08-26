@@ -38,7 +38,7 @@ curl -sS --get "$BASE_URL/espresso/events" \
 
 Continue with the [Espresso overview](/products/espresso) or [Espresso API reference](/api/espresso). Espresso collections return `pagination.next_cursor`. See [API conventions](/guides/api-conventions).
 
-Unknown query parameters are silently ignored. Empty searches return HTTP `200` with `data: []`.
+Unknown or route-inapplicable query parameters return HTTP `400` with the ErrorResponse envelope. Empty searches return HTTP `200` with `data: []`.
 
 ## Using the API in production
 

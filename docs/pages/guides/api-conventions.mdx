@@ -29,7 +29,7 @@ One key works across live REST APIs and MCP servers. Store the key in an environ
 
 ## Query validation
 
-Unknown query parameters are silently ignored. Malformed UUIDs, malformed cursors, and out-of-range `limit` values are **rejected** with HTTP `400` and the error envelope below.
+Unknown or route-inapplicable query parameters are **rejected** with HTTP `400` and the ErrorResponse envelope below. Malformed UUIDs, malformed cursors, and out-of-range `limit` values are rejected with HTTP `400` as well.
 
 Use only the parameters listed for that route in the [Beans](/api/beans) or [Espresso](/api/espresso) reference.
 

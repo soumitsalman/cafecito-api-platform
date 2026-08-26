@@ -1,5 +1,3 @@
-# Cafecito Documentation Gap Report
-
 | Field | Value |
 |---|---|
 | Status | **current** |
@@ -65,6 +63,67 @@ The highest-priority work is to reconcile those surfaces before adding more pros
 | Needed for usability | Common conventions, troubleshooting, client setup, dynamic response fields, and cross-product recipes are incomplete or distributed across multiple pages. | P1 |
 | Needed for discovery | SEO metadata is broad, machine-readable schemas are weak, MCP/LLM catalogs are incomplete, and repository-facing documentation contains stale paths and terminology. | P1/P2 |
 
+
+## Current-state re-audit - 2026-08-25
+
+This section supersedes the open/closed interpretation of the original findings below. The detailed findings remain as audit evidence; an item is still open only when this disposition marks it active or partial.
+
+### Verification snapshot
+
+- **Contract cascade: PASS.** npm run verify:api-contracts reports Beans 17 backend / 18 gateway operations and Espresso 14 backend / 15 gateway operations, with zero unexplained mismatches. Reviewed differences are in config/api-contract-exceptions.json.
+- **Portal build: PASS.** npm run build --workspace docs produces 65 prerendered routes, Pagefind, sitemap, published Markdown, llms.txt, and llms-full.txt.
+- **Live documentation checks: PASS.** Examples, terms, lifecycle, links, inventory, generated-output, and forbidden-public-term checks produce no live issues.
+- **Complete docs verifier: PASS.** `npm run verify:docs` passes live checks, positioning parity, generated-output checks, and all negative fixtures.
+- **Deployment enforcement: PARTIAL.** api-contract-docs.yml is workflow_dispatch only; deploy workflows do not depend on it. The check is reproducible but not an automatic or required gate.
+
+### Updated intent distance
+
+| API | Current distance | Evidence | Remaining gap |
+|---|---|---|---|
+| Beans | Near | Publisher-content positioning, broad content-purpose examples, and migration mappings for TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io are present; the start-page Markdown table, entry pages, OpenAPI, portal metadata, and generated Markdown are checked for wording parity. | Keep the parity expectations current when wording changes. |
+| Espresso | Near | Market/business intelligence positioning, GDELT and Perigon mapping, evidence/provenance, monitoring, research-brief, and early-warning workflows are present; the start-page Markdown table, OpenAPI, portal metadata, and generated Markdown are checked for wording parity. | Keep the parity expectations current when wording changes. |
+
+### Disposition by category
+
+#### Inconsistent information
+
+| Finding | Status | Current state |
+|---|---|---|
+| I-01 | Partial / controlled | Active READMEs and indexes are current. Superseded plans still contain old paths, but lifecycle labels and generated-output exclusion control the risk. |
+| I-02, I-03 | Resolved | Beans post is response-only, top-headlines rejects inapplicable filters, and current router/OAS/portal/Bruno surfaces agree. |
+| I-04, I-05 | Resolved on active surfaces | Current pagination and Espresso terminology/formats agree. Old cursor, sip, relation, and text claims remain only in labeled historical design records. |
+| I-06 | **Resolved** | Active docs now state that unknown or route-inapplicable query parameters are rejected with HTTP 400 and the ErrorResponse envelope across Beans and Espresso; unsupported Espresso `response_type` is also documented as 400. |
+| I-07, I-08 | Resolved | Bearer, health, 401/429 boundaries, and current MCP tool inventories are represented and structurally checked. |
+| I-09, I-10 | Resolved / controlled | Product status, frozen limits, and public/internal boundaries are current; generated public output contains none of the tested internal terms. |
+
+#### Needed for usability
+
+| Finding | Status | Current state |
+|---|---|---|
+| U-01 | **Resolved** | Shared conventions now document strict unknown/inapplicable query rejection with the ErrorResponse envelope. |
+| U-02, U-03, U-05, U-06, U-07, U-09, U-10, U-11 | Resolved or monitor | Schemas, Espresso route matrices, reusable clients, MCP setup, dynamic-field guidance, freshness semantics, SDK/versioning/limits guidance, and Bruno links are now present. |
+| U-04 | **Resolved** | Troubleshooting now identifies unsupported `response_type` as HTTP 400 and directs clients to JSON. |
+| U-08 | **Resolved** | The workflow has corrected numbering plus complete Node.js and Python composite clients covering Beans search, Espresso Events/Signals, and Event evidence. |
+
+#### Needed for discovery
+
+| Finding | Status | Current state |
+|---|---|---|
+| D-01, D-03, D-04, D-06, D-08, D-09 | Resolved or monitor | Product-specific metadata, intent-to-route API overview, MCP catalog, page descriptions, Bruno links, and search vocabulary are present. |
+| D-02 | Resolved for crawl baseline; scoped for enhancement | Canonical URLs, sitemap, Pagefind, Markdown, LLM indexes, `metadata.robots`, and checked-in `robots.txt` are present. A custom global Open Graph/Twitter/JSON-LD plugin is intentionally not used; product-specific `<Head>` metadata remains an optional future enhancement. |
+| D-05, D-07 | Partial / controlled | Structural OAS parity and lifecycle headers are present, but semantic prose parity is not machine-checked and repository crawlers can still encounter historical plans. |
+| D-10 | Resolved | Generated output contains required current slugs and no tested internal terms; `npm run verify:docs` passes its generated-output checks and all negative fixtures. |
+
+### Current remaining edit set
+
+No active edits remain from this re-audit. `docs/zudoku.config.tsx` uses Zudoku native metadata, canonical URL, and sitemap configuration, with `docs/public/robots.txt` for crawler directives. If product-specific sharing cards or structured data become necessary, add small local `<Head>` blocks to the relevant product overview pages rather than restoring a global plugin.
+
+### Current RCCA status
+
+The architectural correction is underway, not complete. CA-1, CA-2, CA-4, CA-5, CA-6, and CA-7 have concrete repository artifacts. CA-3 has a manual workflow, but it is deliberately not a pull-request, push, or required deployment gate.
+
+The remaining root cause is narrower: Cafecito now has structural reconciliation and documentation hygiene controls, but semantic prose parity and the final verification gate remain manually enforced.
+
 # Product intent and documentation distance
 
 ## Assessment method
@@ -81,14 +140,12 @@ This section measures documentation distance from the stated product intent, not
 
 | API | Stated intent | Current documentation alignment | Distance | Main remaining gap |
 |---|---|---|---|---|
-| Beans | A multi-source News and Blogs API comparable to TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai/Event Registry, and NewsData.io, with additional publisher content such as earnings reports, financial reports, litigation/lawsuits, official statements, research papers, podcasts, and technical documents. | Strong on core retrieval: Articles, Sources, Stories, feeds, discovery, related reading, mentions, filters, and full-content projection are documented. | Near to moderate | The public entry points still frame Beans mainly as News & Blogs. The broader publisher-content taxonomy, provider migration story, and non-news use cases are not prominent enough. |
-| Espresso | A market and Business Intelligence API comparable to GDELT and Perigon, covering event/news intelligence, normalized events, stories or evidence, entities, geography, search, source context, and explainable intelligence. | Strong on the Cafecito model: Events, Signals, Evidence, Sources, discovery, structured filters, and agent workflows are documented. | Moderate | The docs explain Espresso as an internal conceptual model of Events and Signals, but do not clearly position it as market, business, event, and news intelligence or map its scope against GDELT and Perigon patterns. |
+| Beans | A multi-source News and Blogs API comparable to TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai/Event Registry, and NewsData.io, with additional publisher content such as earnings reports, financial reports, litigation/lawsuits, official statements, research papers, podcasts, and technical documents. | Strong on core retrieval: Articles, Sources, Stories, feeds, discovery, related reading, mentions, filters, and full-content projection are documented. | Near | Keep the canonical source and parity check current when wording changes. |
+| Espresso | A market and Business Intelligence API comparable to GDELT and Perigon, covering event/news intelligence, normalized events, stories or evidence, entities, geography, search, source context, and explainable intelligence. | Strong on the Cafecito model: Events, Signals, Evidence, Sources, discovery, structured filters, and agent workflows are documented. | Near | Keep the canonical source and parity check current when wording changes. |
 
 ### Overall conclusion
 
-Beans is approximately one positioning layer away from the intended product. Its public route documentation already resembles a useful News API, but the top-level language and examples do not make the broad publisher-content scope obvious.
-
-Espresso is approximately one positioning and comparison layer plus one workflow layer away from the intended product. Its resource model is clear, but a user looking for a GDELT or Perigon-style market or event intelligence API may not recognize that Espresso is the relevant product or understand where it intentionally differs.
+Beans and Espresso are now near their stated intents on active documentation surfaces. The canonical positioning source, gateway OpenAPI descriptions, portal pages, SEO metadata, generated Markdown, and parity verifier keep the category and provider-boundary language aligned. Remaining work is maintenance when product wording changes.
 
 The highest-value additions are:
 
