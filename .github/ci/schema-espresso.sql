@@ -1,25 +1,4 @@
 --
--- PostgreSQL database dump
---
-
-\restrict j4vXZnEuVgoNhmlGYZsDWE9XTieJ4360cZppdnuOJjKrJmYqFfx8UgaxPymJ2eM
-
--- Dumped from database version 18.6 (3484359)
--- Dumped by pg_dump version 18.6 (Debian 18.6-1.pgdg13+2)
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
 -- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -306,10 +285,4 @@ CREATE INDEX idx_sips_url ON public.sips USING btree (url);
 
 CREATE INDEX idx_sources_base_url ON public.sources USING btree (base_url);
 
-
---
--- PostgreSQL database dump complete
---
-
-\unrestrict j4vXZnEuVgoNhmlGYZsDWE9XTieJ4360cZppdnuOJjKrJmYqFfx8UgaxPymJ2eM
 

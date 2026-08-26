@@ -1,6 +1,6 @@
 // @title             Espresso API & MCP
-// @version           0.2
-// @description       Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.
+// @version           0.5
+// @description       Espresso is a business and market intelligence data API for AI agents, automated research, and analytical applications.
 // @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
 // @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
 // @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
@@ -279,8 +279,6 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} EventCollectionResponse "Event collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID searchEvents
@@ -323,8 +321,6 @@ func (r *Configuration) getEvents(c *gin.Context) {
 // @Success 200 {object} EventDetailResponse "Event detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getEvent
@@ -370,8 +366,6 @@ func (r *Configuration) getEvent(c *gin.Context) {
 // @Success 200 {object} EventEvidenceCollectionResponse "Event evidence collection envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getEventEvidence
@@ -434,8 +428,6 @@ func (r *Configuration) getEventEvidence(c *gin.Context) {
 // @Success 200 {object} SignalCollectionResponse "Signals derived from this Event"
 // @Failure 400 {object} ErrorResponse "Malformed UUID, invalid cursor token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Event with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getEventSignals
@@ -496,8 +488,6 @@ func (r *Configuration) getEventSignals(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} SignalCollectionResponse "Signal collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid query parameters, malformed UUID, or malformed cursor token"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID searchSignals
@@ -539,8 +529,6 @@ func (r *Configuration) getSignals(c *gin.Context) {
 // @Success 200 {object} SignalDetailResponse "Signal detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getSignal
@@ -595,8 +583,6 @@ func (r *Configuration) getSignal(c *gin.Context) {
 // @Success 200 {object} EventCollectionResponse "Events supporting this Signal"
 // @Failure 400 {object} ErrorResponse "Malformed UUID, invalid cursor token, or invalid parameters"
 // @Failure 404 {object} ErrorResponse "No Signal with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getSignalEvents
@@ -649,8 +635,6 @@ func (r *Configuration) getSignalEvents(c *gin.Context) {
 // @Param response_type query string false "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients." Enums(json, yaml, toon) default(json)
 // @Success 200 {object} SourceCollectionResponse "Source collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID listIntelligenceSources
@@ -686,8 +670,6 @@ func (r *Configuration) getSources(c *gin.Context) {
 // @Success 200 {object} SourceItemResponse "Source detail envelope"
 // @Failure 400 {object} ErrorResponse "Malformed UUID"
 // @Failure 404 {object} ErrorResponse "No Source with this UUID"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID getIntelligenceSource
@@ -724,8 +706,6 @@ func (r *Configuration) getSource(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Tag value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or response_type"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Concurrency limit exceeded; retry shortly"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID listIntelligenceTags
@@ -771,7 +751,6 @@ func (r *Configuration) getTags(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Entity value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID listIntelligenceEntities
@@ -811,7 +790,6 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Region value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID listIntelligenceRegions
@@ -847,7 +825,6 @@ func (r *Configuration) getRegions(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it."
 // @Success 200 {object} DiscoveryValueCollectionResponse "Event type value collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid limit, cursor token, or parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
 // @Failure 500 {object} ErrorResponse "Service unavailable; retry."
 // @Security BackendAPIKey
 // @ID listIntelligenceEventTypes

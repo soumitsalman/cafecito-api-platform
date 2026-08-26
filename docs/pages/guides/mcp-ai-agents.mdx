@@ -1,14 +1,15 @@
 ---
-title: MCP and AI agents
 description: Hosted Beans and Espresso MCP servers, exported tools, Bearer auth, REST equivalents, and tool sequencing. No official SDK.
 ---
 
-# MCP and AI agents
+import { Button } from "zudoku/ui/Button";
 
-Cafecito hosts two Model Context Protocol (MCP) servers. They use the **same API key** as REST. There is **no official SDK**; connect any MCP client that can send `Authorization: Bearer` to the hosted URLs.
+# MCP and AI Agents
+
+Cafecito hosts two Model Context Protocol (MCP) servers. They use the **same API key** as REST. Connect any MCP client that can send `Authorization: Bearer` to the hosted URLs.
 
 - **Beans MCP** answers publisher coverage: Articles, Sources, Stories, and discovery vocabularies.
-- **Espresso MCP** answers structured intelligence: Events, Signals, evidence, and intelligence Sources.
+- **Espresso MCP** answers market intelligence: Events, Signals, evidence, and intelligence Sources.
 
 Do not use Beans tools for Event or Signal questions. Do not use Espresso tools when the user needs Article URLs, publisher text, Story membership, or source-coverage counts from Beans.
 
@@ -26,7 +27,7 @@ Cross-product sequencing (Beans coverage → Espresso evidence) is on [Cross-pro
 | Auth | `Authorization: Bearer YOUR-API-KEY` |
 | Health | REST only; not exported as MCP tools |
 
-Create a key from the portal ([API keys](/start/api-keys)). One key works on both MCP servers and both REST APIs. Store it in the client's secret store; never commit it.
+<Button className="btn-with-link" asChild><a href="/settings/api-keys">Create API Key</a></Button> from the portal. One key works on both MCP servers and both REST APIs. Store it in the client's secret store; never commit it.
 
 Example MCP client config (replace the key; this is not an SDK):
 
@@ -51,7 +52,7 @@ Example MCP client config (replace the key; this is not an SDK):
 
 Missing or invalid keys return HTTP `401` on MCP the same as REST. Rate and monthly quota apply to MCP tool calls the same as REST.
 
-## Beans MCP catalog
+## Beans MCP tools
 
 Exported tools are exactly the `operationId` values listed on `/beans/mcp`. `healthCheck` and `beansMcp` are **not** tools.
 
@@ -74,7 +75,7 @@ Exported tools are exactly the `operationId` values listed on `/beans/mcp`. `hea
 | `getStory` | `GET /beans/stories/{id}` | What is this Story, including member-Article path metadata? |
 | `listStoryArticles` | `GET /beans/stories/{id}/articles` | Which member Articles belong to this Story? |
 
-`content_type` filters Articles by type. `post` is response-only: it may appear on returned Articles, but `content_type=post` is rejected with HTTP `400`. The other 14 types remain valid filters. Omit `content_type` to include all types.
+`content_type` filters Articles by type.
 
 ### Beans tool sequencing
 
@@ -85,9 +86,9 @@ Exported tools are exactly the `operationId` values listed on `/beans/mcp`. `hea
 5. Call `listStoryArticles` after a Story UUID when the user needs member Articles.
 6. Call `getSimilarArticles` or `getArticleMentions` only when the question needs related reading or external observations.
 7. Call `listSources` / `getSource` for publisher metadata, not for Article bodies.
-8. Send `pagination.next_cursor` unchanged as the next `cursor` on the same tool with the same filters. Beans collections do not serialize `pagination.cursor`.
+8. Send `pagination.next_cursor` unchanged as the next `cursor` on the same tool with the same filters.
 
-## Espresso MCP catalog
+## Espresso MCP tools
 
 Exported tools are exactly the 13 operations on `/espresso/mcp`. `healthCheck` and `espressoMcp` are **not** tools.
 
@@ -107,7 +108,7 @@ Exported tools are exactly the 13 operations on `/espresso/mcp`. `healthCheck` a
 | `listIntelligenceRegions` | `GET /espresso/regions` | Discover exact region filter values. |
 | `listIntelligenceEventTypes` | `GET /espresso/event-types` | Discover exact `event_types` filter values. |
 
-`categories` is not an alias for `event_types`. Espresso `from` / `to` bound record `created_at`. JSON, YAML, and TOON collection payloads share the same fields, including pagination.
+`response_type=json`, `response_type=yaml`, `response_type=toon` payloads share the same fields, including pagination.
 
 ### Espresso tool sequencing
 
@@ -125,5 +126,4 @@ Exported tools are exactly the 13 operations on `/espresso/mcp`. `healthCheck` a
 - Prefer the hosted MCP tools above over inventing REST paths. Tool names must match this catalog.
 - Carry IDs exactly as returned (RFC 4122 UUIDs). Do not invent IDs.
 - Empty collections are success with `data: []`. Missing detail IDs are not found.
-- Cite Beans Article `url` for publisher reading. Cite Espresso evidence URLs and Source IDs for structured claims.
-- Do not claim an official Cafecito SDK or client library.
+- Cite Beans Article `url` for publisher reading. Cite Espresso evidence URLs for provenance.

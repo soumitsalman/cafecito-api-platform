@@ -1,6 +1,5 @@
 ---
-title: Beans News and Publisher Content API
-description: Read-only publisher-content API for news, blogs, earnings and financial reports, litigation, official statements, research, technical documents, Sources, and Stories.
+description: Publisher-content API & MCP for news, blogs, earnings and financial reports, litigation, official statements, research papers, technical documents and cross publisher stories.
 ---
 
 import { Badge } from "zudoku/ui/Badge";
@@ -8,19 +7,18 @@ import { Button } from "zudoku/ui/Button";
 
 ![Beans banner](/beans-banner.png)
 
-# Beans News API & MCP
+# Beans News API
 
 <Badge variant="default">v1</Badge><Badge className="badge-live">Live</Badge>
 
-**In one line:** Beans is a read-only publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
 
 - **Articles** are publisher items (news, blogs, reports, statements, research, and other stored types).
 - **Sources** are publisher records available on an Article or through the Source routes.
-- **Stories** group related Articles under a stable UUID and expose the member-Article route.
-- **Mentions** are external platform or forum observations for a selected Article.
-- **Discovery routes** return normalized values that can be used as Article and Story filters.
+- **Stories** are clusters of articles to track the same news/content across different publishers.
+- **Mentions** are engagement on an article in different social media platforms such as shared links, likes, comments etc.
 
-| If the user asks | Use |
+| Question | Use |
 | --- | --- |
 | What did publishers report? | Beans |
 | Which sources covered the same story? | Beans Stories and Sources |
@@ -29,22 +27,18 @@ import { Button } from "zudoku/ui/Button";
 | What does it mean or what is the outlook? | Espresso Signals |
 | What evidence supports the conclusion? | Espresso Evidence |
 
-Beans reports publisher material and coverage context. It does not produce Espresso Events, Signals, impact, or forecast.
-
-There is no official Cafecito SDK. Integrate with REST or MCP. Cortado and Latte are reserved products and are not live APIs.
-
 ## Key features
 
 - **Article-first retrieval**: search publisher material by relevance query, exact Article UUID or URL, type, Source, byline, date, and normalized labels.
 - **Purposeful feeds**: use `latest` for chronology, `top-headlines` for recent attention-ranked news, and `trending` for attention-ranked coverage.
 - **Controlled exploration**: choose Article, Source, and Story UUIDs from collection `data`, then request detail or a subresource only when it answers the next question.
 - **Coverage context**: inspect related publisher reading, Story membership, and external mentions without treating those concepts as interchangeable.
-- **Content on demand**: keep collections compact and request `full_content=true` only for a selected Article or a narrowed Article collection.
+- **Content on demand**: keep collections compact and request `full_content=true` (Applies to a subset of articles. Full content is not available for all articles).
 - **Agent-friendly transport**: JSON is canonical. Cursor pagination, stable UUIDs, explicit envelopes, and small follow-up calls make the API suitable for tool and agent workflows.
 
 ## Choose a route by the user question
 
-| User needs | Start here | Follow only when needed | Provider parallel |
+| Initial Question | Start here | Follow only when needed | Provider parallel |
 | --- | --- | --- | --- |
 | Publisher material about a topic, person, place, or organization | `GET /beans/articles/search` | Article detail, related Articles, mentions, Source detail, or Story detail | World News search-news, GNews search, NewsAPI.ai getArticles, NewsAPI.org everything |
 | The most recently published material | `GET /beans/articles/latest` | Continue with the returned cursor or inspect a selected Article | NewsData.io latest, Currents latest-news |
@@ -136,7 +130,7 @@ response.raise_for_status()
 print(response.json()["data"])
 ```
 
-```bash title="cURL"
+```bash title="curl"
 curl -s --get "${BASE_URL}/beans/articles/search" \
   -H "Authorization: Bearer ${API_KEY}" \
   --data-urlencode "q=agentic AI programme" \

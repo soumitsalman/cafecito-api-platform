@@ -5,13 +5,13 @@ export const CAFECITO_GATEWAY = "https://api.cafecito.tech";
 
 export const PRODUCT_STATEMENTS = {
   beans:
-    "The Beans API is a read-only publisher-content API for news, blogs, earnings and financial reports, litigation, official statements, research, technical documents, Sources, and Stories.",
+    "The Beans API is a publisher-content API for news, blogs, earnings reports, litigations, government announcements and cross publisher story threads.",
   espresso:
-    "The Espresso API is a read-only market and business intelligence API for searching Events, interpreting Signals, and tracing evidence and Sources.",
+    "The Espresso API is a market and business intelligence API for searching market events & signals.",
   cortado:
     "Cortado is a future social-media management API. It has no public REST or MCP surface.",
   latte:
-    "Latte is a reserved future Cafecito product. It has no public REST or MCP surface.",
+    "Latte is a reserved future travel scheduler API. It has no public REST or MCP surface.",
 } as const;
 
 export function ProductStatusTable() {

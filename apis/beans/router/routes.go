@@ -1,5 +1,6 @@
 // @title 			Beans News API & MCP
 // @version 		1.0
+// @description Beans is a news and publisher content API for AI agents, automated research, and analytical applications.
 // @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
 // @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
 // @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
@@ -12,6 +13,7 @@
 // @securityDefinitions.apikey BackendAPIKey
 // @in header
 // @name X-API-KEY
+
 package router
 
 import (
@@ -295,8 +297,6 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID searchArticles
 // @Router /articles/search [get]
@@ -351,8 +351,6 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getLatestArticles
 // @Router /articles/latest [get]
@@ -416,8 +414,6 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTrendingArticles
 // @Router /articles/trending [get]
@@ -484,8 +480,6 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTopHeadlines
 // @Router /top-headlines [get]
@@ -529,8 +523,6 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 // @Param full_content query bool false "Include content when available." default(false)
 // @Success 200 {object} ArticleDetailResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getArticle
@@ -580,8 +572,6 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getSimilarArticles
@@ -631,8 +621,6 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} MentionCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Article not found"
 // @ID getArticleMentions
@@ -679,8 +667,6 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} SourceCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listSources
 // @Router /sources [get]
@@ -718,8 +704,6 @@ func (r *Configuration) getSources(c *gin.Context) {
 // @Param id path string true "Source UUID." format(uuid)
 // @Success 200 {object} SourceDetailResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Source not found"
 // @ID getSource
@@ -755,8 +739,6 @@ func (r *Configuration) getSource(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listEntities
 // @Router /entities [get]
@@ -775,8 +757,6 @@ func (r *Configuration) getEntities(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listRegions
 // @Router /regions [get]
@@ -795,8 +775,6 @@ func (r *Configuration) getRegions(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listCategories
 // @Router /categories [get]
@@ -815,8 +793,6 @@ func (r *Configuration) getCategories(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} TagCollectionResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listSentiments
 // @Router /sentiments [get]
@@ -872,8 +848,6 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} StoryCollectionResponse "Story collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID listStories
 // @Router /stories [get]
@@ -936,8 +910,6 @@ func (r *Configuration) getStories(c *gin.Context) {
 // @Param id path string true "Story UUID." format(uuid)
 // @Success 200 {object} StoryDetailResponse "Story detail envelope"
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Story not found"
 // @ID getStory
@@ -987,8 +959,6 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} StoryArticleCollectionResponse "Story Article collection envelope"
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
-// @Failure 401 {object} ErrorResponse "Missing or invalid API key"
-// @Failure 429 {object} ErrorResponse "Request limit reached"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
 // @Failure 404 {object} ErrorResponse "Story not found"
 // @ID listStoryArticles

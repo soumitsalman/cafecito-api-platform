@@ -1,11 +1,10 @@
 ---
-title: Make your first Cafecito API call
-description: Authenticate with a Bearer API key and run a first Beans or Espresso request. No official SDK.
+description: Authenticate with a Bearer API key and make your first Beans or Espresso API request. No official SDK.
 ---
 
-# First API call
+# Make Your First API Call
 
-Cafecito uses one gateway (`https://api.cafecito.tech`) and `Authorization: Bearer` for authenticated REST and MCP. Health is public. There is **no official SDK**; copy [reusable clients](/guides/client-patterns) when you need pagination, errors, and retries.
+Cafecito uses one gateway (`https://api.cafecito.tech`) and `Authorization: Bearer` for authenticated REST and MCP. Health is public. See [reusable clients](/guides/client-patterns) when you need pagination, errors, and retries.
 
 Live products: **Beans** and **Espresso**. **Cortado** and **Latte** are not callable yet.
 
@@ -17,7 +16,7 @@ curl -sS "$BASE_URL/beans/health"
 curl -sS "$BASE_URL/espresso/health"
 ~~~
 
-## Beans: recent publisher Articles
+## Beans: recent news & publisher articles
 
 ~~~bash
 curl -sS --get "$BASE_URL/beans/articles/latest" \
@@ -26,9 +25,9 @@ curl -sS --get "$BASE_URL/beans/articles/latest" \
   -H "Authorization: Bearer $CAFECITO_API_KEY"
 ~~~
 
-Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans). Beans collections return `pagination.next_cursor` (no `pagination.cursor` field).
+Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans). Beans collections return `pagination.next_cursor`.
 
-## Espresso: structured Events
+## Espresso: market events and signals
 
 ~~~bash
 curl -sS --get "$BASE_URL/espresso/events" \
@@ -37,9 +36,9 @@ curl -sS --get "$BASE_URL/espresso/events" \
   -H "Authorization: Bearer $CAFECITO_API_KEY"
 ~~~
 
-Espresso collections return `pagination.next_cursor` (no `pagination.cursor` field). Always continue with `pagination.next_cursor`. See [API conventions](/guides/api-conventions).
+Continue with the [Espresso overview](/products/espresso) or [Espresso API reference](/api/espresso). Espresso collections return `pagination.next_cursor`. See [API conventions](/guides/api-conventions).
 
-Unknown query parameters return HTTP `400`. Empty searches return HTTP `200` with `data: []`.
+Unknown query parameters are silently ignored. Empty searches return HTTP `200` with `data: []`.
 
 ## Using the API in production
 

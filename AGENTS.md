@@ -11,6 +11,16 @@ Project Cafecito is a monorepo: Zuplo gateway, Zudoku developer portal, and back
 
 Gateway paths use product prefixes such as `/beans/...` and `/espresso/...`. Backend Go apis expose their routes without those prefixes locally, typically on `:8080`.
 
+## Tech Stack
+- Neon.com serverless postgres as database
+- Backend API service ([apis](./apis/)) is self-hosted on fly.io
+- Self-hosted llama-server as embedder API (deployed through [fly.embedder.toml](apis/fly.embedder.toml))
+- API gateway provided by Zuplo. 
+- API gateway authenticates to backend API service using X-API-KEY Header.
+- Zuplo handles all rate-limit, usage metering and user authentication (through Bearer token). Backend API does not deal with rate-limit, quota, meter or end-user authentication. Hence HTTP status code 401 and 429 is sent by Zuplo gateway and not the backend.
+- User management (sign-in/sign-up/subscription) is provided by Clerk which is connected to zuplo (check [config](config/))
+
+
 ## Gateway (root)
 
 Stack:
@@ -53,10 +63,10 @@ Docs/products:
 The backend Swagger, gateway OpenAPI, and portal pages are separate artifacts. A change does not propagate between them automatically.
 
 - Backend route behavior, request/response types, or Swagger annotations in `apis/<service>/router/` are the service-local contract. Regenerate that service's committed Swagger artifacts after changing annotations; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`.
-  - Espresso: changing annotations in `apis/espresso/router/routes.go` (or referenced router types) requires, from `apis/espresso/`, `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`.
-  - Beans: changing annotations requires the documented `swag` command in [`apis/README.md`](apis/README.md).
+  - Changing annotations in `apis/*/router/routes.go` (or referenced router types) requires running the documented `swag` command in [`apis/README.md`](apis/README.md).
 - A public Espresso contract change must also be reflected manually in `config/espresso.oas.json`. It is the gateway contract under `/espresso`, powers the portal reference at `/api/espresso` through `docs/zudoku.config.tsx`, and declares the `/espresso/mcp` server and its exported `operationId` tools. Keep gateway paths, request/response schemas, descriptions, error semantics, and MCP tool mappings consistent with the backend behavior.
 - Apply the same review to `config/beans.oas.json` for Beans. `docs/zudoku.config.tsx` mounts it at `/api/beans` and mounts Espresso at `/api/espresso`.
+- For both cases swaggo will NOT generate 401 and 429 as failure response since they are handled by Zuplo gateway. So update `config/*.oas.json` files to include 401 and 429 out of bound with Zuplo standard response.
 - A public Espresso behavior change must be reflected in the relevant `docs/pages/` content:
   - product behavior, filters, response envelopes, and route examples: `docs/pages/products/espresso/overview.mdx`;
   - multi-call or agent route sequences: `docs/pages/products/espresso/workflows.mdx`;

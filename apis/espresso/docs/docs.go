@@ -90,12 +90,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable; retry.",
                         "schema": {
@@ -166,12 +160,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid limit, cursor token, or parameters",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -383,18 +371,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable; retry.",
                         "schema": {
@@ -455,20 +431,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Event with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -582,20 +546,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Event with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -729,20 +681,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Event with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -841,12 +781,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid limit, cursor token, or parameters",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -988,18 +922,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable; retry.",
                         "schema": {
@@ -1060,20 +982,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Signal with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1277,20 +1187,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Signal with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1379,18 +1277,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable; retry.",
                         "schema": {
@@ -1451,20 +1337,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "No Source with this UUID",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1549,18 +1423,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid limit, cursor token, or response_type",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1668,6 +1530,114 @@ const docTemplate = `{
                 }
             }
         },
+        "router.EventDetail": {
+            "type": "object",
+            "required": [
+                "created_at",
+                "id",
+                "kind",
+                "tags"
+            ],
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "companies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "counts": {
+                    "$ref": "#/definitions/router.Counts"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "drivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "future_outlook": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "impact_level": {
+                    "type": "string"
+                },
+                "impacted_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "impacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "key_points": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "event"
+                    ]
+                },
+                "links": {
+                    "$ref": "#/definitions/router.Links"
+                },
+                "macro_context": {
+                    "type": "string"
+                },
+                "people": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "router.EventDetailResponse": {
             "type": "object",
             "required": [
@@ -1675,7 +1645,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/router.EventDocument"
+                    "$ref": "#/definitions/router.EventDetail"
                 }
             }
         },
@@ -1688,15 +1658,57 @@ const docTemplate = `{
                 "tags"
             ],
             "properties": {
-                "counts": {
-                    "$ref": "#/definitions/router.Counts"
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "companies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "created_at": {
+                    "type": "string"
+                },
+                "drivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "future_outlook": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "impact_level": {
+                    "type": "string"
+                },
+                "impacted_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "impacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "key_points": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "kind": {
                     "type": "string",
@@ -1704,8 +1716,26 @@ const docTemplate = `{
                         "event"
                     ]
                 },
-                "links": {
-                    "$ref": "#/definitions/router.Links"
+                "macro_context": {
+                    "type": "string"
+                },
+                "people": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "source": {
                     "$ref": "#/definitions/router.SourceDocument"
@@ -1834,6 +1864,108 @@ const docTemplate = `{
                 }
             }
         },
+        "router.SignalDetail": {
+            "type": "object",
+            "required": [
+                "created_at",
+                "id",
+                "kind",
+                "tags"
+            ],
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "companies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "confidence": {
+                    "type": "string"
+                },
+                "counts": {
+                    "$ref": "#/definitions/router.Counts"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "drivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "future_outlook": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "impact_level": {
+                    "type": "string"
+                },
+                "impacted_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "impacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "key_points": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "signal"
+                    ]
+                },
+                "links": {
+                    "$ref": "#/definitions/router.Links"
+                },
+                "people": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "router.SignalDetailResponse": {
             "type": "object",
             "required": [
@@ -1841,7 +1973,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/router.SignalDocument"
+                    "$ref": "#/definitions/router.SignalDetail"
                 }
             }
         },
@@ -1854,15 +1986,57 @@ const docTemplate = `{
                 "tags"
             ],
             "properties": {
-                "counts": {
-                    "$ref": "#/definitions/router.Counts"
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "companies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "confidence": {
+                    "type": "string"
                 },
                 "created_at": {
+                    "type": "string"
+                },
+                "drivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "future_outlook": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "impact_level": {
+                    "type": "string"
+                },
+                "impacted_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "impacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "key_points": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "kind": {
                     "type": "string",
@@ -1870,11 +2044,23 @@ const docTemplate = `{
                         "signal"
                     ]
                 },
-                "links": {
-                    "$ref": "#/definitions/router.Links"
+                "people": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
-                "source": {
-                    "$ref": "#/definitions/router.SourceDocument"
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "summary": {
                     "type": "string"
@@ -1959,12 +2145,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "0.2",
+	Version:          "0.5",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Espresso API & MCP",
-	Description:      "Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404. Errors use `{ \"error\": { \"code\", \"message\" } }`. Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`); `/health` does not. Public clients send Bearer keys to the gateway, not this service.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
+	Description:      "Espresso is a business and market intelligence data API for AI agents, automated research, and analytical applications.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404. Errors use `{ \"error\": { \"code\", \"message\" } }`. Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`); `/health` does not. Public clients send Bearer keys to the gateway, not this service.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

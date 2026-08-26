@@ -1,22 +1,20 @@
 ---
-title: Create a Cafecito API key
-description: Create a Bearer API key that authenticates Beans and Espresso REST and MCP. Health routes stay public.
+description: Create a API key and use it as Bearer token to authenticate against Beans and Espresso REST and MCP. Health routes stay public and does not need API Keys.
 ---
 
+import { Button } from "zudoku/ui/Button";
 import { Stepper } from "zudoku/ui/Stepper";
 
-# API keys
+# Create an API Key
 
 One Cafecito API key authenticates every **live** product: Beans and Espresso REST, plus `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`. Cortado and Latte are future products and do not accept this key yet.
 
 There is no official SDK. Send the key as a Bearer token. [Health](/guides/api-conventions) routes are public.
 
 <Stepper>
-1. Open [API Keys](/settings/api-keys) in the developer portal.
+1. Open <Button className="btn-with-link" asChild><a href="/settings/api-keys">API Keys</a></Button> in the developer portal.
 2. Create a key and store it in a secret manager or `CAFECITO_API_KEY`. Never commit it.
-3. On every authenticated request, send:
-
-   `Authorization: Bearer YOUR-API-KEY`
+3. On every authenticated request, send: `Authorization: Bearer YOUR-API-KEY`
 </Stepper>
 
 ## Example

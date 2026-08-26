@@ -1,13 +1,13 @@
 ---
-title: Migrate to the Beans Publisher Content API
-description: Map TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io workflows to Beans Articles, Sources, Stories, and feeds.
+description: Migrate your news API stack to using Beans API. Map TheNewsAPI, World News API, GNews, finlight, NewsAPI.ai, and NewsData.io workflows to Beans Articles, Sources, Stories, and feeds.
 ---
 
 # Migrate to Beans
 
-Beans is a read-only publisher-content API for news, blogs, earnings and financial reports, litigation, official statements, research, technical documents, and coverage context. It is designed for workflows that need publisher text and metadata. It is not a business-intelligence API; use [Espresso](/products/espresso) for Events, Signals, evidence, and synthesized conclusions.
+Beans API out performs other news APIs on 2 distinctive features:
 
-These provider names are comparison patterns, not a claim of identical fields or content rights.
+- **Content Diversity**: In addition to news Beans API provides publisher-content blogs, corporate announcements, earnings reports, litigation, official statements, research, technical documents, and coverage context. It is designed for workflows that need publisher text, metadata and tracking propagation of a story across multiple providers and social media platforms.
+- **Real Trend Data**: Beans tracks trending contents and top news from their live social media engagement and NOT just claims from publishers.
 
 ## Choose the right target
 
@@ -34,15 +34,13 @@ These provider names are comparison patterns, not a claim of identical fields or
 | NewsAPI.ai / Event Registry | News/blog selection, concepts, categories, duplicates, analysis | Article search, filterable content types, labels, Stories, related coverage. Synthesized analysis belongs in Espresso. |
 | NewsData.io | Search, continuation, AI tags, sentiment, full content | Article search, cursor pagination, normalized labels, `full_content=true` when available |
 
-Behavioral differences: Beans uses cursor pagination, UUID identifiers, strict query validation (unknown parameters return HTTP 400), and response-only `post`. Full-content is requested, not guaranteed.
+Similar to other platforms `full_content` is requested, not guaranteed.
 
 ## Public content types
 
 Request `content_type` accepts:
 
 `blog`, `contract`, `earnings_report`, `enforcement_action`, `financial_report`, `lawsuit`, `news`, `official_statement`, `podcast`, `press_release`, `research_paper`, `site`, `technical_documentation`, and `whitepaper`
-
-`post` may appear on Article responses. `content_type=post` returns HTTP 400. Omit `content_type` to include all stored types. Provider labels such as `pr` are not aliases.
 
 ## Translate the data model
 
@@ -66,7 +64,7 @@ Request `content_type` accepts:
 | Find a publisher, then filter its Articles | `GET /beans/sources?q=...` -> `GET /beans/articles/search?sources={source_id}` |
 | Serve a related-coverage group | `GET /beans/stories` -> `GET /beans/stories/{story_id}` -> `GET /beans/stories/{story_id}/articles` |
 
-Do not fetch detail for every search result. Collection items are intended to help an agent select relevant Article IDs; detail and follow-up routes are targeted calls.
+Collection items are intended to help an agent select relevant Article IDs; detail and follow-up routes are targeted calls.
 
 ## Adapt queries and filters
 
@@ -104,7 +102,7 @@ Beans collections use one stable JSON envelope:
 - An empty collection is a successful HTTP 200 response with `data: []`.
 - Detail routes return `{ "data": { ... } }`; a missing Article, Source, or Story returns HTTP 404.
 - Do not construct an `offset` or `page` parameter. Beans V1 uses cursor pagination.
-- Error responses use `{ "error": { "code", "message" } }` with HTTP 400, 401, 404, 429, or 500 as applicable.
+- Error responses use `{ "error": { "code", "message" } }` with HTTP 400, 404, or 500 as applicable.
 - Extra query parameters that a previous provider ignored now return HTTP 400 on Beans.
 
 ## Migration checklist

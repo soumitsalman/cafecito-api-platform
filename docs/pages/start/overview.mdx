@@ -1,16 +1,17 @@
 ---
-title: Cafecito APIs and MCP
-description: Choose Beans (news and publisher content) or Espresso (events and signals). One API key. Cortado and Latte are future products.
+description: Choose Beans (news and publisher content) or Espresso (market events and signals). One API key. Cortado and Latte are future products.
 ---
+
+import { Button } from "zudoku/ui/Button";
 import { ProductStatusTable } from "../../src/product-status";
 
 ![Cafecito banner](/cafecito-banner.png)
 
-# Cafecito APIs
+# Cafecito APIs & MCPs
 
 Choose the product that matches the job you need to do. Every live product uses the same API key and gateway base URL: `https://api.cafecito.tech`.
 
-**Live:** Beans and Espresso. **Future:** Cortado and Latte (no public API). There is no official SDK.
+**Live:** Beans and Espresso. **Future:** Cortado and Latte.
 
 ## Products
 
@@ -18,8 +19,16 @@ Choose the product that matches the job you need to do. Every live product uses 
 
 ## Start building
 
-1. **[Create an API key](/start/api-keys)**.
+1. <Button className="btn-with-link" asChild><a href="/settings/api-keys">Create an API Key</a></Button>
 2. **[Make your first API call](/start/first-api-call)** with Beans or Espresso.
 3. Continue to the relevant product overview for concepts, examples, and next steps.
 
-For AI-agent and MCP clients, see [MCP & AI agents](/guides/mcp-ai-agents). To combine Beans publisher material with Espresso Events and Signals, see [Cross-product workflow](/guides/cross-product-workflow). For shared request behavior, see [API conventions](/guides/api-conventions). Copy [reusable clients](/guides/client-patterns) for pagination and retries. For failed calls, see [Troubleshooting](/guides/troubleshooting). For current limits, see [Pricing and limits](/guides/pricing-limits).
+
+## Explore further
+
+- For AI-agent and MCP clients, see [MCP & AI agents](/guides/mcp-ai-agents). 
+- To combine Beans publisher material with Espresso Events and Signals, see [Cross-product workflow](/guides/cross-product-workflow). 
+- For shared request behavior, see [API conventions](/guides/api-conventions). 
+- For pagination and retries, see [reusable clients](/guides/client-patterns) . 
+- For failed calls, see [Troubleshooting](/guides/troubleshooting). 
+- For current limits, see [Pricing and limits](/guides/pricing-limits).

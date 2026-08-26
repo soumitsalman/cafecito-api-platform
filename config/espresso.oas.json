@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "description": "Espresso is a market and business intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Errors** use `{ \"error\": { \"code\", \"message\" } }` for 400, 401, 404, 429, and 500.\n**Authentication**: REST operations (except `/espresso/health`) require `Authorization: Bearer <api_key>`.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.\n**Event and Signal fields**: Stable core is `id`, `kind`, `created_at`, and `tags`. `summary`, `source`, `links`, and `counts` are conditional. All other keys are extension fields; clients must ignore unknown extension fields.",
+    "description": "Espresso is a market and business intelligence API for searching concrete Events, interpreting Signals, and tracing evidence and Sources.\n**Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.\n**Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.\n**Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.\n**Collections** return `{data, pagination, meta}`. Pagination contains `limit`, `num_results` (this page only), and `next_cursor`. To continue, send `pagination.next_cursor` unchanged as the next request `cursor`; never construct or decode cursor tokens. Empty collections return HTTP 200 with `data: []`. Detail routes return `{data}`; missing detail resources return HTTP 404.\n**Errors**: application failures (400, 404, 500) use `{ \"error\": { \"code\", \"message\" } }`. Gateway authentication and rate-limit failures return HTTP 401 and 429 as RFC 7807 Problem Details.\n**Authentication**: REST operations (except `/espresso/health`) require `Authorization: Bearer <api_key>`.\n**Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.\n**Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.\n**Event and Signal fields**: Stable core is `id`, `kind`, `created_at`, and `tags`. Collection records may include `summary` and other optional fields. Event records may include `source`. Detail records may also include `links` and `counts`. All other keys are extension fields; clients must ignore unknown extension fields.",
     "title": "Espresso API & MCP",
     "contact": {
       "name": "Project Cafecito",
@@ -11,7 +11,7 @@
     "license": {
       "name": "MIT"
     },
-    "version": "0.2"
+    "version": "0.5"
   },
   "tags": [
     {
@@ -112,7 +112,7 @@
         ],
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EventDocument"
+            "$ref": "#/components/schemas/EventDetail"
           }
         }
       },
@@ -147,7 +147,9 @@
         ],
         "properties": {
           "as_of": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time this collection snapshot was produced."
           }
         }
       },
@@ -180,7 +182,7 @@
         ],
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/SignalDocument"
+            "$ref": "#/components/schemas/SignalDetail"
           }
         }
       },
@@ -282,19 +284,84 @@
             "$ref": "#/components/schemas/SourceDocument",
             "description": "Conditional Source provenance when available."
           },
-          "links": {
-            "type": "object",
-            "additionalProperties": {
+          "key_points": {
+            "type": "array",
+            "items": {
               "type": "string"
             },
-            "description": "Conditional follow-up paths such as evidence or related Signals."
+            "description": "Conditional key points for the Event."
           },
-          "counts": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "integer"
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
             },
-            "description": "Conditional related-record counts."
+            "description": "Conditional drivers for the Event."
+          },
+          "impacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional impacts of the Event."
+          },
+          "impacted_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional impacted domains."
+          },
+          "impact_level": {
+            "type": "string",
+            "description": "Conditional impact-level label."
+          },
+          "future_outlook": {
+            "type": "string",
+            "description": "Conditional outlook text."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional category labels."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional company names."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional region names."
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional people names."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional product names."
+          },
+          "event_type": {
+            "type": "string",
+            "description": "Conditional Event type label."
+          },
+          "macro_context": {
+            "type": "string",
+            "description": "Conditional macro-context text."
           }
         },
         "additionalProperties": true
@@ -391,23 +458,80 @@
             "type": "string",
             "description": "Conditional short description of the Signal."
           },
-          "source": {
-            "$ref": "#/components/schemas/SourceDocument",
-            "description": "Conditional Source provenance when available."
-          },
-          "links": {
-            "type": "object",
-            "additionalProperties": {
+          "key_points": {
+            "type": "array",
+            "items": {
               "type": "string"
             },
-            "description": "Conditional follow-up paths such as supporting Events."
+            "description": "Conditional key points for the Signal."
           },
-          "counts": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "integer"
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
             },
-            "description": "Conditional related-record counts."
+            "description": "Conditional drivers for the Signal."
+          },
+          "impacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional impacts of the Signal."
+          },
+          "impacted_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional impacted domains."
+          },
+          "impact_level": {
+            "type": "string",
+            "description": "Conditional impact-level label."
+          },
+          "future_outlook": {
+            "type": "string",
+            "description": "Conditional outlook text."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional category labels."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional company names."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional region names."
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional people names."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditional product names."
+          },
+          "confidence": {
+            "type": "string",
+            "description": "Conditional confidence label."
           }
         },
         "additionalProperties": true
@@ -454,6 +578,134 @@
             "$ref": "#/components/schemas/SourceDocument"
           }
         }
+      },
+      "Links": {
+        "type": "object",
+        "description": "Conditional follow-up paths for a selected Event or Signal.",
+        "properties": {
+          "evidence": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "string"
+          },
+          "events": {
+            "type": "string"
+          },
+          "signals": {
+            "type": "string"
+          }
+        }
+      },
+      "Counts": {
+        "type": "object",
+        "description": "Conditional related-record counts for a selected Event or Signal.",
+        "properties": {
+          "evidence": {
+            "type": "integer"
+          },
+          "actions": {
+            "type": "integer"
+          },
+          "events": {
+            "type": "integer"
+          },
+          "signals": {
+            "type": "integer"
+          }
+        }
+      },
+      "EventDetail": {
+        "description": "Event detail record. Collection Event fields plus conditional links and counts.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EventDocument"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "links": {
+                "$ref": "#/components/schemas/Links"
+              },
+              "counts": {
+                "$ref": "#/components/schemas/Counts"
+              }
+            }
+          }
+        ]
+      },
+      "SignalDetail": {
+        "description": "Signal detail record. Collection Signal fields plus conditional links and counts.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SignalDocument"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "links": {
+                "$ref": "#/components/schemas/Links"
+              },
+              "counts": {
+                "$ref": "#/components/schemas/Counts"
+              }
+            }
+          }
+        ]
+      },
+      "ZuploProblemDetails": {
+        "type": "object",
+        "description": "Zuplo gateway Problem Details (RFC 7807). Used for gateway-issued 401 and 429 responses.",
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri",
+            "description": "URI identifying the problem type. Occurrences of the same problem share this value.",
+            "example": "https://httpproblems.com/http-status/401"
+          },
+          "title": {
+            "type": "string",
+            "description": "Stable human-readable summary for this problem type.",
+            "example": "Unauthorized"
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code duplicated in the body.",
+            "example": 401
+          },
+          "detail": {
+            "type": "string",
+            "description": "Optional explanation of this occurrence."
+          },
+          "instance": {
+            "type": "string",
+            "description": "Request path that produced the error.",
+            "example": "/espresso/events"
+          },
+          "trace": {
+            "type": "object",
+            "description": "Zuplo trace extension for correlating the error with gateway logs.",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "buildId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -474,21 +726,97 @@
           }
         }
       },
-      "ErrorUnauthorized": {
-        "summary": "Missing or invalid API key",
-        "value": {
-          "error": {
-            "code": "unauthorized",
-            "message": "Missing API Key"
-          }
-        }
-      },
       "ErrorNotFound": {
         "summary": "Missing detail resource",
         "value": {
           "error": {
             "code": "not_found",
             "message": "EVENT with this ID not found"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API key.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/401",
+              "title": "Unauthorized",
+              "status": 401,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          },
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/401",
+              "title": "Unauthorized",
+              "status": 401,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate or monthly quota reached (100 requests/minute or 50,000 requests/month); retry later.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "integer",
+              "example": 60
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/429",
+              "title": "Too Many Requests",
+              "status": 429,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          },
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/429",
+              "title": "Too Many Requests",
+              "status": 429,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
           }
         }
       }
@@ -828,29 +1156,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1027,19 +1336,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Event with this UUID",
@@ -1057,14 +1354,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1284,19 +1574,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Event with this UUID",
@@ -1314,14 +1592,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1553,7 +1824,7 @@
                             "riyadh",
                             "abu_dhabi"
                           ],
-                          "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                           "tags": [
                             "oman",
                             "riyadh",
@@ -1601,7 +1872,7 @@
                 "examples": {
                   "live": {
                     "summary": "Same payload as JSON",
-                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: '2026-08-24T20:38:44.504323225Z'\n"
+                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high‑impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: '2026-08-24T20:38:44.504323225Z'\n"
                   }
                 }
               },
@@ -1612,7 +1883,7 @@
                 "examples": {
                   "live": {
                     "summary": "Same payload as JSON",
-                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: \"2026-08-24T20:38:44.504323225Z\"\n"
+                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: null\nmeta:\n  as_of: \"2026-08-24T20:38:44.504323225Z\"\n"
                   }
                 }
               }
@@ -1634,19 +1905,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Event with this UUID",
@@ -1664,14 +1923,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1964,7 +2216,7 @@
                             "riyadh",
                             "abu_dhabi"
                           ],
-                          "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                          "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                           "tags": [
                             "oman",
                             "riyadh",
@@ -2012,7 +2264,7 @@
                 "examples": {
                   "live": {
                     "summary": "Same payload as JSON",
-                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:36:18.229694905Z'\n"
+                    "value": "data:\n- categories:\n  - media_and_journalism\n  - artificial_intelligence_and_machine_learning\n  - generative_ai_and_foundation_models\n  companies:\n  - dubai_university\n  - spotify\n  - qatar_university\n  confidence: high\n  created_at: '2026-08-23T22:00:43-04:00'\n  drivers:\n  - Governing bodies implement structured AI policies\n  - Private firms leverage AI for competitive advantage\n  future_outlook: Continued acceleration of AI-integrated economic activity across\n    North Africa and Southern Europe\n  id: 72f16578-f9b3-5921-b595-90977d00493d\n  impact_level: high\n  impacted_domains:\n  - technology\n  - food_safety\n  - financial_services\n  - algorithmic_governance\n  impacts:\n  - Trade increases via efficient logistics\n  - Environment protects from algal blooms\n  - Capital inflow fuels AI ventures\n  - Data quality rises with fraud prevention\n  key_points:\n  - 2026-07-25 UAE launches AI policy training program\n  - 2026-07-25 Morocco deploys AI drones to control toxic algae\n  - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n  - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n  kind: signal\n  people:\n  - anghami\n  - carrington_malin\n  - muhammad_khalid\n  - deezer\n  - daniel_valle\n  - dubai_chambers\n  regions:\n  - oman\n  - casablanca\n  - egypt\n  - saudi_arabia\n  - morocco\n  - japan\n  - riyadh\n  - abu_dhabi\n  summary: Multiple high‑impact AI initiatives unfolded concurrently in late July\n    2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi\n    startup success stories, and Saudi agency standardisation. Drivers included proactive\n    regulatory action and entrepreneurial responsiveness driving tangible returns,\n    safety improvements and confidence building.\n  tags:\n  - oman\n  - riyadh\n  - abu_dhabi\n  - spotify\n  - carrington_malin\n  - egypt\n  - daniel_valle\n  - anghami\n  - dubai_chambers\n  - algorithmic_governance\n  - media_and_journalism\n  - qatar_university\n  - dubai_university\n  - food_safety\n  - casablanca\n  - artificial_intelligence_and_machine_learning\n  - financial_services\n  - generative_ai_and_foundation_models\n  - japan\n  - deezer\n  - morocco\n  - technology\n  - muhammad_khalid\n  - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: '2026-08-24T20:36:18.229694905Z'\n"
                   }
                 }
               },
@@ -2023,7 +2275,7 @@
                 "examples": {
                   "live": {
                     "summary": "Same payload as JSON",
-                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:36:18.229694905Z\"\n"
+                    "value": "data:\n  -\n    categories:\n      - media_and_journalism\n      - artificial_intelligence_and_machine_learning\n      - generative_ai_and_foundation_models\n    companies:\n      - dubai_university\n      - spotify\n      - qatar_university\n    confidence: high\n    created_at: \"2026-08-23T22:00:43-04:00\"\n    drivers:\n      - Governing bodies implement structured AI policies\n      - Private firms leverage AI for competitive advantage\n    future_outlook: Continued acceleration of AI-integrated economic activity across North Africa and Southern Europe\n    id: 72f16578-f9b3-5921-b595-90977d00493d\n    impact_level: high\n    impacted_domains:\n      - technology\n      - food_safety\n      - financial_services\n      - algorithmic_governance\n    impacts:\n      - Trade increases via efficient logistics\n      - Environment protects from algal blooms\n      - Capital inflow fuels AI ventures\n      - Data quality rises with fraud prevention\n    key_points:\n      - 2026-07-25 UAE launches AI policy training program\n      - 2026-07-25 Morocco deploys AI drones to control toxic algae\n      - 2026-07-25 Saudi AI startups achieve 5x revenue over traditional rivals\n      - 2026-07-25 SDAIA publishes AI bias mapping guide for 100+ types\n    kind: signal\n    people:\n      - anghami\n      - carrington_malin\n      - muhammad_khalid\n      - deezer\n      - daniel_valle\n      - dubai_chambers\n    regions:\n      - oman\n      - casablanca\n      - egypt\n      - saudi_arabia\n      - morocco\n      - japan\n      - riyadh\n      - abu_dhabi\n    summary: Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.\n    tags:\n      - oman\n      - riyadh\n      - abu_dhabi\n      - spotify\n      - carrington_malin\n      - egypt\n      - daniel_valle\n      - anghami\n      - dubai_chambers\n      - algorithmic_governance\n      - media_and_journalism\n      - qatar_university\n      - dubai_university\n      - food_safety\n      - casablanca\n      - artificial_intelligence_and_machine_learning\n      - financial_services\n      - generative_ai_and_foundation_models\n      - japan\n      - deezer\n      - morocco\n      - technology\n      - muhammad_khalid\n      - saudi_arabia\npagination:\n  limit: 1\n  num_results: 1\n  next_cursor: eyJ2IjoxLCJpZCI6IjcyZjE2NTc4LWY5YjMtNTkyMS1iNTk1LTkwOTc3ZDAwNDkzZCIsImMiOiIyMDI2LTA4LTIzVDIyOjAwOjQzLTA0OjAwIn0\nmeta:\n  as_of: \"2026-08-24T20:36:18.229694905Z\"\n"
                   }
                 }
               }
@@ -2045,29 +2297,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2217,7 +2450,7 @@
                           "abu_dhabi"
                         ],
                         "source_id": null,
-                        "summary": "Multiple high\u2011impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
+                        "summary": "Multiple high‑impact AI initiatives unfolded concurrently in late July 2026, including UAE policy formation, Moroccan agricultural monitoring, Saudi startup success stories, and Saudi agency standardisation. Drivers included proactive regulatory action and entrepreneurial responsiveness driving tangible returns, safety improvements and confidence building.",
                         "tags": [
                           "oman",
                           "riyadh",
@@ -2278,19 +2511,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Signal with this UUID",
@@ -2308,14 +2529,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2677,19 +2891,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Signal with this UUID",
@@ -2707,14 +2909,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2890,29 +3085,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3035,19 +3211,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "No Source with this UUID",
@@ -3065,14 +3229,7 @@
             }
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3249,27 +3406,18 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "500": {
             "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
                 }
               }
             }
@@ -3422,27 +3570,18 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "500": {
             "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
                 }
               }
             }
@@ -3595,27 +3734,18 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "500": {
             "description": "Service unavailable; retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
                 }
               }
             }
@@ -3781,29 +3911,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Concurrency limit exceeded; retry shortly",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3870,6 +3981,9 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "Endpoint not found",
             "content": {
@@ -3896,20 +4010,8 @@
               }
             }
           },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "unauthorized": {
-                    "$ref": "#/components/examples/ErrorUnauthorized"
-                  }
-                }
-              }
-            }
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         },
         "x-zuplo-route": {

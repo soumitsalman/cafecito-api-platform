@@ -1,27 +1,26 @@
 ---
-title: Cross-product workflow
-description: Sequence Beans publisher coverage into Espresso Events, Signals, and evidence. Same API key; no official SDK.
+description: Sequence Beans publisher coverage into Espresso Events, Signals, and evidence. Contains Beans → Espresso evidence path. Same API key; no official SDK. 
 ---
 
-# Cross-product workflow
+# Cross-product Workflow
 
-Use Beans when the user needs **what publishers published**. Use Espresso when they need **what happened**, **what it may mean**, and **what supports that claim**. One API key authenticates both REST and both MCP servers. There is **no official SDK**.
+Use Beans when you need **what publishers published**. Use Espresso when you need **what happened**, **what it may mean**, and **what supports that claim**. One API key authenticates both REST and both MCP servers.
 
-This page is the Beans → Espresso evidence path. Tool names match the hosted MCP catalogs on [MCP and AI agents](/guides/mcp-ai-agents). Shared transport rules live on [API conventions](/guides/api-conventions).
+Tool names match the hosted MCP catalogs on [MCP and AI agents](/guides/mcp-ai-agents). Shared transport rules live on [API conventions](/guides/api-conventions).
 
 ## When to stay on one product
 
 | User intent | Stay on |
 | --- | --- |
-| Article URLs, titles, summaries, available full content, mentions, similar Articles | Beans only |
-| Story membership and member Articles | Beans only (`listStories` → `getStory` → `listStoryArticles`) |
-| Publisher Source metadata for Beans filters | Beans `listSources` / `getSource` |
+| Article URLs, titles, summaries, available full content, social media engagements, similar articles | Beans only |
+| Story across publishers and article clusters | Beans only (`listStories` → `getStory` → `listStoryArticles`) |
+| Publisher metadata for Beans filters | Beans `listSources` / `getSource` |
 | Concrete developments (what happened) | Espresso `searchEvents` / `getEvent` |
 | Meaning, impact, outlook | Espresso `searchSignals` / `getSignal` |
 | Supporting records and available URLs for a selected Event | Espresso `getEventEvidence` |
-| Intelligence Source provenance | Espresso `listIntelligenceSources` / `getIntelligenceSource` |
+| Intelligence source provenance | Espresso `listIntelligenceSources` / `getIntelligenceSource` |
 
-Beans Story tools do not return Espresso Events. Espresso evidence is not a Beans Article search.
+Beans Story tools do not return Espresso Events. Espresso evidence is not a Beans article search.
 
 ## Beans → Espresso evidence sequence
 
@@ -36,18 +35,19 @@ Run this when the user starts from publisher coverage and then needs structured 
 3. **Formulate the intelligence question (Espresso).**  
    Copy the topic, entity names, and region names the user (or the selected Articles) actually used. Do not assume a Beans Article UUID is an Espresso Event UUID.
 
-4. **Search structured records (Espresso).**  
-   - What happened → `searchEvents` (`GET /espresso/events`).  
-   - Meaning, impact, outlook → `searchSignals` (`GET /espresso/signals`).  
-   Discover exact filters with `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, and fuzzy tags with `listIntelligenceTags` when spelling is unknown.
-
-5. **Select an Event or Signal (Espresso).**  
+4. **Search what happened (Espresso).**  
+   Key points, events → `searchEvents` (`GET /espresso/events`). Discover exact filters with `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, and fuzzy tags with `listIntelligenceTags` when spelling is unknown.
+   
+5. **Get more details on what happened (Espresso).**  
    Call `getEvent` or `getSignal` for the chosen `data[].id`. Walk links with `getEventSignals` or `getSignalEvents` when the question needs both facts and conclusions.
 
-6. **Inspect evidence (Espresso).**  
+6. **Understand the broader causal chain, impacts and forecast (Espresso).**  
+   Call `searchSignals` (`GET /espresso/signals`). Discover exact filters with `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, and fuzzy tags with `listIntelligenceTags` when spelling is unknown.
+
+7. **Inspect evidence tracing (Espresso).**  
    After an Event UUID, call `getEventEvidence` (`GET /espresso/events/{event_id}/evidence`). Use returned identity, creation time, tags, Source IDs, and available URLs. An empty `data` array means no evidence records are available for that Event under the supplied filters—not a Beans miss.
 
-7. **Cite both layers.**  
+8. **Cite both layers.**  
    - Publisher reading: Beans Article `url` (and Story membership if used).  
    - Structured claim: Espresso Event/Signal IDs plus evidence URLs and `getIntelligenceSource` when provenance metadata is required.
 

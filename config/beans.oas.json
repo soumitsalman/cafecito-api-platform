@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "Beans News API & MCP",
-    "description": "Read-only publisher-content API for Articles, Sources, Stories, related reading, and external mentions. Collections return `{data, pagination, meta}` with `pagination.limit`, `pagination.num_results` (this page only), `pagination.next_cursor`, and `meta.as_of`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`. Unknown or route-inapplicable query parameters return HTTP 400. `content_type=post` is not a valid request filter and returns HTTP 400; `post` may still appear on Article responses. REST and MCP operations require `Authorization: Bearer <api-key>` except `/beans/health`.",
+    "description": "Read-only publisher-content API for Articles, Sources, Stories, related reading, and external mentions. Collections return `{data, pagination, meta}` with `pagination.limit`, `pagination.num_results` (this page only), `pagination.next_cursor`, and `meta.as_of`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Application errors (400, 404, 500) return `{ \"error\": { \"code\", \"message\" } }`. Gateway authentication and rate-limit failures return HTTP 401 and 429 as RFC 7807 Problem Details. Unknown or route-inapplicable query parameters return HTTP 400. `content_type=post` is not a valid request filter and returns HTTP 400; `post` may still appear on Article responses. REST and MCP operations require `Authorization: Bearer <api-key>` except `/beans/health`.",
     "version": "1.0",
     "contact": {
       "name": "Project Cafecito",
@@ -1094,6 +1094,60 @@
             }
           }
         }
+      },
+      "ZuploProblemDetails": {
+        "type": "object",
+        "description": "Zuplo gateway Problem Details (RFC 7807). Used for gateway-issued 401 and 429 responses.",
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri",
+            "description": "URI identifying the problem type. Occurrences of the same problem share this value.",
+            "example": "https://httpproblems.com/http-status/401"
+          },
+          "title": {
+            "type": "string",
+            "description": "Stable human-readable summary for this problem type.",
+            "example": "Unauthorized"
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code duplicated in the body.",
+            "example": 401
+          },
+          "detail": {
+            "type": "string",
+            "description": "Optional explanation of this occurrence."
+          },
+          "instance": {
+            "type": "string",
+            "description": "Request path that produced the error.",
+            "example": "/beans/articles/search"
+          },
+          "trace": {
+            "type": "object",
+            "description": "Zuplo trace extension for correlating the error with gateway logs.",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "buildId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1102,6 +1156,91 @@
         "scheme": "bearer",
         "bearerFormat": "API key",
         "description": "API key in the Authorization header as `Bearer <api-key>`."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API key.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/401",
+              "title": "Unauthorized",
+              "status": 401,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          },
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/401",
+              "title": "Unauthorized",
+              "status": 401,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate or monthly quota reached (100 requests/minute or 50,000 requests/month); retry later.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "integer",
+              "example": 60
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/429",
+              "title": "Too Many Requests",
+              "status": 429,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          },
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ZuploProblemDetails"
+            },
+            "example": {
+              "type": "https://httpproblems.com/http-status/429",
+              "title": "Too Many Requests",
+              "status": 429,
+              "instance": "/example",
+              "trace": {
+                "timestamp": "2026-04-19T17:13:31.352Z",
+                "requestId": "28f2d802-8e27-49c8-970d-39d90ef0ac61",
+                "buildId": "eb9ef87d-b55d-446e-9fdd-13c209c01b95"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1215,24 +1354,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1345,24 +1470,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1475,24 +1586,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1673,24 +1770,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -1852,24 +1935,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2041,24 +2110,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2232,24 +2287,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2352,24 +2393,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2430,6 +2457,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         },
         "x-zuplo-route": {
@@ -2613,14 +2646,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Article not found.",
@@ -2633,14 +2659,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2759,14 +2778,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Article not found.",
@@ -2779,14 +2791,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2888,14 +2893,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Article not found.",
@@ -2908,14 +2906,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -2997,14 +2988,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Source not found.",
@@ -3017,14 +3001,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3119,24 +3096,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3346,24 +3309,10 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3512,14 +3461,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Story not found.",
@@ -3532,14 +3474,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",
@@ -3705,14 +3640,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "description": "Story not found.",
@@ -3725,14 +3653,7 @@
             }
           },
           "429": {
-            "description": "Request limit reached; retry later.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "500": {
             "description": "Service unavailable; retry.",

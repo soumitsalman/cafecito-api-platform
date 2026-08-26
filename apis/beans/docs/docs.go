@@ -222,18 +222,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -477,18 +465,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -698,18 +674,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -765,20 +729,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Article not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -880,20 +832,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Article not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1114,20 +1054,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Article not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1194,18 +1122,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -1264,18 +1180,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid parameters",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1363,18 +1267,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -1433,18 +1325,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid parameters",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1531,18 +1411,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -1591,20 +1459,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Source not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -1833,18 +1689,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "500": {
                         "description": "Service unavailable",
                         "schema": {
@@ -1893,20 +1737,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Story not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -2127,20 +1959,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
                     "404": {
                         "description": "Story not found",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -2328,18 +2148,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid parameters",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "$ref": "#/definitions/router.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Request limit reached",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -3057,7 +2865,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Beans News API & MCP",
-	Description:      "Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
+	Description:      "Beans is a news and publisher content API for AI agents, automated research, and analytical applications.\nBeans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

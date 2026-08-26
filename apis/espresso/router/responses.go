@@ -227,16 +227,6 @@ func NewEventEvidence(sip *db.Sip) EventEvidence {
 	return doc
 }
 
-// The concrete envelope types below exist so swag can generate named schemas for the
-// OpenAPI spec. swag does not understand generic type parameters, so each collection
-// and detail response needs a concrete wrapper. The runtime still uses the generic
-// CollectionResponse[T] and DetailResponse[T] helpers; these are schema-only.
-type SipCollectionResponse struct {
-	Data       []DigestDocument `json:"data"`
-	Pagination Pagination       `json:"pagination" binding:"required"`
-	Meta       ResponseMeta     `json:"meta" binding:"required"`
-}
-
 type SourceCollectionResponse struct {
 	Data       []SourceDocument `json:"data" binding:"required"`
 	Pagination Pagination       `json:"pagination" binding:"required"`
@@ -261,40 +251,30 @@ type EventEvidenceCollectionResponse struct {
 	Meta       ResponseMeta    `json:"meta" binding:"required"`
 }
 
-// EventDocument is the public Event schema for OpenAPI generation.
-// Runtime Event records remain extensible maps; clients must ignore unknown extension fields.
-type EventDocument struct {
-	ID        uuid.UUID       `json:"id" yaml:"id" toon:"id" binding:"required" swaggertype:"string" format:"uuid"`
-	Kind      string          `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"event"`
-	CreatedAt time.Time       `json:"created_at" yaml:"created_at" toon:"created_at" binding:"required"`
-	Tags      []string        `json:"tags" yaml:"tags" toon:"tags" binding:"required"`
-	Summary   string          `json:"summary,omitempty" yaml:"summary,omitempty" toon:"summary,omitempty"`
-	Source    *SourceDocument `json:"source,omitempty" yaml:"source,omitempty" toon:"source,omitempty"`
-	Links     *Links          `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
-	Counts    *Counts         `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
+// sipDocument is the shared OpenAPI field set for Event and Signal records.
+// Kind is declared on EventDocument and SignalDocument so each keeps its own enum.
+type sipDocument struct {
+	ID              uuid.UUID `json:"id" yaml:"id" toon:"id" binding:"required" swaggertype:"string" format:"uuid"`
+	CreatedAt       time.Time `json:"created_at" yaml:"created_at" toon:"created_at" binding:"required"`
+	Tags            []string  `json:"tags" yaml:"tags" toon:"tags" binding:"required"`
+	KeyPoints       []string  `json:"key_points,omitempty" yaml:"key_points,omitempty" toon:"key_points,omitempty"`
+	Drivers         []string  `json:"drivers,omitempty" yaml:"drivers,omitempty" toon:"drivers,omitempty"`
+	Impacts         []string  `json:"impacts,omitempty" yaml:"impacts,omitempty" toon:"impacts,omitempty"`
+	ImpactedDomains []string  `json:"impacted_domains,omitempty" yaml:"impacted_domains,omitempty" toon:"impacted_domains,omitempty"`
+	ImpactLevel     string    `json:"impact_level,omitempty" yaml:"impact_level,omitempty" toon:"impact_level,omitempty"`
+	FutureOutlook   string    `json:"future_outlook,omitempty" yaml:"future_outlook,omitempty" toon:"future_outlook,omitempty"`
+	Summary         string    `json:"summary,omitempty" yaml:"summary,omitempty" toon:"summary,omitempty"`
+	Categories      []string  `json:"categories,omitempty" yaml:"categories,omitempty" toon:"categories,omitempty"`
+	Companies       []string  `json:"companies,omitempty" yaml:"companies,omitempty" toon:"companies,omitempty"`
+	Regions         []string  `json:"regions,omitempty" yaml:"regions,omitempty" toon:"regions,omitempty"`
+	People          []string  `json:"people,omitempty" yaml:"people,omitempty" toon:"people,omitempty"`
+	Products        []string  `json:"products,omitempty" yaml:"products,omitempty" toon:"products,omitempty"`
 }
 
-// SignalDocument is the public Signal schema for OpenAPI generation.
-// Runtime Signal records remain extensible maps; clients must ignore unknown extension fields.
 type SignalDocument struct {
-	ID        uuid.UUID       `json:"id" yaml:"id" toon:"id" binding:"required" swaggertype:"string" format:"uuid"`
-	Kind      string          `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"signal"`
-	CreatedAt time.Time       `json:"created_at" yaml:"created_at" toon:"created_at" binding:"required"`
-	Tags      []string        `json:"tags" yaml:"tags" toon:"tags" binding:"required"`
-	Summary   string          `json:"summary,omitempty" yaml:"summary,omitempty" toon:"summary,omitempty"`
-	Source    *SourceDocument `json:"source,omitempty" yaml:"source,omitempty" toon:"source,omitempty"`
-	Links     *Links          `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
-	Counts    *Counts         `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
-}
-
-type EventCollectionResponse struct {
-	Data       []EventDocument `json:"data" binding:"required"`
-	Pagination Pagination      `json:"pagination" binding:"required"`
-	Meta       ResponseMeta    `json:"meta" binding:"required"`
-}
-
-type EventDetailResponse struct {
-	Data EventDocument `json:"data" binding:"required"`
+	sipDocument
+	Kind       string `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"signal"`
+	Confidence string `json:"confidence,omitempty" yaml:"confidence,omitempty" toon:"confidence,omitempty"`
 }
 
 type SignalCollectionResponse struct {
@@ -303,12 +283,40 @@ type SignalCollectionResponse struct {
 	Meta       ResponseMeta     `json:"meta" binding:"required"`
 }
 
-type SignalDetailResponse struct {
-	Data SignalDocument `json:"data" binding:"required"`
+type SignalDetail struct {
+	SignalDocument
+	Links  *Links  `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
+	Counts *Counts `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
 }
 
-type SipItemResponse struct {
-	Data DigestDocument `json:"data" binding:"required"`
+type SignalDetailResponse struct {
+	Data SignalDetail `json:"data" binding:"required"`
+}
+
+// EventDocument is the public Event schema for OpenAPI generation.
+// Runtime Event records remain extensible maps; clients must ignore unknown extension fields.
+type EventDocument struct {
+	sipDocument
+	Kind         string          `json:"kind" yaml:"kind" toon:"kind" binding:"required" enums:"event"`
+	EventType    string          `json:"event_type,omitempty" yaml:"event_type,omitempty" toon:"event_type,omitempty"`
+	MacroContext string          `json:"macro_context,omitempty" yaml:"macro_context,omitempty" toon:"macro_context,omitempty"`
+	Source       *SourceDocument `json:"source,omitempty" yaml:"source,omitempty" toon:"source,omitempty"`
+}
+
+type EventCollectionResponse struct {
+	Data       []EventDocument `json:"data" binding:"required"`
+	Pagination Pagination      `json:"pagination" binding:"required"`
+	Meta       ResponseMeta    `json:"meta" binding:"required"`
+}
+
+type EventDetail struct {
+	EventDocument
+	Links  *Links  `json:"links,omitempty" yaml:"links,omitempty" toon:"links,omitempty"`
+	Counts *Counts `json:"counts,omitempty" yaml:"counts,omitempty" toon:"counts,omitempty"`
+}
+
+type EventDetailResponse struct {
+	Data EventDetail `json:"data" binding:"required"`
 }
 
 type SourceItemResponse struct {

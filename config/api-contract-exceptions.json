@@ -52,6 +52,50 @@
       "reason": "Public OAS is explicit about required pagination fields. Swaggo output currently omits required on router.Pagination even though the runtime envelope includes those keys.",
       "reviewed_on": "2026-08-25",
       "review_due": "2026-11-25"
+    },
+    {
+      "id": "beans-gateway-401",
+      "product": "beans",
+      "kind": "extra_response_status",
+      "status": "401",
+      "intentional_difference": "HTTP 401 is issued by the Zuplo gateway for missing or invalid Bearer keys. Backend Swagger does not document 401 because the Go service does not authenticate public clients.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Gateway OpenAPI documents Zuplo RFC 7807 Problem Details for 401. Swaggo output only includes backend application errors.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "beans-gateway-429",
+      "product": "beans",
+      "kind": "extra_response_status",
+      "status": "429",
+      "intentional_difference": "HTTP 429 is issued by the Zuplo gateway for per-minute rate limits and monthly quota. Backend Swagger does not document 429 because the Go service does not enforce those limits.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Gateway OpenAPI documents Zuplo RFC 7807 Problem Details for 429. Swaggo output only includes backend application errors.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "espresso-gateway-401",
+      "product": "espresso",
+      "kind": "extra_response_status",
+      "status": "401",
+      "intentional_difference": "HTTP 401 is issued by the Zuplo gateway for missing or invalid Bearer keys. Backend Swagger does not document 401 because the Go service does not authenticate public clients.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Gateway OpenAPI documents Zuplo RFC 7807 Problem Details for 401. Swaggo output only includes backend application errors.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
+    },
+    {
+      "id": "espresso-gateway-429",
+      "product": "espresso",
+      "kind": "extra_response_status",
+      "status": "429",
+      "intentional_difference": "HTTP 429 is issued by the Zuplo gateway for per-minute rate limits and monthly quota. Backend Swagger does not document 429 because the Go service does not enforce those limits.",
+      "owned_by": "gateway-contract-owner",
+      "reason": "Gateway OpenAPI documents Zuplo RFC 7807 Problem Details for 429. Swaggo output only includes backend application errors.",
+      "reviewed_on": "2026-08-25",
+      "review_due": "2026-11-25"
     }
   ]
 }

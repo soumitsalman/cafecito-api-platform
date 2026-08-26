@@ -1,18 +1,19 @@
 ---
-title: Migrate to Espresso Events and Signals
-description: Map GDELT and Perigon event-intelligence patterns to Espresso Events, Signals, evidence, and Sources without claiming route-for-route equivalence.
+description: Migrate your market intelligence API to use Espresso API. Map GDELT, PredictHQ and Perigon event-intelligence patterns to Espresso Events, Signals, evidence, and Sources without claiming route-for-route equivalence. GDELT, PredictHQ and Perigon are comparison patterns, not a claim that Espresso copies every provider route or field.
 ---
 
 # Migrate to Espresso
 
-Espresso is a market, business, event, and news intelligence API. GDELT and Perigon are comparison patterns, not a claim that Espresso copies every provider route or field.
+Espresso is a market & business intelligence API. If you want to know
 
 - **What happened?** Search **Events** for concrete developments.
 - **What does it mean?** Search **Signals** for synthesized conclusions, then retrieve supporting Events when the answer needs substantiation.
 
-It is not a drop-in replacement for an article archive, a GDELT dump, or a generic entity database. Plan the migration around the question your application or agent must answer, then carry returned IDs into the next call.
+Espresso out performs other market intelligence APIs with 2 distinctive features:
+- **Synthesized Signals**: In addition micro-actions and events, Espresso synthesizes related tangential events and actions into consolidated signals which higher data enrichment such as causal event chains, multi-domain impacts and forecasts.
+- **Token Efficiency**: Espresso is built to be AI agent native and can provide responses in both yaml and toon in addition to default json. This is particularly helpful in reducing input tokens while maintaining the same data fidelity.
 
-There is no official SDK. Cortado and Latte are future products and are not live APIs.
+It is not a drop-in replacement for an article archive. Use Beans API for that.
 
 ## Choose the right target
 
@@ -48,7 +49,7 @@ Start from a collection, select an ID, and retrieve more context only when it ch
 | Find records from a known publisher or domain | `GET /espresso/sources` → `GET /espresso/events?source_ids={source_id}` |
 | Find related conclusions for a known development | `GET /espresso/events/{event_id}/signals` → `GET /espresso/signals/{signal_id}` |
 
-Do not fetch every detail route for every search result. Collections provide enough information to choose relevant IDs; detail and relationship routes are targeted follow-up calls.
+Collections provide enough information to choose relevant IDs; detail and relationship routes are targeted follow-up calls.
 
 ## GDELT and Perigon concept map
 
@@ -66,9 +67,6 @@ These mappings describe typical user jobs, not identical schemas or coverage.
 | Free-text or semantic search | `q` on supported collection routes |
 | Cursor continuation | `cursor` and `next_cursor` |
 
-### Not currently exposed
-
-Espresso does not currently offer public equivalents for provider-specific story graphs, raw article-body archives, GDELT-style count or vector export APIs, or route-for-route Perigon story endpoints. Use [Beans](/products/beans) for publisher Articles. Do not assume field names, geocoding, or aggregation endpoints match another provider.
 
 ## Adapt queries and filters
 
@@ -98,7 +96,9 @@ Espresso collections return one stable envelope:
     "num_results": 0,
     "next_cursor": null
   },
-  "meta": {}
+  "meta": {
+    "as_of": "2026-08-19T00:00:00Z"
+  }
 }
 ```
 
@@ -108,7 +108,7 @@ Espresso collections return one stable envelope:
 - Detail routes return `{ "data": { ... } }`; a missing detail resource returns HTTP `404`.
 - Errors use `{ "error": { "code", "message" } }`. REST calls except health require Bearer authentication.
 
-Stable Event and Signal fields are `id`, `kind`, `created_at`, and `tags`. Treat `summary`, `source`, `links`, `counts`, and any other keys as conditional or extension fields and ignore unknown keys.
+Stable Event and Signal fields are `id`, `kind`, `created_at`, and `tags`. Treat `summary`, `key_points`, `impacts`, `source`, `links`, `counts`, and any other keys as conditional or extension fields.
 
 Use `response_type=json` for the canonical schema. `response_type=yaml` and `response_type=toon` contain the same payload in token-optimized forms for MCP and AI-agent workflows. They do not change the filters, records, or pagination behavior.
 

@@ -60,28 +60,141 @@ definitions:
     - meta
     - pagination
     type: object
-  router.EventDetailResponse:
+  router.EventDetail:
     properties:
-      data:
-        $ref: '#/definitions/router.EventDocument'
-    required:
-    - data
-    type: object
-  router.EventDocument:
-    properties:
+      categories:
+        items:
+          type: string
+        type: array
+      companies:
+        items:
+          type: string
+        type: array
       counts:
         $ref: '#/definitions/router.Counts'
       created_at:
         type: string
+      drivers:
+        items:
+          type: string
+        type: array
+      event_type:
+        type: string
+      future_outlook:
+        type: string
       id:
         format: uuid
         type: string
+      impact_level:
+        type: string
+      impacted_domains:
+        items:
+          type: string
+        type: array
+      impacts:
+        items:
+          type: string
+        type: array
+      key_points:
+        items:
+          type: string
+        type: array
       kind:
         enum:
         - event
         type: string
       links:
         $ref: '#/definitions/router.Links'
+      macro_context:
+        type: string
+      people:
+        items:
+          type: string
+        type: array
+      products:
+        items:
+          type: string
+        type: array
+      regions:
+        items:
+          type: string
+        type: array
+      source:
+        $ref: '#/definitions/router.SourceDocument'
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - created_at
+    - id
+    - kind
+    - tags
+    type: object
+  router.EventDetailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/router.EventDetail'
+    required:
+    - data
+    type: object
+  router.EventDocument:
+    properties:
+      categories:
+        items:
+          type: string
+        type: array
+      companies:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      drivers:
+        items:
+          type: string
+        type: array
+      event_type:
+        type: string
+      future_outlook:
+        type: string
+      id:
+        format: uuid
+        type: string
+      impact_level:
+        type: string
+      impacted_domains:
+        items:
+          type: string
+        type: array
+      impacts:
+        items:
+          type: string
+        type: array
+      key_points:
+        items:
+          type: string
+        type: array
+      kind:
+        enum:
+        - event
+        type: string
+      macro_context:
+        type: string
+      people:
+        items:
+          type: string
+        type: array
+      products:
+        items:
+          type: string
+        type: array
+      regions:
+        items:
+          type: string
+        type: array
       source:
         $ref: '#/definitions/router.SourceDocument'
       summary:
@@ -171,30 +284,135 @@ definitions:
     - meta
     - pagination
     type: object
-  router.SignalDetailResponse:
+  router.SignalDetail:
     properties:
-      data:
-        $ref: '#/definitions/router.SignalDocument'
-    required:
-    - data
-    type: object
-  router.SignalDocument:
-    properties:
+      categories:
+        items:
+          type: string
+        type: array
+      companies:
+        items:
+          type: string
+        type: array
+      confidence:
+        type: string
       counts:
         $ref: '#/definitions/router.Counts'
       created_at:
         type: string
+      drivers:
+        items:
+          type: string
+        type: array
+      future_outlook:
+        type: string
       id:
         format: uuid
         type: string
+      impact_level:
+        type: string
+      impacted_domains:
+        items:
+          type: string
+        type: array
+      impacts:
+        items:
+          type: string
+        type: array
+      key_points:
+        items:
+          type: string
+        type: array
       kind:
         enum:
         - signal
         type: string
       links:
         $ref: '#/definitions/router.Links'
-      source:
-        $ref: '#/definitions/router.SourceDocument'
+      people:
+        items:
+          type: string
+        type: array
+      products:
+        items:
+          type: string
+        type: array
+      regions:
+        items:
+          type: string
+        type: array
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - created_at
+    - id
+    - kind
+    - tags
+    type: object
+  router.SignalDetailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/router.SignalDetail'
+    required:
+    - data
+    type: object
+  router.SignalDocument:
+    properties:
+      categories:
+        items:
+          type: string
+        type: array
+      companies:
+        items:
+          type: string
+        type: array
+      confidence:
+        type: string
+      created_at:
+        type: string
+      drivers:
+        items:
+          type: string
+        type: array
+      future_outlook:
+        type: string
+      id:
+        format: uuid
+        type: string
+      impact_level:
+        type: string
+      impacted_domains:
+        items:
+          type: string
+        type: array
+      impacts:
+        items:
+          type: string
+        type: array
+      key_points:
+        items:
+          type: string
+        type: array
+      kind:
+        enum:
+        - signal
+        type: string
+      people:
+        items:
+          type: string
+        type: array
+      products:
+        items:
+          type: string
+        type: array
+      regions:
+        items:
+          type: string
+        type: array
       summary:
         type: string
       tags:
@@ -250,7 +468,7 @@ definitions:
 info:
   contact: {}
   description: |-
-    Espresso provides read-only business intelligence for AI agents, automated research, and analytical applications.
+    Espresso is a business and market intelligence data API for AI agents, automated research, and analytical applications.
     **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
     **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
     **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
@@ -258,7 +476,7 @@ info:
     **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
     **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
   title: Espresso API & MCP
-  version: "0.2"
+  version: "0.5"
 paths:
   /entities:
     get:
@@ -310,10 +528,6 @@ paths:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
           description: Invalid limit, cursor token, or parameters
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -368,10 +582,6 @@ paths:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
           description: Invalid limit, cursor token, or parameters
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -528,14 +738,6 @@ paths:
             token
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Service unavailable; retry.
           schema:
@@ -580,16 +782,8 @@ paths:
           description: Malformed UUID
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Event with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -672,16 +866,8 @@ paths:
           description: Malformed UUID or invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Event with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -779,16 +965,8 @@ paths:
           description: Malformed UUID, invalid cursor token, or invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Event with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -861,10 +1039,6 @@ paths:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
           description: Invalid limit, cursor token, or parameters
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -971,14 +1145,6 @@ paths:
             token
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Service unavailable; retry.
           schema:
@@ -1023,16 +1189,8 @@ paths:
           description: Malformed UUID
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Signal with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -1180,16 +1338,8 @@ paths:
           description: Malformed UUID, invalid cursor token, or invalid parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Signal with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -1254,14 +1404,6 @@ paths:
           description: Invalid limit, cursor token, or parameters
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "500":
           description: Service unavailable; retry.
           schema:
@@ -1306,16 +1448,8 @@ paths:
           description: Malformed UUID
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
         "404":
           description: No Source with this UUID
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":
@@ -1377,14 +1511,6 @@ paths:
             $ref: '#/definitions/router.DiscoveryValueCollectionResponse'
         "400":
           description: Invalid limit, cursor token, or response_type
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "401":
-          description: Missing or invalid API key
-          schema:
-            $ref: '#/definitions/router.ErrorResponse'
-        "429":
-          description: Concurrency limit exceeded; retry shortly
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "500":

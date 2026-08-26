@@ -1,41 +1,16 @@
 ---
-title: Reusable Cafecito API clients
 description: Node, Python, and cURL patterns for Bearer auth, pagination, errors, and retries. Cafecito does not ship an official SDK.
 ---
 
-# Reusable clients
+# Reusable API Clients
 
-Cafecito does **not** provide an official SDK. Use REST (and MCP where you need tool calling) with a thin wrapper. Change only the path and query for each product call.
+Cafecito does **not** need an official SDK. Use REST APIs (and MCP where you need tool calling) directly. Change only the path and query for each product call.
 
 Set `CAFECITO_API_KEY` in the environment. Never commit keys.
 
-## cURL
+<CodeTabs>
 
-~~~bash
-export CAFECITO_API_KEY="YOUR_API_KEY"
-export BASE_URL="https://api.cafecito.tech"
-
-# Public health (no Authorization)
-curl -sS "$BASE_URL/beans/health"
-curl -sS "$BASE_URL/espresso/health"
-
-# Authenticated collection
-curl -sS --get "$BASE_URL/beans/articles/latest" \
-  --data-urlencode "limit=5" \
-  -H "Authorization: Bearer $CAFECITO_API_KEY"
-
-# Continue: paste pagination.next_cursor unchanged
-curl -sS --get "$BASE_URL/beans/articles/latest" \
-  --data-urlencode "limit=5" \
-  --data-urlencode "cursor=OPAQUE_NEXT_CURSOR" \
-  -H "Authorization: Bearer $CAFECITO_API_KEY"
-~~~
-
-Espresso collections follow the same header and `cursor` query; parse `pagination.next_cursor` as described in [API conventions](/guides/api-conventions).
-
-## Node.js
-
-~~~javascript
+```js title="node.js"
 const BASE_URL = "https://api.cafecito.tech";
 
 function errorEnvelope(status, body) {
@@ -90,20 +65,16 @@ async function* paginate(path, searchParams = {}) {
     cursor = page.pagination?.next_cursor ?? null;
   } while (cursor);
 }
-~~~
+```
 
-Beans and Espresso pages expose `pagination.next_cursor` only (no `pagination.cursor` echo). Always continue with `next_cursor`.
 
-## Python
-
-~~~python
+```python title="python"
 import os
 import time
 
 import requests
 
 BASE_URL = "https://api.cafecito.tech"
-
 
 class CafecitoError(Exception):
     def __init__(self, status, code, message):
@@ -159,11 +130,37 @@ def paginate(path, params=None):
         cursor = (page.get("pagination") or {}).get("next_cursor")
         if not cursor:
             break
-~~~
+```
+
+
+``` bash title="curl"
+export CAFECITO_API_KEY="YOUR_API_KEY"
+export BASE_URL="https://api.cafecito.tech"
+
+# Public health (no Authorization)
+curl -sS "$BASE_URL/beans/health"
+curl -sS "$BASE_URL/espresso/health"
+
+# Authenticated collection
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+
+# Continue: paste pagination.next_cursor unchanged
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "limit=5" \
+  --data-urlencode "cursor=OPAQUE_NEXT_CURSOR" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+```
+
+</CodeTabs>
+
+All Cafecito routes the same header and `cursor` query; Continue with `pagination.next_cursor` as described in [API conventions](/guides/api-conventions).
+
 
 ## Response type
 
-For Espresso, add `response_type=json` (default), `yaml`, or `toon` only when the route documents it. Keep JSON in application code unless you specifically need a compact agent encoding.
+Espresso allows response_type=json (default), yaml, or toon as query param.  Keep JSON in application code unless you specifically need a compact agent encoding.
 
 ## Next
 
