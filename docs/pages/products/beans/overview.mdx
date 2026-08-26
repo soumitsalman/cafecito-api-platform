@@ -42,8 +42,8 @@ Beans is a publisher-content API for news, blogs, financial and earnings reports
 | --- | --- | --- | --- |
 | Publisher material about a topic, person, place, or organization | `GET /beans/articles/search` | Article detail, related Articles, mentions, Source detail, or Story detail | World News search-news, GNews search, NewsAPI.ai getArticles, NewsAPI.org everything |
 | The most recently published material | `GET /beans/articles/latest` | Continue with the returned cursor or inspect a selected Article | NewsData.io latest, Currents latest-news |
-| A current attention-ranked news set | `GET /beans/news/top-headlines` | Article detail or related coverage for selected results | GNews and NewsAPI.org top-headlines |
 | The most attention-ranked coverage | `GET /beans/articles/trending` | Inspect available `trend` observations | World News top-news, TheNewsAPI top-news |
+| A current attention-ranked news set | `GET /beans/news/top-headlines` | Article detail or related coverage for selected results | GNews and NewsAPI.org top-headlines |
 | One known Article UUID | `GET /beans/articles/{id}` | Request content, related Articles, mentions, or the linked Story | TheNewsAPI UUID lookup, World News retrieve-news |
 | Related publisher reading for one Article | `GET /beans/articles/{id}/similar` | Inspect a selected related Article | TheNewsAPI similar-by-UUID |
 | External discussion of one Article | `GET /beans/articles/{id}/mentions` | Use the observation data directly | Beans extension |
