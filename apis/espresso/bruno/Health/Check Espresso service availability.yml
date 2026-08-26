@@ -1,0 +1,39 @@
+info:
+  name: Check Espresso service availability
+  type: http
+  seq: 1
+  tags:
+    - Health
+
+http:
+  method: GET
+  url: "{{baseUrl}}/health"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Service is alive
+    request:
+      url: "{{baseUrl}}/health"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "alive"
+          }
+
+docs: Use this lightweight endpoint to confirm that the Espresso service is reachable before making intelligence requests. It returns service status only; it does not validate an API key, search data, or report dependency health.

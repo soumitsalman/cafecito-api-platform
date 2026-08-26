@@ -1,0 +1,30 @@
+opencollection: 1.0.0
+
+info:
+  name: Beans API
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+request:
+  auth:
+    type: bearer
+    token: "{{apiKey}}"
+
+docs:
+  content: Beans returns citable publisher Articles, Source metadata, attention-ranked feeds, Stories, similar reading, mentions, and filter discovery. Public gateway paths add the /beans prefix. GET /news/top-headlines is the backend path for public GET /beans/news/top-headlines. Do not send content_type, ids, urls, from, or to on that route. content_type=post is not a request filter.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

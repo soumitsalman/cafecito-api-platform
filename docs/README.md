@@ -4,44 +4,62 @@ Zudoku-powered developer portal for [Project Cafecito](https://cafecito.tech) AP
 
 Hosted at [developer.cafecito.tech](https://developer.cafecito.tech). Built on [Zudoku](https://zudoku.dev) and published alongside the Zuplo gateway.
 
+## Product status (canonical)
+
+| Product | Status | Public surface |
+| --- | --- | --- |
+| **Beans** | Live | Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. |
+| **Espresso** | Live | Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence. |
+| **Cortado** | Future | No public API |
+
+One API key authenticates every live product. There is no official SDK. Gateway: `https://api.cafecito.tech`. Limits: ongoing free tier, 100 requests/min and 50,000/month per user (see [Pricing and limits](pages/guides/pricing-limits.mdx)).
+
+Approved one-liners are on [Getting started](pages/start/overview.mdx).
+
 ## Portal content summary
 
-### Welcome — `pages/introduction.mdx`
-
-Landing page for the portal. Introduces live products (**Beans** news/blog intelligence, **Espresso** market intelligence) and **Cortado** (coming soon). Quick start: create an API key, call `https://api.cafecito.tech/<product>/<path>` with `Authorization: Bearer YOUR-API-KEY`.
-
-### Getting Started
+### Getting Started — `pages/start/`
 
 | Page | File | Summary |
 |------|------|---------|
-| API Keys | `howtos/api-keys.mdx` | Create keys in the portal; one key works across all products and MCPs. Bearer auth on every request. |
-| Beans | `howtos/beans-howto.mdx` | News/blog aggregator (7,000+ sources). Semantic search, trends, propagation, tag filters. MCP tool order and REST examples. |
-| Espresso | `howtos/espresso-howto.mdx` | Business intelligence **sips** (events, signals). UUID IDs, tag filtering, relationships (`same_as`, `derived_from`), `response_type=text` for agents. |
-| Cortado | `howtos/cortado-howto.mdx` | Social media automation — placeholder; scheduling, posting, analytics planned. |
+| Overview | `start/overview.mdx` | Product chooser: Beans and Espresso live; Cortado coming soon. |
+| API Keys | `start/api-keys.mdx` | Create keys in the portal; one key for live REST and MCP. Bearer auth. Health is public. |
+| First API call | `start/first-api-call.mdx` | First Beans and Espresso requests. |
 
-### MCP — `pages/howtos/mcp-howto.mdx`
+### Products — `pages/products/`
 
-Each product exposes an MCP server at `https://api.cafecito.tech/<product>/mcp` with the same API key. Documents Beans and Espresso tools mapped to REST paths.
+| Page | File |
+|------|------|
+| Beans | `products/beans/overview.mdx`, `scenarios.mdx`, `migration.mdx` |
+| Espresso | `products/espresso/overview.mdx`, `workflows.mdx`, `migration.mdx` |
+| Cortado | `products/cortado/overview.mdx` (coming soon) |
+
+### Guides — `pages/guides/`
+
+| Page | File |
+|------|------|
+| MCP & AI agents | `guides/mcp-ai-agents.mdx` |
+| Cross-product workflow | `guides/cross-product-workflow.mdx` |
+| API conventions | `guides/api-conventions.mdx` |
+| Reusable clients | `guides/client-patterns.mdx` |
+| Troubleshooting | `guides/troubleshooting.mdx` |
+| Pricing and limits | `guides/pricing-limits.mdx` |
 
 ### API Reference — `pages/api-overview.mdx`
 
 Interactive OpenAPI reference for **Beans** (`/api/beans`) and **Espresso** (`/api/espresso`), mounted from `../config/*.oas.json`.
 
-### Pricing — `pages/pricing.mdx`
-
-Free launch preview until June 30, 2026. Beans: 100 req/min, 50k req/month. Metering is per API call (MCP counts the same). Unlimited keys share one meter.
-
 ### Contact — `pages/contact.mdx`
 
-Bug reports and feature requests via GitHub issue templates on `cafecito-api-manager`.
+Bug reports and feature requests via GitHub issue templates.
 
 ### Company & Policies
 
-| Page | File | Summary |
-|------|------|---------|
-| About Us | `company/about-us.md` | Founders, mission, product lineup (Beans live, Espresso, Cortado, MediCafe). |
-| Privacy Policy | `company/privacy-policy.md` | Data collection, usage, cookies, retention (effective Sep 16, 2024). |
-| Terms of Use | `company/terms-of-use.md` | Acceptable use, service terms for Beans/Espresso/Cortado (effective Sep 16, 2024). |
+| Page | File |
+|------|------|
+| About Us | `company/about-us.md` |
+| Privacy Policy | `company/privacy-policy.md` |
+| Terms of Use | `company/terms-of-use.md` |
 
 ## Local development
 
@@ -77,5 +95,5 @@ Ensure the JWT template name in Clerk matches `CLERK_JWT_TEMPLATE_NAME`.
 
 ## Learn more
 
+- Backend Go services (run, tests, Swagger): [`../apis/README.md`](../apis/README.md)
 - [Zuplo Developer Portal docs](https://zuplo.com/docs/dev-portal/introduction)
-- [Zudoku GitHub repository](https://github.com/zuplo/zudoku)

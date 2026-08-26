@@ -3,12 +3,26 @@ import AccountPage from "./src/AccountPage";
 
 const serverUrl =
   process.env.ZUDOKU_PUBLIC_GATEWAY_URL || import.meta.env.ZUPLO_SERVER_URL;
+
+const clerkPubKey =
+  process.env.ZUDOKU_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  process.env.CLERK_PUBLISHABLE_KEY;
+const clerkJwtTemplateName =
+  process.env.ZUDOKU_PUBLIC_CLERK_JWT_TEMPLATE_NAME ||
+  process.env.CLERK_JWT_TEMPLATE_NAME ||
+  "dev-portal";
 /**
  * Developer Portal Configuration
  * For more information, see:
  * https://zuplo.com/docs/dev-portal/zudoku/configuration/overview
  */
 const config: ZudokuConfig = {
+  canonicalUrlOrigin: "https://developer.cafecito.tech",
+  sitemap: {
+    siteUrl: "https://developer.cafecito.tech",
+    changefreq: "weekly",
+    exclude: ["/account", "/settings", "/oauth/callback", "/404"],
+  },
   site: {
     title: "Cafecito Developer Portal",
     logo: {
@@ -38,10 +52,28 @@ const config: ZudokuConfig = {
     },
   },
   metadata: {
-    title: "Cafecito Developer Portal",
-    description: "Developer documentation for Cafecito APIs & MCPs. Project Cafecito offers AI tools to automate business tasks like news, PR and medical billing.",
-    keywords: ["AI automation", "business tools", "billing software", "PR management", "news api", "news mcp", "market intelligence", "tech startup"],
+    title: "%s | Cafecito Developer Portal",
+    description:
+      "Cafecito developer docs for Beans news and publisher-content APIs, Espresso market, business, event, and news intelligence APIs, and their MCP servers.",
+    applicationName: "Cafecito Developer Portal",
+    logo: "https://developer.cafecito.tech/cafecito-banner.png",
     favicon: "/cafecito-dark.png",
+    robots: "index,follow",
+    creator: "Cafecito",
+    publisher: "Cafecito",
+    keywords: [
+      "news API",
+      "publisher content API",
+      "article search API",
+      "earnings reports API",
+      "litigation monitoring",
+      "market intelligence API",
+      "business intelligence API",
+      "event intelligence API",
+      "news intelligence API",
+      "MCP servers",
+      "AI agents",
+    ],
   },
   theme: {
     light: {
@@ -122,111 +154,132 @@ const config: ZudokuConfig = {
       label: "Documentation",
       items: [
         {
-          type: "doc",
-          file: "introduction",
+          type: "category",
+          label: "Getting Started",
+          icon: "rocket",
+          collapsible: true,
+          collapsed: false,
+          link: {
+            type: "doc",
+            file: "start/overview",
+            path: "/start",
+          },
+          items: [
+            { type: "doc", file: "start/overview", path: "/start" },
+            { type: "doc", file: "start/api-keys", path: "/start/api-keys" },
+            { type: "doc", file: "start/first-api-call", path: "/start/first-api-call" },
+          ],
         },
         {
           type: "category",
-          label: "Getting Started",
-          icon: "puzzle",
+          label: "Products",
+          icon: "boxes",
+          collapsible: true,
+          collapsed: false,
           items: [
             {
-              type: "doc",
-              file: "howtos/api-keys",
+              type: "category",
+              label: "Beans",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", file: "products/beans/overview", path: "/products/beans" },
+              items: [
+                { type: "doc", file: "products/beans/overview", path: "/products/beans" },
+                { type: "doc", file: "products/beans/scenarios", path: "/products/beans/scenarios" },
+                { type: "doc", file: "products/beans/migration", path: "/products/beans/migration" },
+                { type: "link", to: "/api/beans", label: "API reference" },
+              ],
             },
             {
-              type: "doc",
-              file: "howtos/beans-howto",
+              type: "category",
+              label: "Espresso",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", file: "products/espresso/overview", path: "/products/espresso" },
+              items: [
+                { type: "doc", file: "products/espresso/overview", path: "/products/espresso" },
+                { type: "doc", file: "products/espresso/workflows", path: "/products/espresso/workflows" },
+                { type: "doc", file: "products/espresso/migration", path: "/products/espresso/migration" },
+                { type: "link", to: "/api/espresso", label: "API reference" },
+              ],
             },
             {
-              type: "doc",
-              file: "howtos/espresso-howto",
-            },
-            {
-              type: "doc",
-              file: "howtos/cortado-howto",
+              type: "category",
+              label: "Cortado",
+              collapsible: true,
+              collapsed: true,
+              link: { type: "doc", file: "products/cortado/overview", path: "/products/cortado" },
+              items: [
+                { type: "doc", file: "products/cortado/overview", path: "/products/cortado" },
+              ],
             },
           ],
         },
         {
-          type: "doc",
-          file: "howtos/mcp-howto",
+          type: "category",
+          label: "Build with Cafecito",
+          icon: "bot",
+          collapsible: true,
+          collapsed: true,
+          items: [
+            { type: "doc", file: "guides/mcp-ai-agents", path: "/guides/mcp-ai-agents" },
+            { type: "doc", file: "guides/cross-product-workflow", path: "/guides/cross-product-workflow" },
+            { type: "doc", file: "guides/api-conventions", path: "/guides/api-conventions" },
+            { type: "doc", file: "guides/client-patterns", path: "/guides/client-patterns" },
+            { type: "doc", file: "guides/troubleshooting", path: "/guides/troubleshooting" },
+            { type: "doc", file: "guides/pricing-limits", path: "/guides/pricing-limits" },
+          ],
         },
-        {
-          type: "doc",
-          file: "pricing",
-        },
-        {
-          type: "doc",
-          file: "contact",
-        },
+        { type: "doc", file: "contact" },
         {
           type: "category",
           label: "Company & Policies",
           icon: "building",
           items: [
-            {
-              type: "link",
-              to: "https://cafecito.tech",
-              label: "Cafecito Website",
-            },
-            {
-              type: "doc",
-              file: "company/about-us",
-            },
-            {
-              type: "doc",
-              file: "company/privacy-policy",
-            },
-            {
-              type: "doc",
-              file: "company/terms-of-use",
-            },
+            { type: "link", to: "https://cafecito.tech", label: "Cafecito Website" },
+            { type: "doc", file: "company/about-us" },
+            { type: "doc", file: "company/privacy-policy" },
+            { type: "doc", file: "company/terms-of-use" },
           ],
         },
       ],
     },
     {
       type: "category",
-      label: "API Reference",
+      label: "Reference",
       link: {
         type: "doc",
         file: "api-overview",
         path: "/api/overview",
-        label: "Overview",
       },
       items: [
-        {
-          type: "doc",
-          file: "api-overview",
-          path: "/api/overview",
-          label: "Overview",
-        },
-        {
-          type: "link",
-          to: "/api/beans",
-          label: "Beans API",
-        },
-        {
-          type: "link",
-          to: "/api/espresso",
-          label: "Espresso API",
-        },
+        { type: "doc", file: "api-overview", path: "/api/overview" },
+        { type: "link", to: "/api/beans", label: "Beans API" },
+        { type: "link", to: "/api/espresso", label: "Espresso API" },
       ],
     },
     {
       type: "category",
       label: "Account",
       items: [
-        {
-          type: "custom-page",
-          path: "/account",
-          element: <AccountPage />,
-        },
+        { type: "custom-page", path: "/account", element: <AccountPage /> },
       ],
     },
   ],
-  redirects: [{ from: "/", to: "/introduction" }],
+  redirects: [
+    { from: "/", to: "/start" },
+    { from: "/introduction", to: "/start" },
+    { from: "/howtos/api-keys", to: "/start/api-keys" },
+    { from: "/howtos/beans-howto", to: "/products/beans" },
+    { from: "/howtos/espresso-howto", to: "/products/espresso" },
+    { from: "/howtos/espresso-scenarios", to: "/products/espresso/workflows" },
+    { from: "/howtos/espresso-migration", to: "/products/espresso/migration" },
+    { from: "/howtos/cortado-howto", to: "/products/cortado" },
+    { from: "/howtos/mcp-howto", to: "/guides/mcp-ai-agents" },
+    { from: "/pricing", to: "/guides/pricing-limits" },
+    { from: "/guides/cross-product-workflows", to: "/guides/cross-product-workflow" },
+    { from: "/start/troubleshooting", to: "/guides/troubleshooting" },
+  ],
   apis: [
     {
       type: "file",
@@ -239,13 +292,15 @@ const config: ZudokuConfig = {
       path: "/api/espresso",
     },
   ],
-  authentication: {
-    type: "clerk",
-    clerkPubKey: process.env.ZUDOKU_PUBLIC_CLERK_PUBLISHABLE_KEY,
-    jwtTemplateName: process.env.ZUDOKU_PUBLIC_CLERK_JWT_TEMPLATE_NAME,
-  },
+  authentication: clerkPubKey
+    ? {
+        type: "clerk",
+        clerkPubKey,
+        jwtTemplateName: clerkJwtTemplateName,
+      }
+    : undefined,
   apiKeys: {
-    enabled: true,
+    enabled: Boolean(clerkPubKey),
     createKey: async ({ apiKey, context, auth }) => {
       const createApiKeyRequest = new Request(
         serverUrl + "/v1/developer/api-key",

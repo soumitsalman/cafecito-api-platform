@@ -1,0 +1,6 @@
+info:
+  name: Discovery
+  type: folder
+
+request:
+  auth: inherit

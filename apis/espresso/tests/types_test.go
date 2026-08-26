@@ -1,7 +1,7 @@
 package espressoapi_test
 
 import (
-	"strings"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -9,54 +9,127 @@ import (
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/router"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSipToText(t *testing.T) {
-	sip := db.Sip{
-		Created: time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC),
-		Digest: map[string]any{
-			"id":             uuid.New(),
-			"created":        time.Now(),
-			"site_name":      "Example News",
-			"briefing":       "Summary text",
-			"actions":        []any{"act1", "act2"},
-			"people":         []any{"bob", "alice"},
-			"tags":           []any{"t1", "t2"},
-			"impact_level":   "high",
-			"forecast":       "Outlook text",
-			"future_outlook": "",
-		},
-	}
-
-	text := router.SipToText(&sip)
-	lines := strings.Split(text, "\n")
-
-	assert.Equal(t, "reported:2026-05-19", lines[0])
-	assert.Equal(t, "related:alice|bob", lines[1])
-	assert.Equal(t, "briefing:Summary text", lines[2])
-	assert.Equal(t, "actions:act1|act2", lines[3])
-	assert.Contains(t, text, "tags:t1|t2")
-	assert.Contains(t, text, "impact_level:high")
-	assert.NotContains(t, text, "id:")
-	assert.NotContains(t, text, "site_name:")
-	assert.NotContains(t, text, "future_outlook:")
-	assert.Equal(t, "forecast:Outlook text", lines[len(lines)-1])
+func mustDigest(t *testing.T, m map[string]any) json.RawMessage {
+	t.Helper()
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	return b
 }
 
-func TestSipsToText(t *testing.T) {
-	sips := []db.Sip{
-		{
-			Created: time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC),
-			Digest:  map[string]any{"briefing": "first"},
-		},
-		{
-			Created: time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC),
-			Digest:  map[string]any{"briefing": "second"},
-		},
+func TestNewDigestDocumentIncludesSipFields(t *testing.T) {
+	id := uuid.New()
+	created := time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC)
+	sip := db.Sip{
+		ID:      id,
+		Kind:    db.SIP_KIND_EVENT,
+		Created: created,
+		Tags:    []string{"markets"},
+		Digest: mustDigest(t, map[string]any{
+			"briefing":      "Example Semiconductor cut its annual outlook.",
+			"event_type":    "earnings_guidance",
+			"stock_tickers": []any{"EXSC"},
+		}),
 	}
 
-	text := router.SipsToText(sips)
-	assert.Contains(t, text, "reported:2026-05-19\nbriefing:first")
-	assert.Contains(t, text, "reported:2026-05-20\nbriefing:second")
-	assert.Equal(t, 1, strings.Count(text, "\n\n"))
+	doc := router.NewDigestDocumentForSip(&sip)
+	require.NotNil(t, doc)
+	assert.Equal(t, id, doc["id"])
+	assert.Equal(t, created, doc["created_at"])
+	assert.Equal(t, db.SIP_KIND_EVENT, doc["kind"])
+	assert.Equal(t, []string{"markets"}, doc["tags"])
+	assert.Equal(t, "Example Semiconductor cut its annual outlook.", doc["summary"])
+	assert.NotContains(t, doc, "briefing")
+	assert.Equal(t, "earnings_guidance", doc["event_type"])
+	assert.Contains(t, doc, "stock_tickers")
+}
+
+func TestNewDigestDocumentRejectsNonObject(t *testing.T) {
+	doc := router.NewDigestDocumentForSip(&db.Sip{Digest: json.RawMessage(`[]`)})
+	assert.Nil(t, doc)
+}
+
+func TestMaterializeDigest(t *testing.T) {
+	sip := db.Sip{Digest: mustDigest(t, map[string]any{"briefing": "hello"})}
+	fields, err := sip.MaterializeDigest()
+	require.NoError(t, err)
+	assert.Equal(t, "hello", fields["briefing"])
+
+	_, err = (&db.Sip{Digest: json.RawMessage(`[]`)}).MaterializeDigest()
+	assert.Error(t, err)
+}
+
+func TestCursorEncodeDecodeRoundTrip(t *testing.T) {
+	id := uuid.New()
+	created := time.Date(2026, 7, 29, 13, 0, 0, 0, time.UTC)
+	c := &db.Cursor{Version: 1, ID: &id, Created: &created}
+
+	encoded, err := c.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, encoded)
+
+	decoded, err := db.DecodeCursor(encoded)
+	require.NoError(t, err)
+	require.NotNil(t, decoded)
+	require.NotNil(t, decoded.ID)
+	assert.Equal(t, id, *decoded.ID)
+	require.NotNil(t, decoded.Created)
+	assert.True(t, created.Equal(*decoded.Created))
+}
+
+func TestCursorEncodeDecodeRelevance(t *testing.T) {
+	id := uuid.New()
+	distance := 0.42
+	c := &db.Cursor{Version: 1, ID: &id, Distance: &distance}
+
+	encoded, err := c.Encode()
+	require.NoError(t, err)
+
+	decoded, err := db.DecodeCursor(encoded)
+	require.NoError(t, err)
+	require.NotNil(t, decoded.ID)
+	assert.Equal(t, id, *decoded.ID)
+	require.NotNil(t, decoded.Distance)
+	assert.InDelta(t, distance, *decoded.Distance, 1e-9)
+}
+
+func TestDecodeCursorRejectsGarbage(t *testing.T) {
+	_, err := db.DecodeCursor("not-valid-base64-or-json!!")
+	assert.ErrorIs(t, err, db.ErrInvalidCursor)
+
+	decoded, err := db.DecodeCursor("")
+	require.NoError(t, err)
+	assert.Nil(t, decoded)
+}
+
+func TestNewDigestDocuments(t *testing.T) {
+	sips := []db.Sip{
+		{
+			ID:      uuid.New(),
+			Kind:    db.SIP_KIND_SIGNAL,
+			Created: time.Now().UTC(),
+			Digest:  mustDigest(t, map[string]any{"thesis": "rates stay high"}),
+		},
+	}
+	docs := router.NewDigestDocuments(sips)
+	require.Len(t, docs, 1)
+	assert.Equal(t, "rates stay high", docs[0]["thesis"])
+	assert.Equal(t, sips[0].ID, docs[0]["id"])
+}
+
+func TestNewSourceDocumentUsesPublicFieldNames(t *testing.T) {
+	id := uuid.New()
+	doc := router.NewSourceDocument(&db.Source{ID: id, BaseURL: "https://example.com"})
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+
+	var fields map[string]any
+	require.NoError(t, json.Unmarshal(raw, &fields))
+	assert.Equal(t, id.String(), fields["id"])
+	assert.Equal(t, "https://example.com", fields["url"])
+	assert.Contains(t, fields, "domain")
+	assert.Contains(t, fields, "name")
+	assert.NotContains(t, fields, "base_url")
 }

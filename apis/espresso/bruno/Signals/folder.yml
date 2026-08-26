@@ -1,0 +1,6 @@
+info:
+  name: Signals
+  type: folder
+
+request:
+  auth: inherit

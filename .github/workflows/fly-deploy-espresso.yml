@@ -9,7 +9,7 @@ on:
     # Beans-only source changes do not affect the Espresso deployment.
     paths:
       - "apis/espresso/**"
-      - "apis/internal/**"
+      - "apis/shared/**"
       - "apis/go.mod"
       - "apis/go.sum"
       - "apis/Dockerfile"

@@ -1,0 +1,41 @@
+---
+description: Ongoing free-tier rate limits and monthly quotas for Cafecito REST APIs and MCP servers.
+---
+
+# Pricing and Limits
+
+**Last updated:** 2026-08-25
+
+All Cafecito APIs are in free tier during current launch preview phase.
+
+| | |
+| --- | --- |
+| **Price** | $0 |
+| **Rate limit** | 100 requests per minute |
+| **Monthly quota** | 50,000 requests per month |
+
+Limits apply **per authenticated user**, not per API key. Every key you create shares the same 100/min and 50,000/month budget. REST and MCP calls use **the same meter**.
+
+## What is included
+
+- Beans publisher-content REST and MCP
+- Espresso market and business intelligence REST and MCP
+- Keyword and semantic search on documented collection routes
+- Source, discovery, and related-resource routes documented for each product
+- API key management in the developer portal
+
+## How metering works
+
+- Each successful API or MCP call counts as one request, regardless of payload size or `num_results`.
+- Empty successful collections (`200` with `data: []`) count.
+- REST and MCP share the user meter.
+- **Not metered:** public `/health` checks, authenticated `Discovery` routes and API-key creation in the portal.
+- **Not metered:** HTTP `4xx` and `5xx` responses.
+
+When the per-minute limit is exceeded, the gateway returns HTTP `429`. When the monthly quota is exhausted, further authenticated calls return `429` until the next monthly window. There is no soft overage.
+
+Paid plans may be announced later. Until then, the free-tier numbers on this page apply.
+
+## If you hit a limit
+
+Back off on `429` as described in [API conventions](/guides/api-conventions). For operational recovery, see [Troubleshooting](/guides/troubleshooting).

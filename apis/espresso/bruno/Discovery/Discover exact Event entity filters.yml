@@ -1,0 +1,230 @@
+info:
+  name: Discover exact Event entity filters
+  type: http
+  seq: 1
+  tags:
+    - Discovery
+
+http:
+  method: GET
+  url: "{{baseUrl}}/entities"
+  params:
+    - name: q
+      value: ""
+      type: query
+      description: Case-insensitive substring filter.
+      disabled: true
+    - name: types
+      value: ""
+      type: query
+      description: "Entity types (CSV): company, people."
+      disabled: true
+    - name: response_type
+      value: json
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+    - name: response_type
+      value: yaml
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: response_type
+      value: toon
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: limit
+      value: "20"
+      type: query
+      description: Maximum records per page. Default 20, max 100.
+    - name: cursor
+      value: ""
+      type: query
+      description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Entity value collection envelope
+    request:
+      url: "{{baseUrl}}/entities"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive substring filter.
+          disabled: true
+        - name: types
+          value: ""
+          type: query
+          description: "Entity types (CSV): company, people."
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "type": "region",
+                "value": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Invalid limit, cursor token, or parameters
+    request:
+      url: "{{baseUrl}}/entities"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive substring filter.
+          disabled: true
+        - name: types
+          value: ""
+          type: query
+          description: "Entity types (CSV): company, people."
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Database unavailable; retry
+    request:
+      url: "{{baseUrl}}/entities"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive substring filter.
+          disabled: true
+        - name: types
+          value: ""
+          type: query
+          description: "Entity types (CSV): company, people."
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Use only when an agent needs available company or people names before applying an exact Event filter. Returned values are normalized snake_case filter strings, not canonical entity IDs or profiles.
+  If a known normalized value is already available, query Events directly. Use `types=company` or `types=people` to reduce the returned vocabulary.

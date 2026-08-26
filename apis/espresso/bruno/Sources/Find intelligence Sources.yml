@@ -1,0 +1,343 @@
+info:
+  name: Find intelligence Sources
+  type: http
+  seq: 1
+  tags:
+    - Sources
+
+http:
+  method: GET
+  url: "{{baseUrl}}/sources"
+  params:
+    - name: q
+      value: ""
+      type: query
+      description: Case-insensitive Source metadata search.
+      disabled: true
+    - name: domains
+      value: ""
+      type: query
+      description: Exact Source domain-name filter (CSV).
+      disabled: true
+    - name: limit
+      value: "20"
+      type: query
+      description: Maximum records per page. Default 20, max 100.
+    - name: cursor
+      value: ""
+      type: query
+      description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+      disabled: true
+    - name: response_type
+      value: json
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+    - name: response_type
+      value: yaml
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: response_type
+      value: toon
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Source collection envelope
+    request:
+      url: "{{baseUrl}}/sources"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive Source metadata search.
+          disabled: true
+        - name: domains
+          value: ""
+          type: query
+          description: Exact Source domain-name filter (CSV).
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "description": "",
+                "domain": "",
+                "favicon_url": "",
+                "id": "",
+                "name": "",
+                "rss_feed_url": "",
+                "url": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Invalid limit, cursor token, or parameters
+    request:
+      url: "{{baseUrl}}/sources"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive Source metadata search.
+          disabled: true
+        - name: domains
+          value: ""
+          type: query
+          description: Exact Source domain-name filter (CSV).
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Missing or invalid API key
+    request:
+      url: "{{baseUrl}}/sources"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive Source metadata search.
+          disabled: true
+        - name: domains
+          value: ""
+          type: query
+          description: Exact Source domain-name filter (CSV).
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Concurrency limit exceeded; retry shortly
+    request:
+      url: "{{baseUrl}}/sources"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive Source metadata search.
+          disabled: true
+        - name: domains
+          value: ""
+          type: query
+          description: Exact Source domain-name filter (CSV).
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Database unavailable; retry
+    request:
+      url: "{{baseUrl}}/sources"
+      method: GET
+      params:
+        - name: q
+          value: ""
+          type: query
+          description: Case-insensitive Source metadata search.
+          disabled: true
+        - name: domains
+          value: ""
+          type: query
+          description: Exact Source domain-name filter (CSV).
+          disabled: true
+        - name: limit
+          value: "20"
+          type: query
+          description: Maximum records per page. Default 20, max 100.
+        - name: cursor
+          value: ""
+          type: query
+          description: Opaque continuation token. Send pagination.next_cursor from a previous response unchanged as cursor; never construct or decode it.
+          disabled: true
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Use to discover or resolve provenance Sources before filtering Events by `source_ids`, or when an answer needs source metadata for citation. `q` performs case-insensitive metadata matching across source domain, name, and URL; it is not semantic search.
+  Carry a selected `data[].id` into Source detail or `GET /events?source_ids={source_id}`. Source results describe publishers and provenance; they do not contain Events.

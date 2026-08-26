@@ -1,0 +1,146 @@
+---
+description: Sequence Beans publisher coverage into Espresso Events, Signals, and evidence. Contains Beans → Espresso evidence path. Same API key; no official SDK. 
+---
+
+# Cross-product Workflow
+
+Use Beans when you need **what publishers published**. Use Espresso when you need **what happened**, **what it may mean**, and **what supports that claim**. One API key authenticates both REST and both MCP servers.
+
+Tool names match the hosted MCP catalogs on [MCP and AI agents](/guides/mcp-ai-agents). Shared transport rules live on [API conventions](/guides/api-conventions).
+
+## When to stay on one product
+
+| User intent | Stay on |
+| --- | --- |
+| Article URLs, titles, summaries, available full content, social media engagements, similar articles | Beans only |
+| Story across publishers and article clusters | Beans only (`listStories` → `getStory` → `listStoryArticles`) |
+| Publisher metadata for Beans filters | Beans `listSources` / `getSource` |
+| Concrete developments (what happened) | Espresso `searchEvents` / `getEvent` |
+| Meaning, impact, outlook | Espresso `searchSignals` / `getSignal` |
+| Supporting records and available URLs for a selected Event | Espresso `getEventEvidence` |
+| Intelligence source provenance | Espresso `listIntelligenceSources` / `getIntelligenceSource` |
+
+Beans Story tools do not return Espresso Events. Espresso evidence is not a Beans article search.
+
+## Beans → Espresso evidence sequence
+
+Run this when the user starts from publisher coverage and then needs structured confirmation or supporting records.
+
+1. **Find publisher coverage (Beans).**  
+   Use `searchArticles`, `getLatestArticles`, `getTopHeadlines`, `getTrendingArticles`, or `listStories`. Optionally narrow with discovery tools (`listCategories`, `listEntities`, `listRegions`, `listSentiments`).
+
+2. **Select identifiers (Beans).**  
+   Take `data[].id` for Articles or Stories. Call `getArticle` for a selected Article UUID. For a Story, call `getStory` then `listStoryArticles` if member Articles are required. Keep canonical Article `url` values for citation.
+
+3. **Formulate the intelligence question (Espresso).**  
+   Copy the topic, entity names, and region names the user (or the selected Articles) actually used. Do not assume a Beans Article UUID is an Espresso Event UUID.
+
+4. **Search what happened (Espresso).**  
+   Key points, events → `searchEvents` (`GET /espresso/events`). Discover exact filters with `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, and fuzzy tags with `listIntelligenceTags` when spelling is unknown.
+   
+5. **Get more details on what happened (Espresso).**  
+   Call `getEvent` or `getSignal` for the chosen `data[].id`. Walk links with `getEventSignals` or `getSignalEvents` when the question needs both facts and conclusions.
+
+6. **Understand the broader causal chain, impacts and forecast (Espresso).**  
+   Call `searchSignals` (`GET /espresso/signals`). Discover exact filters with `listIntelligenceEntities`, `listIntelligenceRegions`, `listIntelligenceEventTypes`, and fuzzy tags with `listIntelligenceTags` when spelling is unknown.
+
+7. **Inspect evidence tracing (Espresso).**  
+   After an Event UUID, call `getEventEvidence` (`GET /espresso/events/{event_id}/evidence`). Use returned identity, creation time, tags, Source IDs, and available URLs. An empty `data` array means no evidence records are available for that Event under the supplied filters—not a Beans miss.
+
+8. **Cite both layers.**  
+   - Publisher reading: Beans Article `url` (and Story membership if used).  
+   - Structured claim: Espresso Event/Signal IDs plus evidence URLs and `getIntelligenceSource` when provenance metadata is required.
+
+9. **Paginate independently.**  
+   Beans and Espresso cursors are not interchangeable. Send each product's `pagination.next_cursor` unchanged on the same route or tool.
+
+## Complete composite client
+
+The following programs are complete, copy-pasteable handoffs: they search publisher coverage in Beans, search concrete developments and interpretations in Espresso, then retrieve evidence for the first selected Event. Set `CAFECITO_API_KEY` before running. Each product keeps its own returned IDs and pagination envelope.
+
+<CodeTabs syncKey="cross-product-client">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const topic = process.env.CAFECITO_TOPIC || "semiconductor supply pressure";
+if (!apiKey) throw new Error("Set CAFECITO_API_KEY first");
+
+async function get(path, params = {}) {
+  const url = new URL("https://api.cafecito.tech" + path);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  const response = await fetch(url, { headers: { Authorization: "Bearer " + apiKey } });
+  if (!response.ok) throw new Error(path + ": HTTP " + response.status);
+  return response.json();
+}
+
+const [articles, events, signals] = await Promise.all([
+  get("/beans/articles/search", { q: topic, limit: 5 }),
+  get("/espresso/events", { q: topic, limit: 5 }),
+  get("/espresso/signals", { q: topic, limit: 5 }),
+]);
+const event = events.data?.[0] || null;
+const evidence = event
+  ? await get("/espresso/events/" + event.id + "/evidence", { limit: 5 })
+  : { data: [] };
+
+console.log(JSON.stringify({
+  topic,
+  publisher_articles: articles.data || [],
+  events: events.data || [],
+  signals: signals.data || [],
+  evidence: evidence.data || [],
+}, null, 2));
+```
+
+```python
+import json
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+topic = os.getenv("CAFECITO_TOPIC", "semiconductor supply pressure")
+session = requests.Session()
+session.headers.update({"Authorization": "Bearer " + api_key})
+
+def get(path, params=None):
+    response = session.get("https://api.cafecito.tech" + path, params=params or {}, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+articles = get("/beans/articles/search", {"q": topic, "limit": 5})
+events = get("/espresso/events", {"q": topic, "limit": 5})
+signals = get("/espresso/signals", {"q": topic, "limit": 5})
+event = (events.get("data") or [None])[0]
+evidence = get("/espresso/events/" + event["id"] + "/evidence", {"limit": 5}) if event else {"data": []}
+
+print(json.dumps({
+    "topic": topic,
+    "publisher_articles": articles.get("data", []),
+    "events": events.get("data", []),
+    "signals": signals.get("data", []),
+    "evidence": evidence.get("data", []),
+}, indent=2))
+```
+</CodeTabs>
+
+Node 18+ provides `fetch`; the Python program requires the `requests` package. The output keeps publisher Article URLs for citation and Espresso Event/Signal IDs plus evidence records for structured support.
+
+## REST equivalents for the handoff
+
+| Step | MCP tool | REST |
+| --- | --- | --- |
+| Publisher search | `searchArticles` | `GET /beans/articles/search` |
+| Story cluster | `listStories` / `getStory` / `listStoryArticles` | `GET /beans/stories`, `GET /beans/stories/{id}`, `GET /beans/stories/{id}/articles` |
+| Article detail | `getArticle` | `GET /beans/articles/{id}` |
+| What happened | `searchEvents` / `getEvent` | `GET /espresso/events`, `GET /espresso/events/{event_id}` |
+| Evidence | `getEventEvidence` | `GET /espresso/events/{event_id}/evidence` |
+| Outlook | `searchSignals` / `getSignal` | `GET /espresso/signals`, `GET /espresso/signals/{signal_id}` |
+
+Health checks remain REST-only: `GET /beans/health` and `GET /espresso/health` without a key.
+
+## Agent checklist
+
+- Same Bearer key on `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`.
+- Never pass a Beans Article or Story UUID into Espresso path parameters.
+- Never answer “what does this mean?” from Beans Article text alone when Espresso Signals are in scope.
+- Never answer “what did this publisher print?” from Espresso Events alone when Beans Articles are in scope.
+- Do not invent tools outside the [MCP catalog](/guides/mcp-ai-agents).

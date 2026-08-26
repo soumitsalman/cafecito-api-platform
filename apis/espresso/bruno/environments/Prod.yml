@@ -1,0 +1,7 @@
+name: Prod
+variables:
+  - name: baseUrl
+    value: https://api.cafecito.tech/espresso
+  - secret: true
+    name: apiKey
+    description: Create an api key from https://developer.cafecito.tech/settings/api-keys

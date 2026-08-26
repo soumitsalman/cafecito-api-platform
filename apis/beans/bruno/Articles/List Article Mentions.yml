@@ -1,0 +1,172 @@
+info:
+  name: List Article Mentions
+  type: http
+  seq: 5
+  tags:
+    - Articles
+
+http:
+  method: GET
+  url: "{{baseUrl}}/articles/:id/mentions"
+  params:
+    - name: id
+      value: 865d1ebb-1d1f-5d91-92c1-fac05b3c4c38
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "engagement": {
+                  "audiences": 0,
+                  "comments": 0,
+                  "likes": 0
+                },
+                "forum": "",
+                "observed_at": "",
+                "platform": "",
+                "url": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "invalid_request",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unauthorized",
+              "message": ""
+            }
+          }
+  - name: 404 Response
+    description: Not Found
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "not_found",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "rate_limited",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/articles/:id/mentions"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unavailable",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Answers: Where was this Article URL observed on external social or forum platforms?
+  Returns: A cursor-paginated collection of external mention observations; a mention is not another publisher Article.
+  Use when: external attention or discussion observations are needed for a known Article.
+  Do not use when: publisher republication coverage or related reading is needed.
+  Search/filter behavior: the path UUID is exact; optional platforms and forums filters select mention metadata.
+  Time: from and to are inclusive UTC observation-date bounds in YYYY-MM-DD.
+  Sort/pagination: observed-time order; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
+  Missing fields: forum and engagement metrics may be null; empty results are HTTP 200 with data: [].
+  Next step: use GET /articles/{id} to return to the Article citation or GET /articles/trending for aggregate attention ranking.

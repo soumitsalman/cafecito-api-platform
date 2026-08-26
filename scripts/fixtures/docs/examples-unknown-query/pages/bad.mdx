@@ -1,0 +1,8 @@
+---
+title: Invalid query example
+---
+
+```bash
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "made_up_filter=yes"
+```

@@ -1,17 +1,25 @@
-# Cafecito API Manager Repository Knowledge Base
-
-Last refreshed: 2026-07-17
+# Cafecito API Platform
+Updated: 2026-08-25
 
 ## System map
 
-Project Cafecito is a monorepo: Zuplo gateway, Zudoku developer portal, and backend Go apis live in `cafecito-api-manager`.
+Project Cafecito is a monorepo: Zuplo gateway, Zudoku developer portal, and backend Go apis live in `cafecito-api-platform`.
 
 - **Root** (`config/`, `modules/`, `docs/`): Zuplo gateway and Zudoku developer portal. Owns public API paths, API-key creation, Clerk integration, rate limits, quotas, OpenAPI specs, and docs.
 - **`apis/beans/`**: Beans service — read-only news/blog aggregation API with article search, trends, source metadata, and propagation tracking.
 - **`apis/espresso/`**: Espresso service — read-only business intelligence API over "sips" with events, signals, tags, related records, and token-efficient text responses for MCP/agent workflows.
-- **`apis/Dockerfile`** + **`apis/entrypoint.sh`**: API image with a co-located `llama-server`; root **`docker-compose.yml`** builds one image per API.
 
 Gateway paths use product prefixes such as `/beans/...` and `/espresso/...`. Backend Go apis expose their routes without those prefixes locally, typically on `:8080`.
+
+## Tech Stack
+- Neon.com serverless postgres as database
+- Backend API service ([apis](./apis/)) is self-hosted on fly.io
+- Self-hosted llama-server as embedder API (deployed through [fly.embedder.toml](apis/fly.embedder.toml))
+- API gateway provided by Zuplo. 
+- API gateway authenticates to backend API service using X-API-KEY Header.
+- Zuplo handles all rate-limit, usage metering and user authentication (through Bearer token). Backend API does not deal with rate-limit, quota, meter or end-user authentication. Hence HTTP status code 401 and 429 is sent by Zuplo gateway and not the backend.
+- User management (sign-in/sign-up/subscription) is provided by Clerk which is connected to zuplo (check [config](config/))
+
 
 ## Gateway (root)
 
@@ -19,10 +27,10 @@ Stack:
 
 - TypeScript, Zuplo runtime, Zudoku docs portal
 - Workspaces: root gateway plus `docs/`
-- Main scripts: `npm run dev`, `npm run test`, `npm run docs`, `npm run lint`
+- Main scripts: `npm run dev`, `npm run test`, `npm run docs`, `npm run lint`, `npm run verify:api-contracts`, `npm run verify:docs`
 
 Key files:
-
+- `config` directly should ONLY be used for route definitions and route policies.
 - `config/beans.oas.json`: Beans public OpenAPI routes under `/beans`
 - `config/espresso.oas.json`: Espresso public OpenAPI routes under `/espresso`
 - `config/developer.oas.json`: developer API for key creation and Clerk webhooks
@@ -40,173 +48,123 @@ Auth/gateway behavior:
 - Zudoku signs the create-key request using Clerk auth context.
 - Created Zuplo consumers carry `tags.sub`, `tags.email`, and metadata such as `subscription_plan` and `subscription_status`.
 - `gate-auth` currently requires an authenticated user but has inactive-subscription blocking commented out.
-- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)`.
-- Published docs say one API key works across product APIs and MCP endpoints.
+- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)` (private; never document this header on public surfaces).
+- Published docs: one API key works across product APIs and MCP endpoints.
+- **Frozen public policy:** free tier **100 requests/minute** and **50,000 requests/month** per authenticated user; REST clients send `Authorization: Bearer` except **health** (unauthenticated); do not publish private backend headers.
 
 Docs/products:
 
 - Live products in docs: Beans and Espresso.
-- Future/reserved products: Cortado and Latte.
+- Future/reserved products: Cortado.
 - MCP docs point to hosted endpoints such as `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`.
 
-CI/deploy:
+## Documentation dependency map
 
-- `.github/workflows/deploy-gateway.yml`: lint/test; `paths-ignore: apis/**`
-- Zuplo deploys via GitHub integration — configure path filters to exclude `apis/**`
+The backend Swagger, gateway OpenAPI, and portal pages are separate artifacts. A change does not propagate between them automatically.
 
-## apis/beans
+- Backend route behavior, request/response types, or Swagger annotations in `apis/<service>/router/` are the service-local contract. Regenerate that service's committed Swagger artifacts after changing annotations; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`.
+  - Changing annotations in `apis/*/router/routes.go` (or referenced router types) requires running the documented `swag` command in [`apis/README.md`](apis/README.md).
+- A public Espresso contract change must also be reflected manually in `config/espresso.oas.json`. It is the gateway contract under `/espresso`, powers the portal reference at `/api/espresso` through `docs/zudoku.config.tsx`, and declares the `/espresso/mcp` server and its exported `operationId` tools. Keep gateway paths, request/response schemas, descriptions, error semantics, and MCP tool mappings consistent with the backend behavior.
+- Apply the same review to `config/beans.oas.json` for Beans. `docs/zudoku.config.tsx` mounts it at `/api/beans` and mounts Espresso at `/api/espresso`.
+- For both cases swaggo will NOT generate 401 and 429 as failure response since they are handled by Zuplo gateway. So update `config/*.oas.json` files to include 401 and 429 out of bound with Zuplo standard response.
+- A public Espresso behavior change must be reflected in the relevant `docs/pages/` content:
+  - product behavior, filters, response envelopes, and route examples: `docs/pages/products/espresso/overview.mdx`;
+  - multi-call or agent route sequences: `docs/pages/products/espresso/workflows.mdx`;
+  - product positioning and provider mappings: `docs/pages/products/espresso/migration.mdx`;
+  - MCP endpoint, tool list, and agent workflow: `docs/pages/guides/mcp-ai-agents.mdx`;
+  - shared authentication, pagination, or response-format behavior: `docs/pages/guides/api-conventions.mdx` and, when the quickstart changes, `docs/pages/start/first-api-call.mdx`.
+- Update `docs/zudoku.config.tsx` whenever an API reference mount, documentation page, navigation item, or redirect changes. Update `docs/pages/api-overview.mdx` or `docs/pages/start/overview.mdx` only when product availability or high-level positioning changes.
 
-Stack:
+### Public documentation boundary
 
-- Go module `github.com/soumitsalman/beansapi`
-- Gin, pgx, pgvector, zerolog, godotenv, swaggo, gRPC TEI embedder client
-- Tests under `tests/`, OpenAPI generated under `docs/`
+Public surfaces are gateway OpenAPI files in `config/`, generated Swagger files that are served by a backend, and `docs/pages/`. Describe public behavior and stable contracts only. If internal implementation detail appears in one of these surfaces, remove it and replace it with user-facing behavior or a generic message such as "Service unavailable; retry."
 
-Core domain:
+Never expose:
 
-- A "bean" is an article/post keyed by canonical `url`.
-- PostgreSQL schema is expected from the Beans ingestion pipeline in `pycoffeemaker/pybeansack/pgsack.sql`.
-- Tables/entities include `beans`, `publishers`, `chatters`, `related_beans`, and `trend_aggregates`.
-- Semantic search uses 384-dimensional pgvector embeddings.
+- persistence architecture: Espresso's `cupboard`, `sips`, `sources`, or `relations` tables; relationship values such as `same_as` and `derived_from`; digest payloads and their structure; Beans' `beansack` and database tables; SQL, schemas, columns, foreign-key choices, indexes, materialized views, or migration details;
+- retrieval implementation: embeddings, vector dimensions or indexes, HNSW, embedder/model configuration, caches, query internals, or relation direction/relationship storage;
+- private code and operations: Go packages/types/handlers, internal identifiers, backend environment variables or headers, gateway rewrites/policies, infrastructure/vendor details, credentials, quotas implementation, and operational topology.
 
-Important files:
+Public docs may describe Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements, but not how those concepts are stored or implemented.
 
-- `main.go`: loads env, creates `beansack.PGSack`, remote embedder, router, and server.
-- `router/routes.go`: HTTP routes, validation, auth/concurrency middleware, swagger annotations.
-- `beansack/types.go`: response/domain types such as `Bean`, `Publisher`, `Chatter`, `BeanTrend`, `PropagationResult`.
-- `beansack/pgsack.go`: SQL builder and query execution.
-- `nlp/embedder.go`: gRPC client to TEI-compatible embedding service.
-- `docs/swagger.yaml` and `docs/swagger.json`: generated API spec.
 
-Local/backend routes:
+## CI, ownership, and Definition of Done
 
-- `GET /health`
-- `GET /tags/categories`
-- `GET /tags/entities`
-- `GET /tags/regions`
-- `GET /sources`
-- `GET /articles/search`
-- `GET /articles/latest`
-- `GET /articles/trending`
-- `GET /articles/top-headlines`
-- `GET /articles/propagation`
-- `POST /articles/propagation`
-- `GET /swagger/*any`
+**API Contract & Docs** (`.github/workflows/api-contract-docs.yml`) is **manual only** (`workflow_dispatch`). It must not run on pull_request or push, must not be called from other workflows, and must **not** be a required GitHub check.
 
-Common query concepts:
+### Run verification locally
 
-- Pagination: `limit` default 16, max 128; `offset` default 0.
-- Article filters: `q`, `acc`, `content_type`, `urls`, `tags`, `categories`, `regions`, `entities`, `sources`, `from`, `full_content`.
-- Propagation accepts up to 128 URLs and returns coverage plus social mentions per input URL.
+From the repo root. Go tests need Postgres with pgvector and `PG_CONNECTION_STRING` (same role as `.github/workflows/api-contract-docs.yml`: apply `.github/ci/schema-beans.sql` or `schema-espresso.sql` + `.github/ci/seed-espresso.sql`).
 
-Runtime config:
+```bash
+# Beans (deterministic fixtures / fake embedder; stress tests skip without :8080)
+(cd apis/beans && go test ./tests/... -count=1 -timeout 20m)
 
-- Required: `PG_CONNECTION_STRING`, `EMBEDDER_BASE_URL`
-- Optional: `EMBEDDER_API_KEY`, `EMBEDDER_MODEL`, `PORT`, `MAX_CONCURRENT_REQUESTS`, `API_KEYS`
-- `API_KEYS` format is semicolon-separated `Header=Value`, for example `X-API-KEY=secret;Authorization=Bearer token`.
-- If `API_KEYS` is unset, backend auth is disabled.
+# Espresso (skip live-embedder vector search)
+(cd apis/espresso && go test ./tests/... -count=1 -timeout 20m -skip 'TestRouterVectorSearch')
 
-Commands:
+# Swagger must match annotations (no hand-edits)
+(cd apis/beans && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal)
+(cd apis/espresso && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal)
+git diff --exit-code -- apis/beans/docs apis/espresso/docs
 
-- Build: `cd apis/beans && go build -o beansapi .`
-- Run: `cd apis/beans && go run .` or `./beansapi`
-- Docker (from repo root): `docker compose up --build beansapi` (beans on `:8080`; the image starts its own `llama-server`)
-- Regenerate docs: `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go -o docs`
-- Tests: `go test ./tests/...` with a reachable database and `.env`.
+# Gateway OpenAPI, cascade, docs, lint, portal
+npm ci
+npm run lint
+node --input-type=module -e 'import { readFile } from "node:fs/promises";
+for (const f of ["config/beans.oas.json","config/espresso.oas.json"]) {
+  const spec = JSON.parse(await readFile(f, "utf8"));
+  if (!String(spec.openapi||"").startsWith("3.")) throw new Error(f + " is not OpenAPI 3.x");
+}'
+npm run verify:api-contracts
+# optional live gateway: ZUPLO_TEST_ENDPOINT=... npm test
+npm run build --workspace docs
+node scripts/verify-documentation.mjs --require-generated
+bash .github/ci/inspect-portal-output.sh .
+```
 
-Deploy: `.github/workflows/deploy-beans.yml` → Azure Container App `cafecito-beans-api` (paths: `apis/beans/**`).
+Without a portal build, `npm run verify:docs` still checks examples, terms, lifecycle, links, and inventory (`generated` is skipped). After a Zudoku build, use `--require-generated` as above.
 
-## apis/espresso
+Manual GitHub run: Actions → **API Contract & Docs** → **Run workflow**.
 
-Stack:
+Workflows:
 
-- Go module `github.com/soumitsalman/espressoapi`
-- Gin, pgx, pgvector, zerolog, godotenv, swaggo, gRPC TEI embedder client
-- Tests under `tests/`, OpenAPI generated under `docs/`
+| Workflow `name` | File | Role |
+|---|---|---|
+| API Contract & Docs | `.github/workflows/api-contract-docs.yml` | Manual: Go suites, Swagger diff, OpenAPI, cascade, docs, lint, Zudoku, portal inspection |
+| Gateway CI | `.github/workflows/zpl-deploy-gateway.yml` | Lint on gateway-path PRs/`main`. `paths-ignore: apis/**` |
+| Fly Deploy Beans API | `.github/workflows/fly-deploy-beans.yml` | `flyctl deploy` (no contract-docs gate) |
+| Fly Deploy Espresso API | `.github/workflows/fly-deploy-espresso.yml` | Same as Beans Fly |
+| Trigger auto deployment for cafecito-beans-api | `.github/workflows/az-deploy-beans.yml` | Disabled (`__disabled__`); correct `Dockerfile` + `API_KEY` before re-enable |
+| Trigger auto deployment for cafecito-espresso-api | `.github/workflows/az-deploy-espresso.yml` | Same as Beans Azure |
 
-Core domain:
+Zuplo production deploy is GitHub integration: configure path filters to exclude `apis/**`.
 
-- A "sip" is a UUID-keyed unit of intelligence with kind `action`, `event`, or `signal`.
-- The router flattens each sip `digest` JSON and merges `id` and `created` into response objects.
-- PostgreSQL schema is expected from the Espresso ingestion pipeline in `pycoffeemaker/pycupboard/pgcupboard.py`.
-- Tables/entities include `sips`, `sources`, and `relations`.
-- Relations support `same_as` and `derived_from`.
-- Semantic search uses 384-dimensional pgvector embeddings.
+CODEOWNERS: `.github/CODEOWNERS` (`@soumitsalman`). PR checklist: `.github/pull_request_template.md`.
 
-Important files:
+Definition of Done for a public API change:
 
-- `main.go`: loads env, creates `cupboard.Cupboard`, remote embedder, router, and server.
-- `router/routes.go`: HTTP routes, validation, response selection, auth/concurrency middleware, swagger annotations.
-- `router/types.go`: flattened JSON response shapes and `response_type=text` rendering.
-- `cupboard/types.go`: persistence types for `Sip`, `Source`, and `Relation`.
-- `cupboard/database.go`: SQL builder and query execution.
-- `nlp/embedder.go`: gRPC client to TEI-compatible embedding service.
-- `docs/swagger.yaml` and `docs/swagger.json`: generated API spec.
+1. Runtime behavior and tests are complete.
+2. Annotations are updated.
+3. Generated Swagger is regenerated (`git diff --exit-code` on `apis/<service>/docs`).
+4. Gateway OpenAPI is reconciled.
+5. MCP exposure is reconciled.
+6. Portal pages and examples are reconciled.
+7. Intent and frozen public policy remain correct.
+8. `npm run verify:api-contracts` and `node scripts/verify-documentation.mjs --require-generated` after a Zudoku build. Do not wait on GitHub **API Contract & Docs** (manual only).
 
-Local/backend routes:
 
-- `GET /health`
-- `GET /tags`
-- `GET /events`
-- `GET /signals`
-- `GET /related/:relationship`
-- `GET /swagger/*any`
+## API Implementation
 
-Common query concepts:
+Code: [apis/](apis/)
+Read: [AGENTS.md](apis/AGENTS.md) for instructions
 
-- Pagination: `limit` default 16, max 128; `offset` default 0.
-- Event/signal filters: `ids`, `tags`, `q`, `acc`, `from`, `response_type`, `limit`, `offset`.
-- `response_type=json` is default.
-- `response_type=text` returns compact plain-text records for MCP/LLM context.
-
-Runtime config:
-
-- Required: `PG_CONNECTION_STRING`, `EMBEDDER_BASE_URL`
-- Optional: `EMBEDDER_API_KEY`, `EMBEDDER_MODEL`, `PORT`, `MAX_CONCURRENT_REQUESTS`, `API_KEYS`
-- `API_KEYS` format is semicolon-separated `Header=Value`.
-- If `API_KEYS` is unset, backend auth is disabled.
-
-Commands:
-
-- Build: `cd apis/espresso && go build -o espressoapi .`
-- Run: `cd apis/espresso && go run .` or `./espressoapi`
-- Docker (from repo root): `docker compose up --build espressoapi` (espresso on `:8081`; the image starts its own `llama-server`)
-- Regenerate docs: `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`
-- Tests: `go test ./tests/...` with a reachable database and `.env`.
-
-Deploy: `.github/workflows/deploy-espresso.yml` → Azure Container App `cafecito-espresso-api` (paths: `apis/espresso/**`).
-
-## Local Docker stack
-
-Root `docker-compose.yml` builds `apis/Dockerfile` separately for `beansapi` and `espressoapi`. Each container runs its API and a co-located `llama-server`; there is no separate embedder service.
-
-## Cross-component implementation notes
-
-- **When routes or swaggo docstrings in `apis/` change**, do both in the same change (in parallel where possible):
-  1. Regenerate Swagger with swaggo (beans: `cd apis/beans && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go -o docs`; espresso: `cd apis/espresso && go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal`).
-  2. Update the matching gateway OpenAPI file in `config/` (`config/beans.oas.json` for beans, `config/espresso.oas.json` for espresso) so public paths, parameters, and schemas stay aligned — gateway paths keep the `/beans` or `/espresso` prefix.
-- Public OpenAPI specs in `config/` should stay aligned with generated Swagger specs in `apis/*/docs/`.
-- Gateway paths add `/beans` or `/espresso`; backend service route files do not.
-- The gateway authenticates public traffic and forwards a backend API key header. The Go apis can also enforce `API_KEYS` directly.
-- Both Go apis use the same basic runtime pattern: env loading, DB pool, remote embedder, Gin router, CORS, optional API key middleware, and in-memory concurrency queue.
-- Both Go apis rely on external ingestion pipelines for database schema and data population; schema changes may require coordinating with `pycoffeemaker`.
-- For MCP/agent ergonomics, Espresso explicitly supports `response_type=text`; Beans exposes MCP docs and JSON APIs but does not currently mirror Espresso's text response format in the backend routes.
-
-## Go naming conventions (`apis/`)
-
-When writing or editing Go code under `apis/`, follow:
-
-- Local variables: `lower_snake_case`
-- Constants: `UPPER_SNAKE_CASE`
-- Private functions: `camelCase`
-- Public functions: `PascalCase`
-- **Tests**: all Go tests belong in the service's `tests/` directory (e.g. `apis/beans/tests/`, `apis/espresso/tests/`). **Never** place `*_test.go` files next to production code under packages like `router/`, `cupboard/`, `beansack/`, `nlp/`, etc.
 
 ## First files to open by task
 
 - Gateway route/auth/rate-limit issue: `config/policies.json`, then `modules/gate-auth.ts`, `modules/tiered-rate-limit.ts`, and the relevant `config/*.oas.json`.
 - Developer portal/API-key issue: `docs/zudoku.config.tsx`, `modules/create-api-keys.ts`, `modules/clerk-webhook.ts`, `modules/consumer-ops.ts`.
 - Beans endpoint behavior: `apis/beans/router/routes.go`, then `apis/beans/beansack/pgsack.go` and `apis/beans/beansack/types.go`.
-- Beans API spec/docs drift: `apis/beans/docs/swagger.yaml`, `config/beans.oas.json`, and `docs/pages/howtos/beans-howto.mdx`.
+- Beans API spec/docs drift: `apis/beans/router/`, `apis/beans/docs/swagger.yaml`, `config/beans.oas.json`, and `docs/pages/products/beans/overview.mdx`.
 - Espresso endpoint behavior: `apis/espresso/router/routes.go`, `apis/espresso/router/types.go`, then `apis/espresso/cupboard/database.go`.
-- Espresso API spec/docs drift: `apis/espresso/docs/swagger.yaml`, `config/espresso.oas.json`, and `docs/pages/howtos/espresso-howto.mdx`.
+- Espresso API spec/docs drift: `apis/espresso/router/`, `apis/espresso/docs/swagger.yaml`, `config/espresso.oas.json`, `docs/pages/products/espresso/`, and the relevant `docs/pages/guides/` page.

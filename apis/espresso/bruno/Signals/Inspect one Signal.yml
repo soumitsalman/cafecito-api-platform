@@ -1,0 +1,279 @@
+info:
+  name: Inspect one Signal
+  type: http
+  seq: 2
+  tags:
+    - Signals
+
+http:
+  method: GET
+  url: "{{baseUrl}}/signals/:signal_id"
+  params:
+    - name: signal_id
+      value: 72f16578-f9b3-5921-b595-90977d00493d
+      type: path
+      description: Signal UUID (RFC 4122).
+    - name: response_type
+      value: json
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+    - name: response_type
+      value: yaml
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+    - name: response_type
+      value: toon
+      type: query
+      description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Signal detail envelope
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "id": "00000000-0000-0000-0000-000000000000",
+              "kind": "signal",
+              "created_at": "2026-01-01T00:00:00Z",
+              "tags": []
+            }
+          }
+  - name: 400 Response
+    description: Malformed UUID
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Missing or invalid API key
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 404 Response
+    description: No Signal with this UUID
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Concurrency limit exceeded; retry shortly
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Database unavailable; retry
+    request:
+      url: "{{baseUrl}}/signals/:signal_id"
+      method: GET
+      params:
+        - name: signal_id
+          value: ""
+          type: path
+          description: Signal UUID (RFC 4122).
+        - name: response_type
+          value: json
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+        - name: response_type
+          value: yaml
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+        - name: response_type
+          value: toon
+          type: query
+          description: "Response serialization: JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients. JSON is canonical; YAML and TOON are token-optimized for MCP and AI-agent clients."
+          disabled: true
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Use after selecting a Signal from a collection. Returns its complete public fields, optional Source provenance, and a link/count for Events that support the conclusion.
+  Carry the Signal ID to `/signals/{signal_id}/events` when an answer needs concrete supporting developments. `created_at` is record creation time.

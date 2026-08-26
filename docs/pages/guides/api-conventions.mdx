@@ -1,0 +1,131 @@
+---
+description: Canonical authentication, pagination, dates, errors, retries, and query validation for Cafecito REST APIs and MCPs.
+---
+
+import { Button } from "zudoku/ui/Button";
+
+# API Conventions
+
+Use this page to implement a shared HTTP client. Product pages describe resources and filters; this page is the shared transport contract.
+
+Live products: **Beans** and **Espresso**. **Cortado** is a future product and have no public API.
+
+There is **no official Cafecito SDK**. Integrate with REST or MCP using the patterns on [Reusable clients](/guides/client-patterns). For limits, see [Pricing and limits](/guides/pricing-limits). For recovery, see [Troubleshooting](/guides/troubleshooting).
+
+## Base URL and authentication
+
+| Item | Contract |
+| --- | --- |
+| Gateway base URL | `https://api.cafecito.tech` |
+| Authenticated requests <Button className="btn-with-link" asChild><a href="/settings/api-keys">API Key</a></Button> | `Authorization: Bearer YOUR-API-KEY` |
+| Health | `GET /beans/health` and `GET /espresso/health` are public. Do not send a key. |
+| MCP | Same key as REST. Hosted endpoints: `https://api.cafecito.tech/beans/mcp` and `https://api.cafecito.tech/espresso/mcp`. |
+
+~~~http
+Authorization: Bearer YOUR-API-KEY
+~~~
+
+One key works across live REST APIs and MCP servers. Store the key in an environment variable or secret manager. Never commit it.
+
+## Query validation
+
+Unknown or route-inapplicable query parameters are **rejected** with HTTP `400` and the ErrorResponse envelope below. Malformed UUIDs, malformed cursors, and out-of-range `limit` values are rejected with HTTP `400` as well.
+
+Use only the parameters listed for that route in the [Beans](/api/beans) or [Espresso](/api/espresso) reference.
+
+## Pagination
+
+Products paginate collections with `limit` (default `20`, maximum `100`) and an opaque `cursor`. `pagination.num_results` is the count **in this page**, not a total match count. When `pagination.next_cursor` is non-null, send that exact string as the next request `cursor` on the same route with the same filters. Do not decode, modify, sort, or synthesize tokens.
+
+Empty collections are HTTP `200` with `data: []`. Missing detail resources are HTTP `404`.
+
+### Collection envelope
+
+Collections return `pagination`, `meta`, and `data`. Continuation uses only `next_cursor` → request `cursor`.
+
+```json
+{
+  "pagination": {
+    "limit": 20,
+    "num_results": 20,
+    "next_cursor": "OPAQUE_TOKEN_OR_NULL"
+  },
+  "meta": {
+    "as_of": "2026-08-24T20:42:39Z"
+  },
+  "data": []
+}
+```
+
+Detail routes return 
+
+```json
+{ 
+  "data": { ... } 
+}
+```
+
+## Dates and freshness
+
+| Concept | Meaning |
+| --- | --- |
+| Date-only filters (`from`, `to`) | Inclusive UTC calendar dates in `YYYY-MM-DD`. |
+| Beans `from` / `to` | Bound article publication time (`published_at`). |
+| Espresso `from` / `to` | Bound record creation time (`created_at`). |
+| `meta.as_of` | UTC time this collection snapshot was produced. Show it to users as freshness. Values in examples are captured, not a live dataset. |
+| Bean `full_content=true` | It does not guarantee a full publisher copy or the most fresh copy if the same article has been updated recently. Handle a missing or partial `content` value and cite the canonical Article `url`.|
+
+Examples on product pages are not a guaranteed live result set. Re-query when the application needs a current snapshot.
+
+## Response formats
+
+JSON is canonical for REST. Espresso is capable of returning YAML or TOON where `response_type` is documented; those encodings carry the same fields, including opaque cursors and are primarily designed for token optimization for AI Agents. Beans REST and MCP results use JSON.
+
+## Errors
+
+Application errors from Beans and Espresso use HTTP status plus:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable explanation"
+  }
+}
+```
+
+Missing or invalid **public** keys are rejected at the gateway with HTTP `401` (engine body). Send `Authorization: Bearer <key>`.
+
+| HTTP status | Typical cause | Retry? |
+| --- | --- | --- |
+| `400` | Invalid or unknown query, malformed UUID or cursor, unsupported parameter | No. Fix the request. |
+| `401` | Missing or invalid public API key (gateway) | No. Create or replace the key. |
+| `404` | Detail resource does not exist | No. Do not treat empty collections as 404. |
+| `429` | Rate or monthly quota reached | Yes, after backoff. See [Pricing](/guides/pricing-limits). |
+| `5xx` | Temporary service failure | Yes, with bounded retries. |
+
+Successful collections never use `204` for empty results.
+
+## Retries and operational recovery
+
+1. Confirm `GET /beans/health` or `GET /espresso/health` without a key.
+2. Retry `429` and `5xx` with exponential backoff and jitter. Honor any `Retry-After` header when present.
+3. Do not retry `400`, `401`, or `404` with the same request.
+4. If a cursor is rejected (`400`), restart the collection from the first page with the same filters.
+5. If a response format is unsupported, fall back to JSON (`response_type=json` or omit the parameter).
+6. Keep identifiers and `next_cursor` values exactly as returned.
+
+## Versioning and support
+
+- Compatible changes are **additive**: new optional fields, new routes, and new enum values may appear without a URL version bump.
+- **Breaking** changes ship as a new API version, with deprecation notices on this portal before removal.
+- Report bugs and request features via [Contact](/contact) (GitHub issue templates).
+
+## Product choice
+
+| Job | Product |
+| --- | --- |
+| Publisher articles, stories, mentions, available full content | Beans |
+| Market events, signals, evidence | Espresso |
+
+MCP tool catalogs and product overviews cover route selection. Shared client wrappers live on [Reusable clients](/guides/client-patterns).

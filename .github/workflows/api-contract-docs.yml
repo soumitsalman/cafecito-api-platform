@@ -1,0 +1,180 @@
+name: API Contract & Docs
+
+on:
+  workflow_dispatch:
+
+# Manual only. Do not add pull_request, push, or schedule. Do not call this
+# workflow from deploy/CI jobs. Run the same checks locally with
+# `npm run verify:api-contracts` and `npm run verify:docs`.
+
+concurrency:
+  group: api-contract-docs-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PGHOST: localhost
+  PGPORT: 5432
+  PGUSER: postgres
+  PGPASSWORD: postgres
+  PGDATABASE: cafecito_ci
+  PG_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/cafecito_ci?sslmode=disable
+
+jobs:
+  go-beans:
+    name: Beans Go tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cafecito_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafecito_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apis/go.mod
+          cache-dependency-path: apis/go.sum
+      - name: Apply pgvector schema
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+          psql "$PG_CONNECTION_STRING" -f .github/ci/schema-beans.sql
+      - name: Run Beans tests
+        working-directory: apis/beans
+        env:
+          PG_CONNECTION_STRING: ${{ env.PG_CONNECTION_STRING }}
+        run: |
+          # Deterministic fixtures seed in tests/fixtures_test.go (fake embedder).
+          # Stress tests skip when no live :8080 process is running.
+          go test ./tests/... -count=1 -timeout 20m
+
+  go-espresso:
+    name: Espresso Go tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cafecito_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafecito_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apis/go.mod
+          cache-dependency-path: apis/go.sum
+      - name: Apply pgvector schema and fixtures
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+          psql "$PG_CONNECTION_STRING" -f .github/ci/schema-espresso.sql
+          psql "$PG_CONNECTION_STRING" -f .github/ci/seed-espresso.sql
+      - name: Run Espresso tests
+        working-directory: apis/espresso
+        env:
+          PG_CONNECTION_STRING: ${{ env.PG_CONNECTION_STRING }}
+        run: |
+          # Contract tests are hermetic. DB/router suites use CI fixtures above.
+          # Skip router vector-search tests: they require llama-server/embedder
+          # on :10000 (not available without large model artifacts).
+          # Stress tests skip when no live API process is running.
+          go test ./tests/... -count=1 -timeout 20m -skip 'TestRouterVectorSearch'
+
+  swagger-freshness:
+    name: Swagger regeneration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apis/go.mod
+          cache-dependency-path: apis/go.sum
+      - name: Regenerate Beans Swagger
+        working-directory: apis/beans
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal
+      - name: Regenerate Espresso Swagger
+        working-directory: apis/espresso
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g router/routes.go -o docs --parseDependency --parseInternal
+      - name: Fail if generated Swagger drifted
+        run: git diff --exit-code -- apis/beans/docs apis/espresso/docs
+
+  gateway-and-docs:
+    name: OpenAPI, docs, gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Validate gateway OpenAPI JSON
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFile } from "node:fs/promises";
+          const files = ["config/beans.oas.json", "config/espresso.oas.json"];
+          for (const f of files) {
+            const spec = JSON.parse(await readFile(f, "utf8"));
+            if (!spec.openapi || !String(spec.openapi).startsWith("3.")) {
+              throw new Error(`${f} is not OpenAPI 3.x`);
+            }
+            if (!spec.paths || typeof spec.paths !== "object") {
+              throw new Error(`${f} missing paths`);
+            }
+            console.log(`ok ${f} openapi=${spec.openapi} paths=${Object.keys(spec.paths).length}`);
+          }
+          EOF
+      - name: Contract cascade (strict)
+        run: npm run verify:api-contracts
+      - name: Gateway tests
+        env:
+          ZUPLO_TEST_ENDPOINT: ${{ secrets.ZUPLO_TEST_ENDPOINT }}
+        run: |
+          # zuplo test hits a live gateway for Bearer 401 paths. Skip without
+          # ZUPLO_TEST_ENDPOINT (no account/runtime secrets in this job).
+          if [[ -n "${ZUPLO_TEST_ENDPOINT:-}" ]]; then
+            npm test
+          else
+            echo "SKIP: npm test (zuplo test) requires ZUPLO_TEST_ENDPOINT / a running gateway."
+          fi
+      - name: Zudoku build
+        run: npm run build --workspace docs
+      - name: Documentation checks including generated LLM output
+        run: node scripts/verify-documentation.mjs --require-generated
+      - name: Inspect Markdown, Pagefind, and llms.txt
+        run: bash .github/ci/inspect-portal-output.sh .
+
+  api-contract-docs:
+    name: API Contract & Docs
+    runs-on: ubuntu-latest
+    needs:
+      - go-beans
+      - go-espresso
+      - swagger-freshness
+      - gateway-and-docs
+    steps:
+      - name: All contract and docs jobs passed
+        run: echo "Beans Go tests, Espresso Go tests, Swagger regeneration, and OpenAPI/docs/gateway succeeded."

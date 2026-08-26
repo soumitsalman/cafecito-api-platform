@@ -1,606 +1,991 @@
+// @title 			Beans News API & MCP
+// @version 		1.0
+// @description Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+// @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
+// @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
+// @description Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
+// @schemes 		https
+// @license.name 	MIT
+// @contact.name 	Project Cafecito
+// @contact.url  	https://cafecito.tech
+// @contact.email 	soumitsrah@cafecito.tech
+// @securityDefinitions.apikey BackendAPIKey
+// @in header
+// @name X-API-KEY
+
 package router
 
 import (
-	"fmt"
+	// "fmt" // Legacy route validation dependency.
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/maypok86/otter/v2"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
-	"github.com/soumitsalman/cafecito-api-platform/apis/internal/embedding"
+	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
+
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const (
-	MIN_WINDOW          = 1
-	DEFAULT_WINDOW      = 7 // DAYS
-	DEFAULT_ACCURACY    = 0.5
-	DEFAULT_LIMIT       = 16
-	MAX_LIMIT           = 128
-	FAVICON_PATH        = "./images/beans.png"
-	DEFAULT_CONCURRENCY = 512
+	MIN_WINDOW              = 1
+	DEFAULT_WINDOW          = 7 // DAYS
+	DEFAULT_SCORE_THRESHOLD = 0.5
+	DEFAULT_LIMIT           = 20
+	MAX_LIMIT               = 100
 )
 
 const (
-	_CACHE_SIZE = 1000
-	_CACHE_TTL  = 30 * time.Minute
+	API_ERROR_MSG_OUR_BAD            = "Our bad. Please try again later."
+	API_ERROR_MSG_SOURCE_NOT_FOUND   = "Source not found."
+	API_ERROR_MSG_TAG_NOT_FOUND      = "Tag not found."
+	API_ERROR_MSG_ENTITY_NOT_FOUND   = "Entity not found."
+	API_ERROR_MSG_REGION_NOT_FOUND   = "Region not found."
+	API_ERROR_MSG_CATEGORY_NOT_FOUND = "Category not found."
+	API_ERROR_MSG_COMPANY_NOT_FOUND  = "Company not found."
+	API_ERROR_MSG_PRODUCT_NOT_FOUND  = "Product not found."
+	API_ERROR_MSG_ARTICLE_NOT_FOUND  = "Article not found."
+	API_ERROR_MSG_STORY_NOT_FOUND    = "Story not found."
 )
 
-const (
-	_EMBEDDER_ERROR     = "Embedder just died. Retry in a bit."
-	_DB_ERROR           = "DB just died. Retry in a bit."
-	_NEEDS_SEARCH_PARAM = "At least one search parameter is required (q, tags, categories, regions, entities)."
-)
-
-const (
-	_BEAN_TREND_FIELDS = "likes, comments, shares, related, trend_score"
-)
-
-// PaginationInput holds shared list-endpoint pagination query params.
-// form default=16 and max=128 must stay in sync with DEFAULT_LIMIT and MAX_LIMIT.
-type PaginationInput struct {
-	Limit  int `form:"limit,default=16" binding:"min=1,max=128"`
-	Offset int `form:"offset" binding:"min=0"`
+type Configuration struct {
+	DB       *db.PGSack
+	Embedder embedding.Embedder
+	APIKeys  map[string]string
 }
 
-func (p PaginationInput) ToDB() db.Pagination {
-	return db.Pagination{Limit: p.Limit, Offset: p.Offset}
-}
-
-func normalizePagination(p *PaginationInput) error {
+// createPageRequest creates a PageRequest for db from given pagination params and validates the cursor.
+func (p *paginationParams) createPageRequest(c *gin.Context, config *Configuration) (*db.PageRequest, error) {
 	if p.Limit == 0 {
 		p.Limit = DEFAULT_LIMIT
 	}
-	if p.Limit > MAX_LIMIT {
-		return fmt.Errorf("limit must be <= %d", MAX_LIMIT)
+	cursor, err := db.DecodeCursor(p.Cursor)
+	if err != nil {
+		return nil, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
-	if p.Offset < 0 {
-		return fmt.Errorf("offset must be >= 0")
+	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
+}
+
+// toDBFilters converts router-level article filter params to db-level Filters.
+func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters := db.BeanFilters{
+		Kind:              strings.ToLower(p.ContentType),
+		Sources:           p.Sources,
+		ExcludeSources:    p.ExcludeSources,
+		Domains:           utils.NormalizeTexts(p.Domains),
+		ExcludeDomains:    utils.NormalizeTexts(p.ExcludeDomains),
+		Authors:           p.Authors,
+		Tags:              utils.NormalizeTags(p.Tags),
+		Categories:        utils.NormalizeTags(p.Categories),
+		ExcludeCategories: utils.NormalizeTags(p.ExcludeCategories),
+		Sentiments:        utils.NormalizeTags(p.Sentiments),
+		Entities:          utils.NormalizeTags(p.Entities),
+		Regions:           utils.NormalizeTags(p.Regions),
+		FullContent:       p.FullContent,
+	}
+	return &filters, nil
+}
+
+func (p *topHeadlinesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters := db.BeanFilters{
+		Sources:           p.Sources,
+		ExcludeSources:    p.ExcludeSources,
+		Domains:           utils.NormalizeTexts(p.Domains),
+		ExcludeDomains:    utils.NormalizeTexts(p.ExcludeDomains),
+		Authors:           p.Authors,
+		Tags:              utils.NormalizeTags(p.Tags),
+		Categories:        utils.NormalizeTags(p.Categories),
+		ExcludeCategories: utils.NormalizeTags(p.ExcludeCategories),
+		Sentiments:        utils.NormalizeTags(p.Sentiments),
+		Entities:          utils.NormalizeTags(p.Entities),
+		Regions:           utils.NormalizeTags(p.Regions),
+		FullContent:       p.FullContent,
+	}
+	if err := p.vectorSearchParams.attachToFilters(c, r, &filters); err != nil {
+		return nil, err
+	}
+	return &filters, nil
+}
+
+func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+		return nil, err
+	}
+	return filters, nil
+}
+
+func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters, _ := p.articleFeedParams.createFilters(c, r)
+	filters.IDs = p.IDs
+	filters.URLs = p.URLs
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
+	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+		return nil, err
+	}
+	return filters, nil
+}
+
+func (p *similarArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
+	return filters, nil
+}
+
+func (p *articleMentionsParams) createFilters(c *gin.Context, r *Configuration) (*db.MentionFilters, error) {
+	return &db.MentionFilters{
+		Platforms:    utils.NormalizeTexts(p.Platforms),
+		Forums:       utils.NormalizeTexts(p.Forums),
+		ObservedFrom: p.From,
+		ObservedTo:   utils.NormalizeEndOfDay(p.To),
+	}, nil
+}
+
+func (p *sourceSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.SourceFilters, error) {
+	return &db.SourceFilters{
+		Q:       utils.NormalizeText(p.Q),
+		Domains: utils.NormalizeTexts(p.Domains),
+		IDs:     p.IDs,
+	}, nil
+}
+
+func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.ClusterFilters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.FullContent = false
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
+	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+		return nil, err
+	}
+	return &db.ClusterFilters{BeanFilters: *filters, MinBeanCount: p.MinArticleCount}, nil
+}
+
+func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters.ClusterID = p.ID
+	filters.CreatedFrom = p.From
+	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
+	return filters, nil
+}
+
+func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
+	q := strings.TrimSpace(p.Q)
+	if q != "" {
+		filters.Embedding = config.Embedder.EmbedQuery(c, q)
+		if len(filters.Embedding) == 0 {
+			return utils.NewAPIError(utils.API_ERROR_EMBEDDING_ERROR, API_ERROR_MSG_OUR_BAD)
+		}
+		if p.ScoreThreshold > 0 {
+			distance := (1 - p.ScoreThreshold) * 2
+			filters.Distance = distance
+		}
 	}
 	return nil
 }
 
-// TagsInput describes pagination for tag discovery endpoints (/tags/*).
-type TagsInput struct {
-	PaginationInput
-}
-
-// PublishersInput describes query parameters for getPublishers (/sources).
-type PublishersInput struct {
-	// Sources: Publisher source IDs to resolve (CSV). Required for meaningful results.
-	Sources []string `form:"sources" collection_format:"csv"`
-	PaginationInput
-}
-
-// ArticlesInput describes shared query parameters for article list and search endpoints.
-type ArticlesInput struct {
-	// URLs: Optional list of article URLs to fetch directly (CSV).
-	URLs []string `form:"urls" collection_format:"csv"`
-	// Q: Free-text semantic/vector search query (max 512 chars).
-	Q string `form:"q" binding:"max=512"`
-	// Acc: Similarity accuracy threshold (0.0-1.0). Higher => stricter match.
-	// Used to compute vector distance (distance = 1 - Acc).
-	Acc float64 `form:"acc,default=0.5" binding:"min=0,max=1"`
-	// ContentType: Optional content type filter (e.g., "news" or "blog").
-	ContentType string `form:"content_type" binding:"omitempty,oneof=news blog"`
-	// Categories: Filter results to one or more categories/topics (CSV).
-	Categories []string `form:"categories" collection_format:"csv"`
-	// Regions: Filter results to one or more geographic regions (CSV).
-	Regions []string `form:"regions" collection_format:"csv"`
-	// Entities: Filter results to one or more named entities (CSV).
-	Entities []string `form:"entities" collection_format:"csv"`
-	// Tags: Tag/keyword filters (CSV). Combined into a full-text query for tag matching.
-	Tags []string `form:"tags" collection_format:"csv"`
-	// Sources: Publisher/source IDs to include (CSV).
-	Sources []string `form:"sources" collection_format:"csv"`
-	// From: Start date for published/updated filtering (format YYYY-MM-DD).
-	From time.Time `form:"from" time_format:"2006-01-02" swaggertype:"string" format:"date"`
-	// FullContent: If true, include full article content in results (larger payload).
-	FullContent bool `form:"full_content,default=false"`
-	// PaginationInput: Embeds common pagination params (Limit, Offset).
-	PaginationInput
-}
-
-type PropagationInput struct {
-	// URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1–128 items).
-	URLs []string `form:"urls" json:"urls" collection_format:"csv" binding:"required,min=1,dive,url"`
-}
-
-func bindPropagationInput(c *gin.Context) (PropagationInput, error) {
-	var input PropagationInput
-	switch c.Request.Method {
-	case http.MethodGet:
-		if err := c.ShouldBindQuery(&input); err != nil {
-			return PropagationInput{}, err
-		}
-	case http.MethodPost:
-		if err := c.ShouldBindJSON(&input); err != nil {
-			return PropagationInput{}, err
-		}
-	default:
-		return PropagationInput{}, fmt.Errorf("method not allowed")
+// writeCollection writes a typed collection envelope as JSON, or compact text when requested.
+func writeCollection[T any](c *gin.Context, items []T, limit int, next_cursor *db.Cursor) {
+	if items == nil {
+		items = []T{}
 	}
-	if len(input.URLs) > MAX_LIMIT {
-		return PropagationInput{}, fmt.Errorf("urls must contain at most %d items", MAX_LIMIT)
+	response := CollectionResponse[T]{
+		Data:       items,
+		Pagination: Pagination{Limit: limit, NumResults: len(items)},
+		Meta:       ResponseMeta{AsOf: time.Now().UTC()},
 	}
-	return input, nil
+	if next_cursor != nil {
+		if cur, err := next_cursor.Encode(); err == nil {
+			response.Pagination.NextCursor = &cur
+		}
+	}
+	c.JSON(http.StatusOK, response)
 }
 
-type Configuration struct {
-	DB       db.Beansack
-	Embedder embedding.Embedder
-	APIKeys  map[string]string
-	queue    chan int
-	cache    *otter.Cache[string, []float32]
+// writeDetail writes a typed detail envelope as JSON, or compact text when requested.
+func writeDetail[T any](c *gin.Context, item T) {
+	c.JSON(http.StatusOK, DetailResponse[T]{Data: item})
+}
+
+func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next_cursor *db.Cursor, story_id uuid.UUID) {
+	if items == nil {
+		items = []ArticleDocument{}
+	}
+	response := StoryArticleCollectionResponse{
+		Data:       items,
+		Pagination: Pagination{Limit: limit, NumResults: len(items)},
+		Meta:       StoryArticleMeta{StoryID: story_id, AsOf: time.Now().UTC()},
+	}
+	if next_cursor != nil {
+		if cur, err := next_cursor.Encode(); err == nil {
+			response.Pagination.NextCursor = &cur
+		}
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+// writeError writes an APIError to the response.
+// Uses InternalServerError for DB, Embedding, Encoding errors and default cases
+func writeError(c *gin.Context, err error) {
+	status := http.StatusInternalServerError
+	body := ErrorBody{Code: utils.API_ERROR_DB_ERROR, Message: err.Error()}
+	if api_err, ok := err.(utils.APIError); ok {
+		body.Code = api_err.Code
+		body.Message = api_err.Message
+		switch api_err.Code {
+		case utils.API_ERROR_INVALID_REQUEST:
+			status = http.StatusBadRequest
+		case utils.API_ERROR_NOT_FOUND:
+			status = http.StatusNotFound
+		case utils.API_ERROR_UNAUTHORIZED:
+			status = http.StatusUnauthorized
+		}
+	}
+	c.AbortWithStatusJSON(status, ErrorResponse{Error: body})
 }
 
 // health godoc
 // @Summary Check API health
-// @Description Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.
+// @Description Lightweight liveness probe. No authentication required.
 // @Tags Health
 // @Produce json
-// @Success 200 {object} map[string]string "status alive"
+// @Success 200 {object} HealthResponse "status alive"
 // @ID healthCheck
 // @Router /health [get]
 func (r *Configuration) health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "alive"})
-}
-
-func validateTagsParams(c *gin.Context) {
-	var input TagsInput
-	if err := c.ShouldBindQuery(&input); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := normalizePagination(&input.PaginationInput); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.Set("req_params", input)
-	c.Set("req_page", input.PaginationInput.ToDB())
-	c.Next()
-}
-
-// getCategories godoc
-// @Summary List article category topics
-// @Description Discover valid values for the `categories` filter on article endpoints.
-// @Description Returns a paginated array of unique topic labels extracted from indexed articles (e.g. "Artificial Intelligence", "Cybersecurity", "Politics").
-// @Description **When to use**: call before searchArticles or feed endpoints when you need exact, case-sensitive category strings.
-// @Description **Related tools**: listEntities, listRegions, searchArticles.
-// @Description **Pagination**: use `offset` to walk the full catalog when `limit` < total count.
-// @Tags Tags
-// @Produce json
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of items to skip. Default 0." minimum(0)
-// @Success 200 {array} string "JSON array of category label strings"
-// @Success 204 "No categories in index (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid limit or offset"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID listCategories
-// @Router /tags/categories [get]
-func (r *Configuration) getCategories(c *gin.Context) {
-	page := c.MustGet("req_page").(db.Pagination)
-	data, err := r.DB.DistinctCategories(c.Request.Context(), page)
-	returnResponse(c, data, err)
-}
-
-// getEntities godoc
-// @Summary List named entities
-// @Description Discover valid values for the `entities` filter on article endpoints.
-// @Description Returns a paginated array of unique named entities (people, organizations, products, places) extracted via NLP from article text.
-// @Description **When to use**: call before searchArticles when filtering by specific people, companies, or places with exact spelling.
-// @Description **Related tools**: listCategories, listRegions, searchArticles.
-// @Tags Tags
-// @Produce json
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of items to skip. Default 0." minimum(0)
-// @Success 200 {array} string "JSON array of entity label strings"
-// @Success 204 "No entities in index (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid limit or offset"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID listEntities
-// @Router /tags/entities [get]
-func (r *Configuration) getEntities(c *gin.Context) {
-	page := c.MustGet("req_page").(db.Pagination)
-	data, err := r.DB.DistinctEntities(c.Request.Context(), page)
-	returnResponse(c, data, err)
-}
-
-// getRegions godoc
-// @Summary List geographic regions
-// @Description Discover valid values for the `regions` filter on article endpoints.
-// @Description Returns a paginated array of unique geographic region labels (e.g. "North America", "Europe", "India", "Middle East").
-// @Description **When to use**: call before searchArticles when filtering by geography with exact, case-sensitive region strings.
-// @Description **Related tools**: listCategories, listEntities, searchArticles.
-// @Tags Tags
-// @Produce json
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of items to skip. Default 0." minimum(0)
-// @Success 200 {array} string "JSON array of region label strings"
-// @Success 204 "No regions in index (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid limit or offset"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID listRegions
-// @Router /tags/regions [get]
-func (r *Configuration) getRegions(c *gin.Context) {
-	page := c.MustGet("req_page").(db.Pagination)
-	data, err := r.DB.DistinctRegions(c.Request.Context(), page)
-	returnResponse(c, data, err)
-}
-
-func validatePublishersParams(c *gin.Context) {
-	var input PublishersInput
-	if err := c.ShouldBindQuery(&input); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := normalizePagination(&input.PaginationInput); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.Set("req_params", input)
-	c.Set("req_conditions", db.Condition{Sources: input.Sources})
-	c.Set("req_page", input.PaginationInput.ToDB())
-	c.Next()
-}
-
-// getPublishers godoc
-// @Summary Resolve publisher source metadata
-// @Description Look up display metadata for one or more publisher source IDs found on article `source` fields.
-// @Description Returns site name, base URL, description, and favicon for each requested source ID.
-// @Description **When to use**: after searchArticles or feed endpoints to humanize source IDs in UI or agent responses.
-// @Description **Required**: at least one value in `sources` (comma-separated source IDs, e.g. techcrunch.com).
-// @Description **Related tools**: searchArticles, getLatestArticles.
-// @Tags Publishers
-// @Produce json
-// @Param sources query []string true "Publisher source IDs to resolve (CSV). Example: techcrunch.com,theverge.com" collectionFormat(csv)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Number of items to skip. Default 0." minimum(0)
-// @Success 200 {array} beansack.Publisher "Publisher metadata objects keyed by source ID"
-// @Success 204 "No matching publishers (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Missing sources or invalid pagination"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID getPublishers
-// @Router /sources [get]
-func (r *Configuration) getPublishers(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(db.Condition)
-	page := c.MustGet("req_page").(db.Pagination)
-	items, err := r.DB.QueryPublishers(c.Request.Context(), conditions, page, []string{db.CORE_PUBLISHER_FIELDS})
-	returnResponse(c, items, err)
-}
-
-func (config *Configuration) validateArticlesParams(c *gin.Context) {
-	var input ArticlesInput
-	if err := c.ShouldBindQuery(&input); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := normalizePagination(&input.PaginationInput); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	conditions := db.Condition{
-		URLs:       input.URLs,
-		Kind:       []string{db.NEWS, db.BLOG}, // default
-		Created:    input.From,
-		Updated:    input.From,
-		Tags:       input.Tags,
-		Categories: input.Categories,
-		Regions:    input.Regions,
-		Entities:   input.Entities,
-		Sources:    input.Sources,
-		Extra:      []string{},
-	}
-	if len(input.ContentType) > 0 {
-		conditions.Kind = []string{input.ContentType}
-	}
-	if input.FullContent {
-		conditions.Extra = append(conditions.Extra, db.UNRESTRICTED_CONTENT_CONDITIONS)
-	}
-	if input.Q != "" {
-		distance := (1 - input.Acc) * 2
-		conditions.Distance = &distance
-		if embedding, found := config.cache.GetIfPresent(input.Q); found {
-			conditions.Embedding = embedding
-		} else {
-			conditions.Embedding = config.Embedder.EmbedQuery(c, input.Q)
-			if len(conditions.Embedding) == 0 {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": _EMBEDDER_ERROR})
-				return
-			}
-			config.cache.Set(input.Q, conditions.Embedding)
-		}
-	}
-	columns := []string{db.CORE_BEAN_FIELDS}
-	if input.FullContent {
-		columns = append(columns, db.K_CONTENT)
-	}
-	c.Set("req_params", input)
-	c.Set("req_conditions", conditions)
-	c.Set("req_page", input.PaginationInput.ToDB())
-	c.Set("req_columns", columns)
-	c.Next()
+	c.JSON(http.StatusOK, HealthResponse{Status: "alive"})
 }
 
 // searchArticles godoc
-// @Summary Search all articles by topic, tags, or URL
-// @Description **Primary MCP tool** — full-corpus search sorted by relevance.
-// @Description **Requires at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.
-// @Description **Search modes** (combinable with filters):
-// @Description - `q` + `acc`: semantic vector search over article embeddings (natural language, 3–512 chars).
-// @Description - `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).
-// @Description - `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).
-// @Description - `urls`: fetch specific articles by canonical URL (CSV).
-// @Description **Performance**: semantic search uses indexed nearest-neighbor candidates; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.
-// @Description **Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.
+// @Summary Search Articles
+// @Description Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.
 // @Tags Articles
-// @Accept json
+// @Security BackendAPIKey
 // @Produce json
-// @Param q query string false "Semantic search query in natural language (3–512 chars). Ranks by embedding similarity."
-// @Param acc query number false "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
-// @Param urls query []string false "Fetch articles by exact URL (CSV). Satisfies the required-search-param rule on its own." collectionFormat(csv)
-// @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values). Good when exact tag spelling is unknown." collectionFormat(csv)
-// @Param categories query []string false "Exact topic filter (OR). Case sensitive — use listCategories first." collectionFormat(csv)
-// @Param regions query []string false "Exact region filter (OR). Case sensitive — use listRegions first." collectionFormat(csv)
-// @Param entities query []string false "Exact entity filter (OR). Case sensitive — use listEntities first." collectionFormat(csv)
-// @Param sources query []string false "Publisher source ID filter (OR). Resolve names via getPublishers." collectionFormat(csv)
-// @Param from query string false "Only articles published or updated on/after this date (YYYY-MM-DD)." format(date)
-// @Param full_content query bool false "Include full article body. Default false (summary only)." default(false)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Skip N results for pagination. Default 0." minimum(0)
-// @Success 200 {array} beansack.BeanAggregate "Articles with publisher info, engagement metrics, and trend_score"
-// @Success 204 "No matching articles (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Missing required search param or invalid input"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database or embedder unavailable; retry"
+// @Param q query string false "Optional relevance query." maxlength(512)
+// @Param score_threshold query number false "Optional relevance threshold used with q." minimum(0) maximum(1)
+// @Param ids query []string false "Exact Article UUIDs (CSV)." collectionFormat(csv)
+// @Param urls query []string false "Exact Article URLs (CSV)." collectionFormat(csv)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower timestamp bound." format(date)
+// @Param to query string false "UTC upper timestamp bound." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} ArticleCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID searchArticles
 // @Router /articles/search [get]
 func (r *Configuration) searchArticles(c *gin.Context) {
-	input := c.MustGet("req_params").(ArticlesInput)
-	conditions := c.MustGet("req_conditions").(db.Condition)
-	page := c.MustGet("req_page").(db.Pagination)
-	// the precanned columns do not apply here
-	columns := []string{db.EXTENDED_BEAN_FIELDS}
-	if input.FullContent {
-		columns = append(columns, db.K_CONTENT)
-	}
-	// NOTE: if no time window is given, thats fine
-	// but it should at least provide some search param
-	if (len(conditions.Embedding) |
-		len(conditions.Tags) |
-		len(conditions.Categories) |
-		len(conditions.Regions) |
-		len(conditions.Entities) |
-		len(conditions.URLs)) == 0 {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": _NEEDS_SEARCH_PARAM})
+	var params articleSearchParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
 		return
 	}
-	// return all columns
-	items, err := r.DB.QueryBeans(c.Request.Context(), conditions, page, columns)
-	returnResponse(c, items, err)
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryBeans")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
 // getLatestArticles godoc
-// @Summary Search or list newest articles (reverse chronological)
-// @Description Returns recently published articles sorted by publish date (newest first).
-// @Description **Time window**: if `from` is omitted, defaults to the last 7 days.
-// @Description **Filters** (all optional): same semantics as searchArticles — `q` for semantic search, `tags` for fuzzy match, or exact `categories`/`regions`/`entities`/`sources`.
-// @Description **When to use**: monitoring recent news in a topic without full-corpus search cost. Lighter than searchArticles.
-// @Description **Related tools**: listCategories, listEntities, listRegions, searchArticles, getTrendingArticles.
+// @Summary List latest Articles
+// @Description Returns Articles ordered newest first. Date bounds are not accepted.
 // @Tags Articles
-// @Accept json
+// @Security BackendAPIKey
 // @Produce json
-// @Param q query string false "Optional semantic search query (3–512 chars). Narrows results by embedding similarity."
-// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
-// @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
-// @Param categories query []string false "Exact topic filter (OR). Use listCategories for valid values." collectionFormat(csv)
-// @Param regions query []string false "Exact region filter (OR). Use listRegions for valid values." collectionFormat(csv)
-// @Param entities query []string false "Exact entity filter (OR). Use listEntities for valid values." collectionFormat(csv)
-// @Param sources query []string false "Publisher source ID filter (OR)." collectionFormat(csv)
-// @Param from query string false "Published on/after this date (YYYY-MM-DD). Defaults to 7 days ago when omitted." format(date)
-// @Param full_content query bool false "Include full article body. Default false." default(false)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Skip N results. Default 0." minimum(0)
-// @Success 200 {array} beansack.Bean "Latest articles sorted by published_at descending"
-// @Success 204 "No articles in window (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid query parameters"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database or embedder unavailable; retry"
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} ArticleCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getLatestArticles
 // @Router /articles/latest [get]
 func (r *Configuration) getLatestArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(db.Condition)
-	page := c.MustGet("req_page").(db.Pagination)
-	columns := c.MustGet("req_columns").([]string)
-	// default to last 7 days if no date filter is there
-	// and disable trending filter
-	if conditions.Created.IsZero() {
-		conditions.Created = time.Now().AddDate(0, 0, -DEFAULT_WINDOW) // default to last 7 days if no published/trending filter provided
+	var params articleFeedParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
 	}
-	conditions.Updated = time.Time{}
-	items, err := r.DB.QueryLatestBeans(c.Request.Context(), conditions, page, columns)
-	returnResponse(c, items, err)
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	// if params.From.IsZero() {
+	// 	filters.CreatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
+	// } else {
+	// 	filters.CreatedFrom = params.From
+	// }
+	// if !params.To.IsZero() {
+	// 	filters.CreatedTo = params.To
+	// }
+
+	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryBeans")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
 // getTrendingArticles godoc
-// @Summary Search or list trending articles by engagement score
-// @Description Returns articles ranked by `trend_score` (highest first). Trend score blends social engagement (likes, comments, shares), cross-outlet coverage, and recency.
-// @Description **Time window**: if `from` is omitted, defaults to the last 7 days of trending activity.
-// @Description **Filters** (all optional): same semantics as searchArticles.
-// @Description **When to use**: surface what is gaining traction now — prefer over getLatestArticles when popularity matters more than recency alone.
-// @Description **Related tools**: getTopHeadlines (24h subset), searchArticles, getArticlePropagation.
+// @Summary List trending Articles
+// @Description Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.
 // @Tags Articles
-// @Accept json
+// @Security BackendAPIKey
 // @Produce json
-// @Param q query string false "Optional semantic search query (3–512 chars)."
-// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
-// @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
-// @Param categories query []string false "Exact topic filter (OR)." collectionFormat(csv)
-// @Param regions query []string false "Exact region filter (OR)." collectionFormat(csv)
-// @Param entities query []string false "Exact entity filter (OR)." collectionFormat(csv)
-// @Param sources query []string false "Publisher source ID filter (OR)." collectionFormat(csv)
-// @Param from query string false "Trending activity since this date (YYYY-MM-DD). Defaults to 7 days ago when omitted." format(date)
-// @Param full_content query bool false "Include full article body. Default false." default(false)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Skip N results. Default 0." minimum(0)
-// @Success 200 {array} beansack.BeanTrend "Articles with engagement metrics and trend_score, sorted descending"
-// @Success 204 "No trending articles in window (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid query parameters"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database or embedder unavailable; retry"
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} ArticleCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTrendingArticles
 // @Router /articles/trending [get]
 func (r *Configuration) getTrendingArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(db.Condition)
-	page := c.MustGet("req_page").(db.Pagination)
-	columns := c.MustGet("req_columns").([]string)
-	// default to last 7 days if trending window provided
-	if conditions.Updated.IsZero() {
-		conditions.Updated = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
+	var params articleFeedParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
 	}
-	conditions.Created = time.Time{}
-	items, err := r.DB.QueryTrendingBeans(c.Request.Context(), conditions, page, append(columns, _BEAN_TREND_FIELDS))
-	returnResponse(c, items, err)
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	// if params.From.IsZero() {
+	// 	filters.UpdatedFrom = time.Now().AddDate(0, 0, -DEFAULT_WINDOW)
+	// } else {
+	// 	filters.UpdatedFrom = params.From
+	// }
+	// if !params.To.IsZero() {
+	// 	filters.UpdatedTo = params.To
+	// }
+
+	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryTrendingBeans")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
-// getTopHeadlinesArticles godoc
-// @Summary Search or list top headlines from the last 24 hours
-// @Description Returns the highest trend_score articles from the past 24 hours — a narrow window on getTrendingArticles.
-// @Description **When to use**: breaking news, daily briefings, or "what is hot today" without a custom date range.
-// @Description **Note**: `from` is not accepted; the 24h window is fixed server-side.
-// @Description **Filters** (all optional): same semantics as getTrendingArticles except no date override.
-// @Description **Related tools**: getTrendingArticles (7-day window), searchArticles.
+// getTopHeadlinesArticles is the B04 GET /news/top-headlines target scaffold.
+// Primary difference between this and getTrendingArticles and getTopHeadlines is the window of time and content type.
+// getTopHeadlines is always fixed within the last 24 hours and `news` content type. The returned news are created and trending in the last 24 hours.
+// The result excludes content unless explicitly requested.
+// getTopHeadlines godoc
+// @Summary List top headlines
+// @Description Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.
 // @Tags Articles
-// @Accept json
+// @Security BackendAPIKey
 // @Produce json
-// @Param q query string false "Optional semantic search query (3–512 chars)."
-// @Param acc query number false "Match strictness when q is set. Default 0.5." default(0.5) minimum(0) maximum(1)
-// @Param content_type query string false "Restrict to content kind: news or blog." Enums(news,blog)
-// @Param tags query []string false "Fuzzy filter across categories+regions+entities (AND between values)." collectionFormat(csv)
-// @Param categories query []string false "Exact topic filter (OR)." collectionFormat(csv)
-// @Param regions query []string false "Exact region filter (OR)." collectionFormat(csv)
-// @Param entities query []string false "Exact entity filter (OR)." collectionFormat(csv)
-// @Param sources query []string false "Publisher source ID filter (OR)." collectionFormat(csv)
-// @Param full_content query bool false "Include full article body. Default false." default(false)
-// @Param limit query int false "Page size. Default 16, max 128." default(16) minimum(1) maximum(128)
-// @Param offset query int false "Skip N results. Default 0." minimum(0)
-// @Success 200 {array} beansack.BeanTrend "Top headlines from last 24h sorted by trend_score descending"
-// @Success 204 "No headlines in last 24h (empty result, not an error)"
-// @Failure 400 {object} map[string]string "Invalid query parameters"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database or embedder unavailable; retry"
+// @Param q query string false "Optional relevance query. Requires score_threshold greater than zero." maxlength(512)
+// @Param score_threshold query number false "Required when q is supplied." minimum(0) maximum(1)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} ArticleCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
 // @ID getTopHeadlines
-// @Router /articles/top-headlines [get]
-func (r *Configuration) getTopHeadlinesArticles(c *gin.Context) {
-	conditions := c.MustGet("req_conditions").(db.Condition)
-	page := c.MustGet("req_page").(db.Pagination)
-	columns := c.MustGet("req_columns").([]string)
-	conditions.Created = time.Now().AddDate(0, 0, -MIN_WINDOW) // last 24 hours
-	conditions.Updated = time.Now().AddDate(0, 0, -MIN_WINDOW)
-	items, err := r.DB.QueryTrendingBeans(c.Request.Context(), conditions, page, append(columns, _BEAN_TREND_FIELDS))
-	returnResponse(c, items, err)
-}
-
-// getArticlePropagation godoc
-// @Summary Track how articles spread (GET)
-// @Description For each seed article URL, returns cross-outlet republication (`coverage`) and social/forum mentions (`mentions`).
-// @Description **Input**: pass up to 128 article URLs as comma-separated query param `urls`.
-// @Description **When to use**: after searchArticles — measure whether a story was picked up elsewhere or discussed on social platforms.
-// @Description **Returns**: one PropagationResult per input URL (always HTTP 200; empty arrays when no propagation found).
-// @Description **Related tools**: searchArticles, getTrendingArticles.
-// @Tags Articles
-// @Produce json
-// @Param urls query []string true "Seed article URLs to analyze (CSV, 1–128 valid HTTP(S) URLs)" collectionFormat(csv)
-// @Success 200 {array} beansack.PropagationResult "One result object per input URL with coverage and mentions arrays"
-// @Failure 400 {object} map[string]string "Missing urls, too many urls (>128), or invalid URL format"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID getArticlePropagation
-// @Router /articles/propagation [get]
-func (r *Configuration) getArticlePropagation(c *gin.Context) {
-	r.handleArticlePropagation(c)
-}
-
-// postArticlePropagation godoc
-// @Summary Track how articles spread (POST)
-// @Description Same as getArticlePropagation but accepts a JSON body — preferred when URLs contain characters awkward in query strings.
-// @Description **Input**: JSON body `{ "urls": ["https://...", ...] }` with 1–128 valid HTTP(S) URLs.
-// @Description **When to use**: batch propagation lookup from agent workflows that already hold URL lists in JSON.
-// @Tags Articles
-// @Accept json
-// @Produce json
-// @Param input body PropagationInput true "JSON object with urls array (1–128 seed article URLs)"
-// @Success 200 {array} beansack.PropagationResult "One result object per input URL with coverage and mentions arrays"
-// @Failure 400 {object} map[string]string "Missing urls, too many urls (>128), or invalid URL format"
-// @Failure 401 {object} map[string]string "Missing or invalid API key"
-// @Failure 429 {object} map[string]string "Concurrency limit exceeded; retry shortly"
-// @Failure 500 {object} map[string]string "Database unavailable; retry"
-// @ID postArticlePropagation
-// @Router /articles/propagation [post]
-func (r *Configuration) postArticlePropagation(c *gin.Context) {
-	r.handleArticlePropagation(c)
-}
-
-func (r *Configuration) handleArticlePropagation(c *gin.Context) {
-	input, err := bindPropagationInput(c)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// @Router /news/top-headlines [get]
+func (r *Configuration) getTopHeadlines(c *gin.Context) {
+	var params topHeadlinesParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
 		return
 	}
-	items, err := r.DB.QueryPropagation(c.Request.Context(), input.URLs)
+	page_req, err := params.createPageRequest(c, r)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": _DB_ERROR})
+		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, items)
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	filters.CreatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
+	filters.ObservedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
+	filters.Kind = "news"
+
+	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryTrendingBeans")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
 }
 
-func NewRouter(db db.Beansack, embedder embedding.Embedder, api_keys map[string]string, max_concurrent_requests int) *gin.Engine {
-	if max_concurrent_requests <= 0 {
-		max_concurrent_requests = DEFAULT_CONCURRENCY // default to 100 if not set or invalid
+// getArticle godoc
+// @Summary Get an Article
+// @Description Returns one Article selected by UUID. Set full_content=true to request content when available.
+// @Tags Articles
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Success 200 {object} ArticleDetailResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
+// @ID getArticle
+// @Router /articles/{id} [get]
+func (r *Configuration) getArticle(c *gin.Context) {
+	var params articleDetailParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
 	}
+	bean, err := r.DB.GetBean(c.Request.Context(), params.ID, params.FullContent)
+	if err != nil {
+		utils.LogError(err, "[ERROR] GetBean")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeDetail(c, *toArticleDetail(&bean))
+}
+
+// getSimilarArticles godoc
+// @Summary List related Articles
+// @Description Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.
+// @Tags Articles
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower timestamp bound." format(date)
+// @Param to query string false "UTC upper timestamp bound." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} ArticleCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
+// @ID getSimilarArticles
+// @Router /articles/{id}/similar [get]
+func (r *Configuration) getSimilarArticles(c *gin.Context) {
+	var params similarArticlesParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QuerySimilarBeans")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+}
+
+// getArticleMentions godoc
+// @Summary List Article mentions
+// @Description Returns external platform or forum observations for an Article UUID, ordered by observation time.
+// @Tags Articles
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Article UUID." format(uuid)
+// @Param platforms query []string false "Mention platforms (CSV)." collectionFormat(csv)
+// @Param forums query []string false "Mention forums (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower observation timestamp." format(date)
+// @Param to query string false "UTC upper observation timestamp." format(date)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} MentionCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Article not found"
+// @ID getArticleMentions
+// @Router /articles/{id}/mentions [get]
+func (r *Configuration) getArticleMentions(c *gin.Context) {
+	var params articleMentionsParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryMentions")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeCollection(c, toMentionDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+}
+
+// getSources godoc
+// @Summary List Sources
+// @Description Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.
+// @Tags Sources
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional Source prefix query." maxlength(512)
+// @Param ids query []string false "Source ids (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains (CSV)." collectionFormat(csv)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} SourceCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listSources
+// @Router /sources [get]
+func (r *Configuration) getSources(c *gin.Context) {
+	var params sourceSearchParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	page_out, err := r.DB.QuerySources(c.Request.Context(), *filters, *page_req, db.SOURCE_COLUMNS_BASE)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QuerySources")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toSourceDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+}
+
+// getSource godoc
+// @Summary Get a Source
+// @Description Returns one publisher Source selected by UUID.
+// @Tags Sources
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Source UUID." format(uuid)
+// @Success 200 {object} SourceDetailResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Source not found"
+// @ID getSource
+// @Router /sources/{id} [get]
+func (r *Configuration) getSource(c *gin.Context) {
+	var params sourceDetailParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	source, err := r.DB.GetSource(c.Request.Context(), params.ID)
+	if err != nil {
+		utils.LogError(err, "[ERROR] GetSource")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SOURCE_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeDetail(c, toSourceDocument(&source))
+}
+
+// getEntities godoc
+// @Summary List entity labels
+// @Description Lists values accepted by the corresponding Article filter.
+// @Tags Discovery
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} TagCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listEntities
+// @Router /entities [get]
+func (r *Configuration) getEntities(c *gin.Context) {
+	getTags(r, c, "entities", "entity")
+}
+
+// getRegions godoc
+// @Summary List region labels
+// @Description Lists values accepted by the corresponding Article filter.
+// @Tags Discovery
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} TagCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listRegions
+// @Router /regions [get]
+func (r *Configuration) getRegions(c *gin.Context) {
+	getTags(r, c, "regions", "region")
+}
+
+// getCategories godoc
+// @Summary List category labels
+// @Description Lists values accepted by the corresponding Article filter.
+// @Tags Discovery
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} TagCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listCategories
+// @Router /categories [get]
+func (r *Configuration) getCategories(c *gin.Context) {
+	getTags(r, c, "categories", "category")
+}
+
+// getSentiments godoc
+// @Summary List sentiment labels
+// @Description Lists values accepted by the corresponding Article filter.
+// @Tags Discovery
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional case-insensitive prefix query." maxlength(512)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} TagCollectionResponse
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listSentiments
+// @Router /sentiments [get]
+func (r *Configuration) getSentiments(c *gin.Context) {
+	getTags(r, c, "sentiments", "sentiment")
+}
+
+func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_type string) {
+	var params tagListParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryTags(c.Request.Context(), strings.ToLower(strings.TrimSpace(params.Q)), db_tag_type, *page)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryTags")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toTagDocuments(page_out.Items, response_tag_type), page.Limit, page_out.NextCursor)
+}
+
+// getStories godoc
+// @Summary List Stories
+// @Description Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.
+// @Tags Stories
+// @Security BackendAPIKey
+// @Produce json
+// @Param q query string false "Optional Story relevance query." maxlength(512)
+// @Param score_threshold query number false "Optional Story relevance threshold; requires q." minimum(0) maximum(1)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param min_article_count query int false "Minimum Story Article count. Default 2." default(2) minimum(2)
+// @Param from query string false "UTC lower publication timestamp." format(date)
+// @Param to query string false "UTC upper publication timestamp." format(date)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} StoryCollectionResponse "Story collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @ID listStories
+// @Router /stories [get]
+func (r *Configuration) getStories(c *gin.Context) {
+	var params storySearchParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryClusters(c.Request.Context(), *filters, *page_req)
+	if err != nil {
+		utils.LogError(err, "[ERROR] QueryClusters")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeCollection(c, toStoryDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+}
+
+// getStory godoc
+// @Summary Get a Story
+// @Description Returns one Story selected by its stable UUID, including a link to its paginated member Articles.
+// @Tags Stories
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Story UUID." format(uuid)
+// @Success 200 {object} StoryDetailResponse "Story detail envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Story not found"
+// @ID getStory
+// @Router /stories/{id} [get]
+func (r *Configuration) getStory(c *gin.Context) {
+	var params itemIDParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
+	if err != nil {
+		utils.LogError(err, "[ERROR] GetCluster")
+		if errors.Is(err, db.ErrNonExistentID) {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
+		} else {
+			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		}
+		return
+	}
+	writeDetail(c, toStoryDetail(&story))
+}
+
+// getStoryArticles godoc
+// @Summary List Story Articles
+// @Description Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.
+// @Tags Stories
+// @Security BackendAPIKey
+// @Produce json
+// @Param id path string true "Story UUID." format(uuid)
+// @Param content_type query string false "Filterable Article type. post is response-only and returns 400." Enums(blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,press_release,research_paper,site,technical_documentation,whitepaper)
+// @Param sources query []string false "Source UUIDs to include (CSV)." collectionFormat(csv)
+// @Param exclude_sources query []string false "Source UUIDs to exclude (CSV)." collectionFormat(csv)
+// @Param domains query []string false "Source domains to include (CSV)." collectionFormat(csv)
+// @Param exclude_domains query []string false "Source domains to exclude (CSV)." collectionFormat(csv)
+// @Param authors query []string false "Author text filters (CSV)." collectionFormat(csv)
+// @Param categories query []string false "Category values (CSV)." collectionFormat(csv)
+// @Param exclude_categories query []string false "Excluded category values (CSV)." collectionFormat(csv)
+// @Param regions query []string false "Region values (CSV)." collectionFormat(csv)
+// @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
+// @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
+// @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param from query string false "UTC lower publication timestamp." format(date)
+// @Param to query string false "UTC upper publication timestamp." format(date)
+// @Param full_content query bool false "Include content when available." default(false)
+// @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
+// @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
+// @Success 200 {object} StoryArticleCollectionResponse "Story Article collection envelope"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 500 {object} ErrorResponse "Service unavailable"
+// @Failure 404 {object} ErrorResponse "Story not found"
+// @ID listStoryArticles
+// @Router /stories/{id}/articles [get]
+func (r *Configuration) getStoryArticles(c *gin.Context) {
+	var params storyArticleParams
+	if err := params.shouldBind(c); err != nil {
+		writeError(c, err)
+		return
+	}
+	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
+	if err != nil {
+		utils.LogError(err, "[ERROR] ClusterExists")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	if !exists {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
+		return
+	}
+
+	page_req, err := params.createPageRequest(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	filters, err := params.createFilters(c, r)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	if err != nil {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.ID)
+}
+
+func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
 	config := &Configuration{
 		DB:       db,
 		Embedder: embedder,
 		APIKeys:  api_keys,
-		queue:    make(chan int, max_concurrent_requests),
-		cache: otter.Must(&otter.Options[string, []float32]{
-			MaximumSize:      _CACHE_SIZE,
-			ExpiryCalculator: otter.ExpiryAccessing[string, []float32](_CACHE_TTL),
-		}),
 	}
 
 	router := gin.New()
-	// JSON access logs and recovery using zerolog
+	// JSON logs and recovery using zerolog
 	router.Use(
-		// logger
 		requestLogger,
-		// recovery
 		gin.Recovery(),
-		// cors
 		cors.New(cors.Config{
 			AllowAllOrigins:  true,
 			AllowMethods:     []string{"GET", "POST", "OPTIONS"},
@@ -613,35 +998,41 @@ func NewRouter(db db.Beansack, embedder embedding.Embedder, api_keys map[string]
 	// Swagger / OpenAPI endpoints
 	// NOTE: run `swag init` to generate docs (package `docs`) before using the UI.
 	// Serve Swagger UI and point it at the generated spec in assets/docs
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	router.GET("/health", config.health)
-	router.StaticFile("favicon.ico", FAVICON_PATH)
 
-	// protected group
+	// Authenticated group
 	protected := router.Group("/")
-	protected.Use(config.apiKeyMiddleware, config.concurrencyMiddleware)
+	protected.Use(config.apiKeyMiddleware)
 
-	tags := protected.Group("/tags", validateTagsParams)
-	{
-		tags.GET("/categories", config.getCategories)
-		tags.GET("/entities", config.getEntities)
-		tags.GET("/regions", config.getRegions)
-	}
-	publishers := protected.Group("/sources", validatePublishersParams)
-	{
-		publishers.GET("", config.getPublishers)
-		// publishers.GET("/metadata", config.getPublishers)
-	}
-	articles := protected.Group("/articles", config.validateArticlesParams)
-	{
-		articles.GET("/search", config.searchArticles)
-		articles.GET("/latest", config.getLatestArticles)
-		articles.GET("/trending", config.getTrendingArticles)
-		articles.GET("/top-headlines", config.getTopHeadlinesArticles)
-	}
-	protected.GET("/articles/propagation", config.getArticlePropagation)
-	protected.POST("/articles/propagation", config.postArticlePropagation)
+	// TAGS discovery routes
+	// protected.GET("/tags", config.getTags)
+	protected.GET("/categories", config.getCategories)
+	protected.GET("/entities", config.getEntities)
+	protected.GET("/regions", config.getRegions)
+	protected.GET("/sentiments", config.getSentiments)
+
+	// SOURCES routes
+	protected.GET("/sources", config.getSources)
+	protected.GET("/sources/:id", config.getSource)
+
+	// ARTICLES routes
+	protected.GET("/articles/search", config.searchArticles)
+	protected.GET("/articles/latest", config.getLatestArticles)
+	protected.GET("/articles/trending", config.getTrendingArticles)
+	protected.GET("/articles/:id", config.getArticle)
+	protected.GET("/articles/:id/similar", config.getSimilarArticles)
+	protected.GET("/articles/:id/mentions", config.getArticleMentions)
+
+	// HEADLINES routes
+	protected.GET("/news/top-headlines", config.getTopHeadlines)
+
+	// STORIES routes. Wildcard captures URL-like story IDs (slashes); trailing /articles is membership.
+	protected.GET("/stories", config.getStories)
+	protected.GET("/stories/:id", config.getStory)
+	protected.GET("/stories/:id/articles", config.getStoryArticles)
+
 	return router
 }
 
@@ -657,15 +1048,7 @@ func (r *Configuration) apiKeyMiddleware(c *gin.Context) {
 			return
 		}
 	}
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing API Key"})
-}
-
-func (r *Configuration) concurrencyMiddleware(c *gin.Context) {
-	if r.queue != nil {
-		r.queue <- 1
-		defer func() { <-r.queue }()
-	}
-	c.Next()
+	writeError(c, utils.NewAPIError(utils.API_ERROR_UNAUTHORIZED, "Missing or invalid API key"))
 }
 
 // requestLogger logs request path, query parameters, status and latency in JSON via zerolog
@@ -693,17 +1076,4 @@ func requestLogger(c *gin.Context) {
 		evt.Str("error", c.Errors.String())
 	}
 	evt.Msg("incoming")
-}
-
-func returnResponse[T any](c *gin.Context, items []T, err error) {
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": _DB_ERROR})
-		return
-	}
-	if len(items) == 0 {
-		c.Status(http.StatusNoContent)
-		return
-	}
-	c.JSON(http.StatusOK, items)
-
 }

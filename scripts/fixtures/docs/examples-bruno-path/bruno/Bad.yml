@@ -1,0 +1,7 @@
+info:
+  name: Invalid Bruno route
+  type: http
+http:
+  method: GET
+  url: "{{baseUrl}}/not-a-real-route"
+  auth: inherit

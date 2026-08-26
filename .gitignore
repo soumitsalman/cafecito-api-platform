@@ -4,7 +4,17 @@ dist/
 node_modules/
 .env
 .env.zuplo
+
+
+# graphify and coding agents
 graphify-out
+.codex
+.cursor
+.opencode
+.claude
+.agents
+skills-lock.json
+.vscode
 
 # Go apis
 .beansack
@@ -28,3 +38,8 @@ graphify-out
 
 .DS_Store
 .llama-cpp
+
+__pycache__
+
+# Optional local dumps from contract verifiers (scripts/*.mjs stay tracked)
+scripts/*.report.json

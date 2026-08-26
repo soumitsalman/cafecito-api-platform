@@ -1,0 +1,174 @@
+info:
+  name: Get a Story by UUID
+  type: http
+  seq: 2
+  tags:
+    - Stories
+http:
+  method: GET
+  url: "{{baseUrl}}/stories/:id"
+  params:
+    - name: id
+      value: 0325c4ec-8881-5597-b8dd-a8a6eae19c49
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: >-
+          {
+            "data": {
+              "id": "0325c4ec-8881-5597-b8dd-a8a6eae19c49",
+              "title": "Example Story",
+              "first_published_at": "2026-08-20T10:00:00Z",
+              "last_published_at": "2026-08-24T10:00:00Z",
+              "article_count": 4,
+              "source_count": 3,
+              "categories": [
+                "technology"
+              ],
+              "regions": [],
+              "entities": [],
+              "tags": [
+                "technology"
+              ],
+              "top_articles": [],
+              "links": {
+                "articles": "/stories/0325c4ec-8881-5597-b8dd-a8a6eae19c49/articles"
+              }
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "invalid_request",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unauthorized",
+              "message": ""
+            }
+          }
+  - name: 404 Response
+    description: Not Found
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "not_found",
+              "message": ""
+            }
+          }
+  - name: 429 Response
+    description: Too Many Requests
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "rate_limited",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/stories/:id"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unavailable",
+              "message": ""
+            }
+          }
+docs: >-
+  Answers: What related-coverage Story is identified by this UUID?
+
+  Returns: One Story detail object inside data, including the stable UUID,
+  coverage counts, labels, top Article previews, and links.articles.
+
+  Use when: a Story UUID came from GET /stories or is already known.
+
+  Request parameters: id is the required Story UUID path parameter.
+
+  Response handoff: links.articles is service-relative; the public gateway call
+  is GET /beans/stories/{id}/articles.
+
+  Missing resource: HTTP 404 means the Story UUID was not found.
+
+  Next step: call GET /stories/{id}/articles to retrieve the paginated member
+  Articles.

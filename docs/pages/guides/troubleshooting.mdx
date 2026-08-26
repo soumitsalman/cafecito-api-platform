@@ -1,0 +1,36 @@
+---
+description: Diagnose authentication, validation, pagination, rate-limit, empty-result, and service failures for Cafecito APIs and MCPs.
+---
+
+# API Troubleshooting
+
+Use this table after a failed or surprising call. Shared contract detail lives in [API conventions](/guides/api-conventions). Limits live in [Pricing and limits](/guides/pricing-limits).
+
+| Symptom | What happened | Change | Retry? | Next |
+| --- | --- | --- | --- | --- |
+| HTTP `401` | Missing, malformed, or revoked Bearer token | Create a key, send `Authorization: Bearer …`, do not use a private backend header | No | [API keys](/start/api-keys) |
+| HTTP `400` unknown or unsupported query | Strict validation rejected the parameter | Remove undocumented fields (`offset`, `page`, route-forbidden filters) | No | Product route matrix and [API reference](/api/beans) |
+| HTTP `400` malformed UUID or cursor | Path or `cursor` is not a valid token | Copy IDs and `next_cursor` exactly; restart paging if the token is stale | No | [Pagination](/guides/api-conventions) |
+| HTTP `404` | Detail ID does not exist | Treat as missing resource, not an empty search | No | Confirm the ID from a collection response |
+| HTTP `200` with `data: []` | Query matched nothing | Broaden filters or dates; this is success | n/a | Product search docs |
+| HTTP `429` | User rate (100/min) or monthly quota (50,000) | Back off; wait for the next minute or month | Yes, after delay | [Pricing](/guides/pricing-limits) |
+| HTTP `5xx` | Temporary service failure | Bounded exponential backoff with jitter | Yes | Hit `/health` without a key, then retry |
+| Health check fails | Product gateway or service unavailable | Wait and retry health; do not send a key | Yes | `/beans/health` or `/espresso/health` |
+| HTTP `400` | Unsupported `response_type` | Use JSON | No | Espresso `response_type=json` |
+| MCP cannot connect | Wrong URL, missing Bearer, or tool not exported | Use hosted `/beans/mcp` or `/espresso/mcp` with the same key | After fixing config | [MCP and AI agents](/guides/mcp-ai-agents) |
+
+## Operational recovery sequence
+
+1. Call the product health route with no authentication.
+2. Retry the original request only for `429` and `5xx`.
+3. On `400` from a cursor, drop `cursor` and fetch page one.
+4. Preserve successful IDs and `next_cursor` values; do not reconstruct them.
+5. File persistent failures on [Contact](/contact).
+
+## Authentication checklist
+
+- Header name is `Authorization`; value is `Bearer` plus the portal key.
+- Health routes stay unauthenticated.
+- The same key works for Beans REST, Espresso REST, and both MCP servers.
+
+Copyable wrappers: [Reusable clients](/guides/client-patterns).

@@ -4,37 +4,40 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "MCP-ready news and blog intelligence over RSS-sourced articles, semantic enrichment, and propagation tracking.\nA **bean** is one article or post keyed by canonical URL. Records include publisher metadata, summary/full text, publish timestamp, inferred categories, regions, entities, sentiments, and optional social trend metrics.\nAgent workflow: (1) listCategories, listEntities, listRegions to discover exact filter values; (2) searchArticles for full-corpus retrieval; (3) getLatestArticles, getTrendingArticles, or getTopHeadlines for feed-style monitoring; (4) getPublishers to resolve source IDs; (5) getArticlePropagation or postArticlePropagation to check story spread.\nConventions: Auth is optional at the backend but API-key protected through the gateway. Pagination uses `limit` default 16 max 128 and `offset` default 0. Empty result sets return HTTP 204, not an error. Use fuzzy `tags` when spelling is uncertain, exact `categories`/`regions`/`entities` after discovery, and `q` + `acc` for semantic vector search.",
+        "description": "Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.\nBeans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
         "title": "Beans News API \u0026 MCP",
         "contact": {
             "name": "Project Cafecito",
-            "url": "http://cafecito.tech",
+            "url": "https://cafecito.tech",
             "email": "soumitsrah@cafecito.tech"
         },
         "license": {
             "name": "MIT"
         },
-        "version": "0.8"
+        "version": "1.0"
     },
     "paths": {
         "/articles/latest": {
             "get": {
-                "description": "Returns recently published articles sorted by publish date (newest first).\n**Time window**: if `from` is omitted, defaults to the last 7 days.\n**Filters** (all optional): same semantics as searchArticles — `q` for semantic search, `tags` for fuzzy match, or exact `categories`/`regions`/`entities`/`sources`.\n**When to use**: monitoring recent news in a topic without full-corpus search cost. Lighter than searchArticles.\n**Related tools**: listCategories, listEntities, listRegions, searchArticles, getTrendingArticles.",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
                 ],
+                "description": "Returns Articles ordered newest first. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Search or list newest articles (reverse chronological)",
+                "summary": "List latest Articles",
                 "operationId": "getLatestArticles",
                 "parameters": [
                     {
+                        "maxLength": 512,
                         "type": "string",
-                        "description": "Optional semantic search query (3–512 chars). Narrows results by embedding similarity.",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
                         "name": "q",
                         "in": "query"
                     },
@@ -42,18 +45,29 @@
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness when q is set. Default 0.5.",
-                        "name": "acc",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
                         "in": "query"
                     },
                     {
                         "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
                             "news",
-                            "blog"
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Restrict to content kind: news or blog.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -63,8 +77,8 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
-                        "name": "tags",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
                         "in": "query"
                     },
                     {
@@ -73,7 +87,47 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact topic filter (OR). Use listCategories for valid values.",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
                         "name": "categories",
                         "in": "query"
                     },
@@ -83,7 +137,17 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact region filter (OR). Use listRegions for valid values.",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
                         "name": "regions",
                         "in": "query"
                     },
@@ -93,7 +157,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact entity filter (OR). Use listEntities for valid values.",
+                        "description": "Entity values (CSV).",
                         "name": "entities",
                         "in": "query"
                     },
@@ -103,233 +167,60 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Publisher source ID filter (OR).",
-                        "name": "sources",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
                         "in": "query"
                     },
-                    {
-                        "type": "string",
-                        "format": "date",
-                        "description": "Published on/after this date (YYYY-MM-DD). Defaults to 7 days ago when omitted.",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include full article body. Default false.",
-                        "name": "full_content",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Skip N results. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Latest articles sorted by published_at descending",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.Bean"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No articles in window (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Invalid query parameters",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database or embedder unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/articles/propagation": {
-            "get": {
-                "description": "For each seed article URL, returns cross-outlet republication (`coverage`) and social/forum mentions (`mentions`).\n**Input**: pass up to 128 article URLs as comma-separated query param `urls`.\n**When to use**: after searchArticles — measure whether a story was picked up elsewhere or discussed on social platforms.\n**Returns**: one PropagationResult per input URL (always HTTP 200; empty arrays when no propagation found).\n**Related tools**: searchArticles, getTrendingArticles.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Articles"
-                ],
-                "summary": "Track how articles spread (GET)",
-                "operationId": "getArticlePropagation",
-                "parameters": [
                     {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Seed article URLs to analyze (CSV, 1–128 valid HTTP(S) URLs)",
-                        "name": "urls",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "One result object per input URL with coverage and mentions arrays",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.PropagationResult"
-                            }
-                        }
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
                     },
-                    "400": {
-                        "description": "Missing urls, too many urls (\u003e128), or invalid URL format",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Same as getArticlePropagation but accepts a JSON body — preferred when URLs contain characters awkward in query strings.\n**Input**: JSON body `{ \"urls\": [\"https://...\", ...] }` with 1–128 valid HTTP(S) URLs.\n**When to use**: batch propagation lookup from agent workflows that already hold URL lists in JSON.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Articles"
-                ],
-                "summary": "Track how articles spread (POST)",
-                "operationId": "postArticlePropagation",
-                "parameters": [
                     {
-                        "description": "JSON object with urls array (1–128 seed article URLs)",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/router.PropagationInput"
-                        }
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "One result object per input URL with coverage and mentions arrays",
+                        "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.PropagationResult"
-                            }
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
                         }
                     },
                     "400": {
-                        "description": "Missing urls, too many urls (\u003e128), or invalid URL format",
+                        "description": "Invalid parameters",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     }
                 }
@@ -337,22 +228,25 @@
         },
         "/articles/search": {
             "get": {
-                "description": "**Primary MCP tool** — full-corpus search sorted by relevance.\n**Requires at least one of**: `q`, `tags`, `categories`, `regions`, `entities`, or `urls`.\n**Search modes** (combinable with filters):\n- `q` + `acc`: semantic vector search over article embeddings (natural language, 3–512 chars).\n- `tags`: fuzzy text match across categories, regions, and entities (AND between tag values; case/whitespace insensitive).\n- `categories` / `regions` / `entities`: exact array filters (OR within each dimension; case/whitespace sensitive — discover values via listCategories, listEntities, listRegions).\n- `urls`: fetch specific articles by canonical URL (CSV).\n**Performance**: semantic search uses indexed nearest-neighbor candidates; prefer `full_content=false` unless the body is needed. Heavier than feed endpoints.\n**Related tools**: listCategories, listEntities, listRegions, getPublishers, getArticlePropagation.",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
                 ],
+                "description": "Returns Articles matching an optional relevance query, exact Article IDs or URLs, and filters. Without q, results are newest first.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Search all articles by topic, tags, or URL",
+                "summary": "Search Articles",
                 "operationId": "searchArticles",
                 "parameters": [
                     {
+                        "maxLength": 512,
                         "type": "string",
-                        "description": "Semantic search query in natural language (3–512 chars). Ranks by embedding similarity.",
+                        "description": "Optional relevance query.",
                         "name": "q",
                         "in": "query"
                     },
@@ -360,18 +254,49 @@
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness when q is set. 0.0=broad, 1.0=strict. Default 0.5.",
-                        "name": "acc",
+                        "description": "Optional relevance threshold used with q.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact Article UUIDs (CSV).",
+                        "name": "ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Exact Article URLs (CSV).",
+                        "name": "urls",
                         "in": "query"
                     },
                     {
                         "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
                             "news",
-                            "blog"
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Restrict to content kind: news or blog.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -381,8 +306,8 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Fetch articles by exact URL (CSV). Satisfies the required-search-param rule on its own.",
-                        "name": "urls",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
                         "in": "query"
                     },
                     {
@@ -391,8 +316,8 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Fuzzy filter across categories+regions+entities (AND between values). Good when exact tag spelling is unknown.",
-                        "name": "tags",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
                         "in": "query"
                     },
                     {
@@ -401,7 +326,37 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact topic filter (OR). Case sensitive — use listCategories first.",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
                         "name": "categories",
                         "in": "query"
                     },
@@ -411,7 +366,17 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact region filter (OR). Case sensitive — use listRegions first.",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
                         "name": "regions",
                         "in": "query"
                     },
@@ -421,7 +386,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact entity filter (OR). Case sensitive — use listEntities first.",
+                        "description": "Entity values (CSV).",
                         "name": "entities",
                         "in": "query"
                     },
@@ -431,254 +396,74 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Publisher source ID filter (OR). Resolve names via getPublishers.",
-                        "name": "sources",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "format": "date",
-                        "description": "Only articles published or updated on/after this date (YYYY-MM-DD).",
+                        "description": "UTC lower timestamp bound.",
                         "name": "from",
                         "in": "query"
                     },
                     {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include full article body. Default false (summary only).",
-                        "name": "full_content",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Skip N results for pagination. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Articles with publisher info, engagement metrics, and trend_score",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.BeanAggregate"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No matching articles (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Missing required search param or invalid input",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database or embedder unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/articles/top-headlines": {
-            "get": {
-                "description": "Returns the highest trend_score articles from the past 24 hours — a narrow window on getTrendingArticles.\n**When to use**: breaking news, daily briefings, or \"what is hot today\" without a custom date range.\n**Note**: `from` is not accepted; the 24h window is fixed server-side.\n**Filters** (all optional): same semantics as getTrendingArticles except no date override.\n**Related tools**: getTrendingArticles (7-day window), searchArticles.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Articles"
-                ],
-                "summary": "Search or list top headlines from the last 24 hours",
-                "operationId": "getTopHeadlines",
-                "parameters": [
-                    {
                         "type": "string",
-                        "description": "Optional semantic search query (3–512 chars).",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1,
-                        "minimum": 0,
-                        "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness when q is set. Default 0.5.",
-                        "name": "acc",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "news",
-                            "blog"
-                        ],
-                        "type": "string",
-                        "description": "Restrict to content kind: news or blog.",
-                        "name": "content_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
-                        "name": "tags",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Exact topic filter (OR).",
-                        "name": "categories",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Exact region filter (OR).",
-                        "name": "regions",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Exact entity filter (OR).",
-                        "name": "entities",
-                        "in": "query"
-                    },
-                    {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "collectionFormat": "csv",
-                        "description": "Publisher source ID filter (OR).",
-                        "name": "sources",
+                        "format": "date",
+                        "description": "UTC upper timestamp bound.",
+                        "name": "to",
                         "in": "query"
                     },
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include full article body. Default false.",
+                        "description": "Include content when available.",
                         "name": "full_content",
                         "in": "query"
                     },
                     {
-                        "maximum": 128,
+                        "maximum": 100,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Skip N results. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Top headlines from last 24h sorted by trend_score descending",
+                        "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.BeanTrend"
-                            }
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
                         }
-                    },
-                    "204": {
-                        "description": "No headlines in last 24h (empty result, not an error)"
                     },
                     "400": {
-                        "description": "Invalid query parameters",
+                        "description": "Invalid parameters",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     }
                 }
@@ -686,22 +471,25 @@
         },
         "/articles/trending": {
             "get": {
-                "description": "Returns articles ranked by `trend_score` (highest first). Trend score blends social engagement (likes, comments, shares), cross-outlet coverage, and recency.\n**Time window**: if `from` is omitted, defaults to the last 7 days of trending activity.\n**Filters** (all optional): same semantics as searchArticles.\n**When to use**: surface what is gaining traction now — prefer over getLatestArticles when popularity matters more than recency alone.\n**Related tools**: getTopHeadlines (24h subset), searchArticles, getArticlePropagation.",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
                 ],
+                "description": "Returns attention-ranked Articles with trend metrics when available. Date bounds are not accepted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Search or list trending articles by engagement score",
+                "summary": "List trending Articles",
                 "operationId": "getTrendingArticles",
                 "parameters": [
                     {
+                        "maxLength": 512,
                         "type": "string",
-                        "description": "Optional semantic search query (3–512 chars).",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
                         "name": "q",
                         "in": "query"
                     },
@@ -709,18 +497,29 @@
                         "maximum": 1,
                         "minimum": 0,
                         "type": "number",
-                        "default": 0.5,
-                        "description": "Match strictness when q is set. Default 0.5.",
-                        "name": "acc",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
                         "in": "query"
                     },
                     {
                         "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
                             "news",
-                            "blog"
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
                         ],
                         "type": "string",
-                        "description": "Restrict to content kind: news or blog.",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
                         "name": "content_type",
                         "in": "query"
                     },
@@ -730,8 +529,8 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Fuzzy filter across categories+regions+entities (AND between values).",
-                        "name": "tags",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
                         "in": "query"
                     },
                     {
@@ -740,7 +539,47 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact topic filter (OR).",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
                         "name": "categories",
                         "in": "query"
                     },
@@ -750,7 +589,17 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact region filter (OR).",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
                         "name": "regions",
                         "in": "query"
                     },
@@ -760,7 +609,7 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Exact entity filter (OR).",
+                        "description": "Entity values (CSV).",
                         "name": "entities",
                         "in": "query"
                     },
@@ -770,88 +619,570 @@
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Publisher source ID filter (OR).",
-                        "name": "sources",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "format": "date",
-                        "description": "Trending activity since this date (YYYY-MM-DD). Defaults to 7 days ago when omitted.",
-                        "name": "from",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
                         "in": "query"
                     },
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include full article body. Default false.",
+                        "description": "Include content when available.",
                         "name": "full_content",
                         "in": "query"
                     },
                     {
-                        "maximum": 128,
+                        "maximum": 100,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Skip N results. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Articles with engagement metrics and trend_score, sorted descending",
+                        "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.BeanTrend"
-                            }
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
                         }
-                    },
-                    "204": {
-                        "description": "No trending articles in window (empty result, not an error)"
                     },
                     "400": {
-                        "description": "Invalid query parameters",
+                        "description": "Invalid parameters",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Database or embedder unavailable; retry",
+                        "description": "Service unavailable",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Get an Article",
+                "operationId": "getArticle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.ArticleDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Article not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/{id}/mentions": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns external platform or forum observations for an Article UUID, ordered by observation time.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "List Article mentions",
+                "operationId": "getArticleMentions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Mention platforms (CSV).",
+                        "name": "platforms",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Mention forums (CSV).",
+                        "name": "forums",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower observation timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper observation timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.MentionCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Article not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/{id}/similar": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns related Articles for an Article UUID, ordered newest first. It is not a relevance-ranked search route.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "List related Articles",
+                "operationId": "getSimilarArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Article UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower timestamp bound.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper timestamp bound.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Article not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Lists values accepted by the corresponding Article filter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "List category labels",
+                "operationId": "listCategories",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.TagCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/entities": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Lists values accepted by the corresponding Article filter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "List entity labels",
+                "operationId": "listEntities",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.TagCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     }
                 }
@@ -859,7 +1190,7 @@
         },
         "/health": {
             "get": {
-                "description": "Lightweight liveness probe. Use before other tools to confirm the service is reachable. No authentication required when API keys are disabled.",
+                "description": "Lightweight liveness probe. No authentication required.",
                 "produces": [
                     "application/json"
                 ],
@@ -872,10 +1203,318 @@
                     "200": {
                         "description": "status alive",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/news/top-headlines": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "List top headlines",
+                "operationId": "getTopHeadlines",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional relevance query. Requires score_threshold greater than zero.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Required when q is supplied.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.ArticleCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/regions": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Lists values accepted by the corresponding Article filter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "List region labels",
+                "operationId": "listRegions",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.TagCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sentiments": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Lists values accepted by the corresponding Article filter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discovery"
+                ],
+                "summary": "List sentiment labels",
+                "operationId": "listSentiments",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional case-insensitive prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.TagCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     }
                 }
@@ -883,334 +1522,635 @@
         },
         "/sources": {
             "get": {
-                "description": "Look up display metadata for one or more publisher source IDs found on article `source` fields.\nReturns site name, base URL, description, and favicon for each requested source ID.\n**When to use**: after searchArticles or feed endpoints to humanize source IDs in UI or agent responses.\n**Required**: at least one value in `sources` (comma-separated source IDs, e.g. techcrunch.com).\n**Related tools**: searchArticles, getLatestArticles.",
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns publisher Sources. q matches the beginning of Source metadata; domains narrows results.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Publishers"
+                    "Sources"
                 ],
-                "summary": "Resolve publisher source metadata",
-                "operationId": "getPublishers",
+                "summary": "List Sources",
+                "operationId": "listSources",
                 "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional Source prefix query.",
+                        "name": "q",
+                        "in": "query"
+                    },
                     {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
                         "collectionFormat": "csv",
-                        "description": "Publisher source IDs to resolve (CSV). Example: techcrunch.com,theverge.com",
+                        "description": "Source ids (CSV).",
+                        "name": "ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.SourceCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sources/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns one publisher Source selected by UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sources"
+                ],
+                "summary": "Get a Source",
+                "operationId": "getSource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Source UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.SourceDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Source not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns Stories identified by stable UUIDs. Use Story filters to narrow coverage; a Story collection does not include every member Article.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "List Stories",
+                "operationId": "listStories",
+                "parameters": [
+                    {
+                        "maxLength": 512,
+                        "type": "string",
+                        "description": "Optional Story relevance query.",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                        "description": "Optional Story relevance threshold; requires q.",
+                        "name": "score_threshold",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
                         "name": "sources",
-                        "in": "query",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 2,
+                        "type": "integer",
+                        "default": 2,
+                        "description": "Minimum Story Article count. Default 2.",
+                        "name": "min_article_count",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower publication timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper publication timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story collection envelope",
+                        "schema": {
+                            "$ref": "#/definitions/router.StoryCollectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns one Story selected by its stable UUID, including a link to its paginated member Articles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "Get a Story",
+                "operationId": "getStory",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Story UUID.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story detail envelope",
+                        "schema": {
+                            "$ref": "#/definitions/router.StoryDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Story not found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories/{id}/articles": {
+            "get": {
+                "security": [
+                    {
+                        "BackendAPIKey": []
+                    }
+                ],
+                "description": "Returns the member Articles for one stable Story UUID. Article filters narrow the returned members.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "List Story Articles",
+                "operationId": "listStoryArticles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Story UUID.",
+                        "name": "id",
+                        "in": "path",
                         "required": true
                     },
                     {
-                        "maximum": 128,
+                        "enum": [
+                            "blog",
+                            "contract",
+                            "earnings_report",
+                            "enforcement_action",
+                            "financial_report",
+                            "lawsuit",
+                            "news",
+                            "official_statement",
+                            "podcast",
+                            "press_release",
+                            "research_paper",
+                            "site",
+                            "technical_documentation",
+                            "whitepaper"
+                        ],
+                        "type": "string",
+                        "description": "Filterable Article type. post is response-only and returns 400.",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to include (CSV).",
+                        "name": "sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source UUIDs to exclude (CSV).",
+                        "name": "exclude_sources",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to include (CSV).",
+                        "name": "domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Source domains to exclude (CSV).",
+                        "name": "exclude_domains",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Author text filters (CSV).",
+                        "name": "authors",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Category values (CSV).",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Excluded category values (CSV).",
+                        "name": "exclude_categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Region values (CSV).",
+                        "name": "regions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Entity values (CSV).",
+                        "name": "entities",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Sentiment values (CSV).",
+                        "name": "sentiments",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Normalized tag terms (CSV).",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC lower publication timestamp.",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "UTC upper publication timestamp.",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include content when available.",
+                        "name": "full_content",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
                         "minimum": 1,
                         "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
+                        "default": 20,
+                        "description": "Maximum records per page. Default 20, max 100.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of items to skip. Default 0.",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "Opaque continuation token from pagination.next_cursor. Send it unchanged.",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Publisher metadata objects keyed by source ID",
+                        "description": "Story Article collection envelope",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/beansack.Publisher"
-                            }
+                            "$ref": "#/definitions/router.StoryArticleCollectionResponse"
                         }
-                    },
-                    "204": {
-                        "description": "No matching publishers (empty result, not an error)"
                     },
                     "400": {
-                        "description": "Missing sources or invalid pagination",
+                        "description": "Invalid parameters",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Missing or invalid API key",
+                    "404": {
+                        "description": "Story not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Database unavailable; retry",
+                        "description": "Service unavailable",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/tags/categories": {
-            "get": {
-                "description": "Discover valid values for the `categories` filter on article endpoints.\nReturns a paginated array of unique topic labels extracted from indexed articles (e.g. \"Artificial Intelligence\", \"Cybersecurity\", \"Politics\").\n**When to use**: call before searchArticles or feed endpoints when you need exact, case-sensitive category strings.\n**Related tools**: listEntities, listRegions, searchArticles.\n**Pagination**: use `offset` to walk the full catalog when `limit` \u003c total count.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tags"
-                ],
-                "summary": "List article category topics",
-                "operationId": "listCategories",
-                "parameters": [
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of items to skip. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "JSON array of category label strings",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No categories in index (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Invalid limit or offset",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/tags/entities": {
-            "get": {
-                "description": "Discover valid values for the `entities` filter on article endpoints.\nReturns a paginated array of unique named entities (people, organizations, products, places) extracted via NLP from article text.\n**When to use**: call before searchArticles when filtering by specific people, companies, or places with exact spelling.\n**Related tools**: listCategories, listRegions, searchArticles.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tags"
-                ],
-                "summary": "List named entities",
-                "operationId": "listEntities",
-                "parameters": [
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of items to skip. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "JSON array of entity label strings",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No entities in index (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Invalid limit or offset",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/tags/regions": {
-            "get": {
-                "description": "Discover valid values for the `regions` filter on article endpoints.\nReturns a paginated array of unique geographic region labels (e.g. \"North America\", \"Europe\", \"India\", \"Middle East\").\n**When to use**: call before searchArticles when filtering by geography with exact, case-sensitive region strings.\n**Related tools**: listCategories, listEntities, searchArticles.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tags"
-                ],
-                "summary": "List geographic regions",
-                "operationId": "listRegions",
-                "parameters": [
-                    {
-                        "maximum": 128,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 16,
-                        "description": "Page size. Default 16, max 128.",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "minimum": 0,
-                        "type": "integer",
-                        "description": "Number of items to skip. Default 0.",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "JSON array of region label strings",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "204": {
-                        "description": "No regions in index (empty result, not an error)"
-                    },
-                    "400": {
-                        "description": "Invalid limit or offset",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid API key",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Concurrency limit exceeded; retry shortly",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Database unavailable; retry",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/router.ErrorResponse"
                         }
                     }
                 }
@@ -1218,410 +2158,697 @@
         }
     },
     "definitions": {
-        "beansack.Bean": {
-            "description": "Primary article/post object returned by Beans article endpoints. Agents should treat `url` as the stable identifier, `source` as the publisher id, `summary` as the compact context field, and `content` as optional full text only present when requested. `categories`, `regions`, `entities`, `sentiments`, and `tags` are inferred enrichment fields for filtering and grounding responses. Internal embedding and gist fields are used for search but omitted from JSON.",
+        "router.ArticleCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.ArticleDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.ArticleDetail": {
             "type": "object",
             "properties": {
                 "author": {
-                    "description": "Author is the byline or attributed creator when available from the source.",
                     "type": "string"
                 },
                 "categories": {
-                    "description": "Categories lists the inferred topics assigned to the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "content": {
-                    "description": "Content is the full body text when the source content is available.",
                     "type": "string"
                 },
                 "content_type": {
-                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
-                    "type": "string"
+                    "description": "Kind is the stored Article type. post may appear in responses but is not a valid request filter.",
+                    "type": "string",
+                    "enum": [
+                        "blog",
+                        "contract",
+                        "earnings_report",
+                        "enforcement_action",
+                        "financial_report",
+                        "lawsuit",
+                        "news",
+                        "official_statement",
+                        "podcast",
+                        "post",
+                        "press_release",
+                        "research_paper",
+                        "site",
+                        "technical_documentation",
+                        "whitepaper"
+                    ]
                 },
                 "entities": {
-                    "description": "Entities lists named entities such as people, places, organizations, or products.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
                 "image_url": {
-                    "description": "ImageUrl is the featured image or preview image associated with the content.",
                     "type": "string"
                 },
+                "links": {
+                    "$ref": "#/definitions/router.ArticleLinks"
+                },
                 "published_at": {
-                    "description": "Created is the original publish timestamp of the article or post.",
                     "type": "string",
                     "format": "date-time"
                 },
                 "regions": {
-                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "sentiments": {
-                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "source": {
-                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
-                    "type": "string"
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "story_id": {
+                    "type": "string",
+                    "format": "uuid"
                 },
                 "summary": {
-                    "description": "Summary is a short abstract or teaser used in listings and previews.",
                     "type": "string"
                 },
                 "tags": {
-                    "description": "Computed tags merged from categories/regions/entities for display",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "title": {
-                    "description": "Title is the human-readable headline or title of the content.",
                     "type": "string"
                 },
+                "trend": {
+                    "$ref": "#/definitions/router.Trend"
+                },
                 "url": {
-                    "description": "URL is the canonical URL of the article or post.",
                     "type": "string"
                 }
             }
         },
-        "beansack.BeanAggregate": {
-            "description": "Search result object that combines article content, social/trend metrics, and publisher display fields. Returned by searchArticles so agents can cite the article and identify the source without making a separate publisher lookup.",
+        "router.ArticleDetailResponse": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.ArticleDetail"
+                }
+            }
+        },
+        "router.ArticleDocument": {
             "type": "object",
             "properties": {
                 "author": {
-                    "description": "Author is the byline or attributed creator when available from the source.",
                     "type": "string"
                 },
                 "categories": {
-                    "description": "Categories lists the inferred topics assigned to the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
-                "comments": {
-                    "description": "Comments is the aggregate number of replies or comments associated with this Bean.",
-                    "type": "integer"
-                },
                 "content": {
-                    "description": "Content is the full body text when the source content is available.",
                     "type": "string"
                 },
                 "content_type": {
-                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
-                    "type": "string"
+                    "description": "Kind is the stored Article type. post may appear in responses but is not a valid request filter.",
+                    "type": "string",
+                    "enum": [
+                        "blog",
+                        "contract",
+                        "earnings_report",
+                        "enforcement_action",
+                        "financial_report",
+                        "lawsuit",
+                        "news",
+                        "official_statement",
+                        "podcast",
+                        "post",
+                        "press_release",
+                        "research_paper",
+                        "site",
+                        "technical_documentation",
+                        "whitepaper"
+                    ]
                 },
                 "entities": {
-                    "description": "Entities lists named entities such as people, places, organizations, or products.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
                 "image_url": {
-                    "description": "ImageUrl is the featured image or preview image associated with the content.",
                     "type": "string"
                 },
-                "likes": {
-                    "description": "Likes is the aggregate number of likes or upvotes associated with this Bean.",
-                    "type": "integer"
-                },
                 "published_at": {
-                    "description": "Created is the original publish timestamp of the article or post.",
                     "type": "string",
                     "format": "date-time"
                 },
                 "regions": {
-                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
-                },
-                "related": {
-                    "description": "Related is the count of semantically or editorially related Beans.",
-                    "type": "integer"
                 },
                 "sentiments": {
-                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
-                "shares": {
-                    "description": "Shares is the aggregate number of reposts or share-like actions associated with this Bean.",
-                    "type": "integer"
-                },
                 "source": {
-                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
-                    "type": "string"
+                    "$ref": "#/definitions/router.SourceDocument"
                 },
-                "source_base_url": {
-                    "description": "BaseURL is the publisher's primary site URL copied onto aggregate results for convenience.",
-                    "type": "string"
-                },
-                "source_description": {
-                    "description": "Description is the publisher description copied onto aggregate results.",
-                    "type": "string"
-                },
-                "source_favicon": {
-                    "description": "Favicon is the publisher favicon URL copied onto aggregate results.",
-                    "type": "string"
-                },
-                "source_site_name": {
-                    "description": "SiteName is the human-readable name of the publisher copied onto aggregate results.",
-                    "type": "string"
-                },
-                "subscribers": {
-                    "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
-                    "type": "integer"
+                "story_id": {
+                    "type": "string",
+                    "format": "uuid"
                 },
                 "summary": {
-                    "description": "Summary is a short abstract or teaser used in listings and previews.",
                     "type": "string"
                 },
                 "tags": {
-                    "description": "Computed tags merged from categories/regions/entities for display",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "title": {
-                    "description": "Title is the human-readable headline or title of the content.",
                     "type": "string"
                 },
-                "trend_score": {
-                    "description": "TrendScore is the computed ranking score used to order trending results.",
-                    "type": "number"
+                "trend": {
+                    "$ref": "#/definitions/router.Trend"
                 },
                 "url": {
-                    "description": "URL is the canonical URL of the article or post.",
                     "type": "string"
                 }
             }
         },
-        "beansack.BeanTrend": {
-            "description": "Article/post object plus trend analytics. Returned by trending and top-headline endpoints when an agent needs both article context and engagement ranking fields such as likes, comments, shares, related count, and trend_score.",
+        "router.ArticleLinks": {
             "type": "object",
             "properties": {
-                "author": {
-                    "description": "Author is the byline or attributed creator when available from the source.",
+                "mentions": {
                     "type": "string"
                 },
-                "categories": {
-                    "description": "Categories lists the inferred topics assigned to the content.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "comments": {
-                    "description": "Comments is the aggregate number of replies or comments associated with this Bean.",
-                    "type": "integer"
-                },
-                "content": {
-                    "description": "Content is the full body text when the source content is available.",
+                "similar": {
                     "type": "string"
                 },
-                "content_type": {
-                    "description": "Kind is the content type, for example news, blog, post, generated, or comment.",
+                "story": {
                     "type": "string"
-                },
-                "entities": {
-                    "description": "Entities lists named entities such as people, places, organizations, or products.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "image_url": {
-                    "description": "ImageUrl is the featured image or preview image associated with the content.",
-                    "type": "string"
-                },
-                "likes": {
-                    "description": "Likes is the aggregate number of likes or upvotes associated with this Bean.",
-                    "type": "integer"
-                },
-                "published_at": {
-                    "description": "Created is the original publish timestamp of the article or post.",
+                }
+            }
+        },
+        "router.ErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
                     "type": "string",
-                    "format": "date-time"
+                    "example": "invalid_request"
                 },
-                "regions": {
-                    "description": "Regions lists geographic regions mentioned in or associated with the content.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "related": {
-                    "description": "Related is the count of semantically or editorially related Beans.",
-                    "type": "integer"
-                },
-                "sentiments": {
-                    "description": "Sentiments lists inferred tones or sentiments expressed in the content.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "shares": {
-                    "description": "Shares is the aggregate number of reposts or share-like actions associated with this Bean.",
-                    "type": "integer"
-                },
-                "source": {
-                    "description": "Source is the canonical publisher identifier and matches Publisher.Source.",
-                    "type": "string"
-                },
-                "subscribers": {
-                    "description": "Subscribers is the aggregate audience size associated with this Bean's chatter.",
-                    "type": "integer"
-                },
-                "summary": {
-                    "description": "Summary is a short abstract or teaser used in listings and previews.",
-                    "type": "string"
-                },
-                "tags": {
-                    "description": "Computed tags merged from categories/regions/entities for display",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "description": "Title is the human-readable headline or title of the content.",
-                    "type": "string"
-                },
-                "trend_score": {
-                    "description": "TrendScore is the computed ranking score used to order trending results.",
-                    "type": "number"
-                },
-                "url": {
-                    "description": "URL is the canonical URL of the article or post.",
-                    "type": "string"
-                }
-            }
-        },
-        "beansack.PropagationCoverage": {
-            "description": "One cross-publisher coverage hit for a seed article URL. Use it to see whether a story was republished or covered by another source.",
-            "type": "object",
-            "properties": {
-                "created": {
+                "message": {
                     "type": "string",
-                    "format": "date-time"
-                },
-                "site_name": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "url": {
-                    "type": "string"
+                    "example": "Unknown or unsupported query parameter: offset"
                 }
             }
         },
-        "beansack.PropagationMention": {
-            "description": "One social or forum mention for a seed article URL, including where it appeared and any available engagement counts.",
+        "router.ErrorResponse": {
             "type": "object",
             "properties": {
-                "comments": {
-                    "type": "integer"
+                "error": {
+                    "$ref": "#/definitions/router.ErrorBody"
+                }
+            }
+        },
+        "router.HealthResponse": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "alive"
+                    ],
+                    "example": "alive"
+                }
+            }
+        },
+        "router.MentionCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.MentionDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.MentionDocument": {
+            "type": "object",
+            "properties": {
+                "engagement": {
+                    "$ref": "#/definitions/router.MentionEngagement"
                 },
                 "forum": {
                     "type": "string"
                 },
-                "likes": {
-                    "type": "integer"
-                },
-                "observed": {
+                "observed_at": {
                     "type": "string",
                     "format": "date-time"
                 },
-                "share_url": {
+                "platform": {
                     "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                }
-            }
-        },
-        "beansack.PropagationResult": {
-            "description": "Propagation result for one input article URL. `coverage` shows related publisher articles; `mentions` shows social/forum discussion. Empty arrays mean no propagation was found for that URL.",
-            "type": "object",
-            "properties": {
-                "coverage": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/beansack.PropagationCoverage"
-                    }
-                },
-                "mentions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/beansack.PropagationMention"
-                    }
                 },
                 "url": {
                     "type": "string"
                 }
             }
         },
-        "beansack.Publisher": {
-            "description": "Publisher/source metadata used to turn article `source` ids into human-readable site details. Use getPublishers when an agent needs display names, base URLs, descriptions, or favicons for sources returned by article endpoints.",
+        "router.MentionEngagement": {
             "type": "object",
             "properties": {
-                "source": {
-                    "description": "Source is the canonical publisher identifier and matches Bean.Source values.",
+                "audience": {
+                    "type": "integer"
+                },
+                "comments": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "router.Pagination": {
+            "type": "object",
+            "required": [
+                "limit",
+                "next_cursor",
+                "num_results"
+            ],
+            "properties": {
+                "limit": {
+                    "description": "Limit is the requested page size for this response.",
+                    "type": "integer",
+                    "example": 20
+                },
+                "next_cursor": {
+                    "description": "NextCursor is an opaque token. Send it unchanged as the next request cursor. Null when there is no next page.",
                     "type": "string"
                 },
-                "source_base_url": {
-                    "description": "BaseURL is the publisher's primary site URL.",
-                    "type": "string"
-                },
-                "source_description": {
-                    "description": "Description is a short description of the publisher or content source.",
-                    "type": "string"
-                },
-                "source_favicon": {
-                    "description": "Favicon is the URL of the publisher favicon or brand icon.",
-                    "type": "string"
-                },
-                "source_site_name": {
-                    "description": "SiteName is the human-readable display name of the publisher.",
+                "num_results": {
+                    "description": "NumResults is the number of records in this page, not a total-match count.",
+                    "type": "integer",
+                    "example": 20
+                }
+            }
+        },
+        "router.ResponseMeta": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "description": "AsOf is the UTC time this collection snapshot was produced.",
                     "type": "string"
                 }
             }
         },
-        "router.PropagationInput": {
+        "router.SourceCollectionResponse": {
             "type": "object",
             "required": [
-                "urls"
+                "data",
+                "meta",
+                "pagination"
             ],
             "properties": {
-                "urls": {
-                    "description": "URLs lists seed article URLs to analyze for cross-outlet coverage and social mentions (1–128 items).",
+                "data": {
                     "type": "array",
-                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/router.SourceDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.SourceDetailResponse": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                }
+            }
+        },
+        "router.SourceDocument": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "favicon_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rss_feed_url": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryArticleCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.ArticleDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.StoryArticleMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.StoryArticleMeta": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "story_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryArticlePreviewDocument": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "source": {
+                    "$ref": "#/definitions/router.SourceDocument"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.StoryCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.StoryDetail": {
+            "type": "object",
+            "properties": {
+                "article_count": {
+                    "type": "integer"
+                },
+                "categories": {
+                    "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "first_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "links": {
+                    "$ref": "#/definitions/router.StoryLinks"
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "top_articles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryArticlePreviewDocument"
+                    }
                 }
             }
+        },
+        "router.StoryDetailResponse": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/router.StoryDetail"
+                }
+            }
+        },
+        "router.StoryDocument": {
+            "type": "object",
+            "properties": {
+                "article_count": {
+                    "type": "integer"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "first_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_published_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "top_articles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.StoryArticlePreviewDocument"
+                    }
+                }
+            }
+        },
+        "router.StoryLinks": {
+            "type": "object",
+            "properties": {
+                "articles": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.TagCollectionResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "meta",
+                "pagination"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.TagDocument"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/router.ResponseMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/router.Pagination"
+                }
+            }
+        },
+        "router.TagDocument": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "router.Trend": {
+            "type": "object",
+            "properties": {
+                "audiences": {
+                    "type": "integer"
+                },
+                "comments": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "mentions": {
+                    "type": "integer"
+                },
+                "related": {
+                    "type": "integer"
+                },
+                "trend_score": {
+                    "type": "number"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BackendAPIKey": {
+            "type": "apiKey",
+            "name": "X-API-KEY",
+            "in": "header"
         }
     }
 }

@@ -8,7 +8,8 @@
     "test": "zuplo test",
     "docs": "zuplo docs",
     "lint": "eslint",
-    "postinstall": "node scripts/patch-zudoku-clerk.mjs"
+    "verify:api-contracts": "node scripts/verify-api-contract-cascade.mjs --strict",
+    "verify:docs": "node scripts/verify-documentation.mjs"
   },
   "dependencies": {
     "http-status-codes": "^2.3.0",

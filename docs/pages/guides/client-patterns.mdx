@@ -1,0 +1,169 @@
+---
+description: Node, Python, and cURL patterns for Bearer auth, pagination, errors, and retries. Cafecito does not ship an official SDK.
+---
+
+# Reusable API Clients
+
+Cafecito does **not** need an official SDK. Use REST APIs (and MCP where you need tool calling) directly. Change only the path and query for each product call.
+
+Set `CAFECITO_API_KEY` in the environment. Never commit keys.
+
+<CodeTabs>
+
+```js title="node.js"
+const BASE_URL = "https://api.cafecito.tech";
+
+function errorEnvelope(status, body) {
+  const code = body?.error?.code ?? "http_error";
+  const message = body?.error?.message ?? `HTTP ${status}`;
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  return err;
+}
+
+async function cafecitoFetch(path, { searchParams, apiKey = process.env.CAFECITO_API_KEY } = {}) {
+  const url = new URL(path, BASE_URL);
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value != null && value !== "") url.searchParams.set(key, String(value));
+    }
+  }
+  const headers = {};
+  if (!path.endsWith("/health")) {
+    if (!apiKey) throw new Error("CAFECITO_API_KEY is not set");
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const res = await fetch(url, { headers });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw errorEnvelope(res.status, body);
+  return body;
+}
+
+async function cafecitoFetchWithRetry(path, options = {}) {
+  let delayMs = 500;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await cafecitoFetch(path, options);
+    } catch (err) {
+      const retry = err.status === 429 || (err.status >= 500 && err.status <= 599);
+      if (!retry || attempt === 4) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+      delayMs *= 2;
+    }
+  }
+}
+
+async function* paginate(path, searchParams = {}) {
+  let cursor;
+  do {
+    const page = await cafecitoFetchWithRetry(path, {
+      searchParams: { ...searchParams, ...(cursor ? { cursor } : {}) },
+    });
+    yield page;
+    cursor = page.pagination?.next_cursor ?? null;
+  } while (cursor);
+}
+```
+
+
+```python title="python"
+import os
+import time
+
+import requests
+
+BASE_URL = "https://api.cafecito.tech"
+
+class CafecitoError(Exception):
+    def __init__(self, status, code, message):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+
+
+def cafecito_get(path, params=None, api_key=None):
+    api_key = api_key or os.environ.get("CAFECITO_API_KEY")
+    headers = {}
+    if not path.endswith("/health"):
+        if not api_key:
+            raise CafecitoError(0, "missing_key", "CAFECITO_API_KEY is not set")
+        headers["Authorization"] = f"Bearer {api_key}"
+    response = requests.get(f"{BASE_URL}{path}", params=params or {}, headers=headers, timeout=30)
+    payload = {}
+    try:
+        payload = response.json()
+    except ValueError:
+        pass
+    if not response.ok:
+        err = payload.get("error") or {}
+        raise CafecitoError(
+            response.status_code,
+            err.get("code", "http_error"),
+            err.get("message", f"HTTP {response.status_code}"),
+        )
+    return payload
+
+
+def cafecito_get_with_retry(path, params=None):
+    delay = 0.5
+    for attempt in range(5):
+        try:
+            return cafecito_get(path, params=params)
+        except CafecitoError as exc:
+            if exc.status not in {429} and not (500 <= exc.status <= 599) or attempt == 4:
+                raise
+            time.sleep(delay)
+            delay *= 2
+
+
+def paginate(path, params=None):
+    params = dict(params or {})
+    cursor = None
+    while True:
+        page_params = dict(params)
+        if cursor:
+            page_params["cursor"] = cursor
+        page = cafecito_get_with_retry(path, params=page_params)
+        yield page
+        cursor = (page.get("pagination") or {}).get("next_cursor")
+        if not cursor:
+            break
+```
+
+
+``` bash title="curl"
+export CAFECITO_API_KEY="YOUR_API_KEY"
+export BASE_URL="https://api.cafecito.tech"
+
+# Public health (no Authorization)
+curl -sS "$BASE_URL/beans/health"
+curl -sS "$BASE_URL/espresso/health"
+
+# Authenticated collection
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+
+# Continue: paste pagination.next_cursor unchanged
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "limit=5" \
+  --data-urlencode "cursor=OPAQUE_NEXT_CURSOR" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+```
+
+</CodeTabs>
+
+All Cafecito routes the same header and `cursor` query; Continue with `pagination.next_cursor` as described in [API conventions](/guides/api-conventions).
+
+
+## Response type
+
+Espresso allows response_type=json (default), yaml, or toon as query param.  Keep JSON in application code unless you specifically need a compact agent encoding.
+
+## Next
+
+- [First API call](/start/first-api-call)
+- [Troubleshooting](/guides/troubleshooting)
+- [MCP and AI agents](/guides/mcp-ai-agents)

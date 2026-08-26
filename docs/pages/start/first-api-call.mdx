@@ -1,0 +1,53 @@
+---
+description: Authenticate with a Bearer API key and make your first Beans or Espresso API request. No official SDK.
+---
+
+# Make Your First API Call
+
+Cafecito uses one gateway (`https://api.cafecito.tech`) and `Authorization: Bearer` for authenticated REST and MCP. Health is public. See [reusable clients](/guides/client-patterns) when you need pagination, errors, and retries.
+
+Live products: **Beans** and **Espresso**. **Cortado** is not callable yet.
+
+~~~bash
+export CAFECITO_API_KEY="YOUR_API_KEY"
+export BASE_URL="https://api.cafecito.tech"
+
+curl -sS "$BASE_URL/beans/health"
+curl -sS "$BASE_URL/espresso/health"
+~~~
+
+## Beans: recent news & publisher articles
+
+~~~bash
+curl -sS --get "$BASE_URL/beans/articles/latest" \
+  --data-urlencode "content_type=news" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+~~~
+
+Continue with the [Beans overview](/products/beans) or [Beans API reference](/api/beans). Beans collections return `pagination.next_cursor`.
+
+## Espresso: market events and signals
+
+~~~bash
+curl -sS --get "$BASE_URL/espresso/events" \
+  --data-urlencode "q=semiconductor supply pressure" \
+  --data-urlencode "limit=5" \
+  -H "Authorization: Bearer $CAFECITO_API_KEY"
+~~~
+
+Continue with the [Espresso overview](/products/espresso) or [Espresso API reference](/api/espresso). Espresso collections return `pagination.next_cursor`. See [API conventions](/guides/api-conventions).
+
+Unknown or route-inapplicable query parameters return HTTP `400` with the ErrorResponse envelope. Empty searches return HTTP `200` with `data: []`.
+
+## Using the API in production
+
+- Limits: 100 requests/minute and 50,000/month per authenticated user, shared across keys; REST and MCP share the meter. [Pricing](/guides/pricing-limits)
+- Compatibility is additive; breaking changes get a new version and deprecation notices. Support: [Contact](/contact)
+- Operational recovery: [Troubleshooting](/guides/troubleshooting)
+
+## Next steps
+
+- [API keys](/start/api-keys)
+- [Reusable clients](/guides/client-patterns)
+- [MCP and AI agents](/guides/mcp-ai-agents)

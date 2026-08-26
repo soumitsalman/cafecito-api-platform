@@ -1,0 +1,399 @@
+---
+description: Search Events, interpret Signals, and trace evidence and Sources with the Espresso market, business, event, and news intelligence API.
+---
+import { Badge } from "zudoku/ui/Badge";
+import { Button } from "zudoku/ui/Button";
+
+![Espresso banner](/espresso-banner-E.png)
+
+# Espresso Market Intelligence API
+
+<Badge variant="default">v0.5</Badge><Badge className="badge-live">Live</Badge>
+
+Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence. Use it for searching: what happened, what it may mean for a company or market, and what evidence supports that view.
+
+- **Events** are concrete developments.
+- **Signals** are synthesized conclusions about developments and their potential impact.
+- **Evidence** provides directly related context and available source coverage for a selected Event.
+- **Sources** provide publisher and provenance metadata.
+
+## Key features
+
+- **Intent-first retrieval** — Search Events for what happened; search Signals for meaning, impact, or outlook.
+- **Controlled exploration** — Start with a collection, preserve returned UUIDs, and retrieve detail, evidence, or supporting records only when needed.
+- **Clear filtering** — Use fuzzy `tags` for concepts and exact snake_case values for structured Event and Signal filters.
+- **Traceable answers** — Follow an Event to evidence or associated Signals, and a Signal to the Events that support it.
+- **Agent-efficient output** — JSON is canonical. YAML and TOON carry the same payload in token-optimized forms for MCP and AI-agent clients.
+
+## Choose a route by the user question
+
+| User needs | Start here | Follow only when needed |
+| --- | --- | --- |
+| A concrete development about a company, person, product, region, or topic | `GET /espresso/events` | Event detail, evidence, or associated Signals. |
+| A conclusion, implication, or outlook | `GET /espresso/signals` | Signal detail, then Events that support the Signal. |
+| Context or source coverage for one Event | `GET /espresso/events/{event_id}/evidence` | Source detail for a selected `source_id`. |
+| Concrete support for one Signal | `GET /espresso/signals/{signal_id}/events` | Event detail or evidence for a selected Event. |
+| An exact filter value not already known | A discovery route such as `GET /espresso/event-types` | Search Events or Signals with the returned value. |
+| A publisher or domain | `GET /espresso/sources` | Reuse the selected UUID as `source_ids` on Event search. |
+
+A good agent workflow uses the smallest useful filter set, selects IDs from `data`, and stops once it has enough support for the answer. Do not fetch details for every collection item.
+
+## Authentication and base URL
+
+<Button className="btn-with-link" asChild>
+  <a href="/settings/api-keys">Get API Key</a>
+</Button>
+
+All gateway routes use the `/espresso` prefix. REST operations require `Authorization: Bearer <api_key>`. `GET /espresso/health` does not. Gateway `401` is the engine response for a missing or invalid public key. Product application errors use `{ "error": { "code": "...", "message": "..." } }`. Empty collections are HTTP `200` with `data: []`. A missing Event, Signal, or Source detail is HTTP `404`.
+
+```bash
+BASE_URL="https://api.cafecito.tech"
+API_KEY="YOUR-API-KEY"
+
+curl -s "${BASE_URL}/espresso/health"
+```
+
+```http
+Authorization: Bearer YOUR-API-KEY
+```
+
+::::info
+The [Espresso API reference](/api/espresso) is the source for endpoint schemas, complete parameters, and status codes.
+::::
+
+## Quickstart in JavaScript, Python, and curl
+
+The following examples make the same Event search in three client styles. Use Events for concrete developments. Use Signals when the user asks for a conclusion or outlook instead.
+
+<CodeTabs syncKey="espresso-api">
+```js
+const apiKey = process.env.CAFECITO_API_KEY;
+const baseUrl = "https://api.cafecito.tech";
+
+const params = new URLSearchParams({
+  q: "semiconductor supply pressure",
+  companies: "microsoft,nvidia",
+  tags: "supply_chain",
+  limit: "5",
+});
+
+const response = await fetch(`${baseUrl}/espresso/events?${params}`, {
+  headers: { Authorization: `Bearer ${apiKey}` },
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+const page = await response.json();
+console.log(page.data);
+```
+
+```python
+import os
+import requests
+
+api_key = os.environ["CAFECITO_API_KEY"]
+
+response = requests.get(
+    "https://api.cafecito.tech/espresso/events",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={
+        "q": "semiconductor supply pressure",
+        "companies": "microsoft,nvidia",
+        "tags": "supply_chain",
+        "limit": 5,
+    },
+    timeout=30,
+)
+response.raise_for_status()
+print(response.json()["data"])
+```
+
+```bash title="curl"
+curl -s --get "${BASE_URL}/espresso/events" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=semiconductor supply pressure" \
+  --data-urlencode "companies=microsoft,nvidia" \
+  --data-urlencode "tags=supply_chain" \
+  --data-urlencode "limit=5"
+```
+</CodeTabs>
+
+The JavaScript and Python examples use JSON because it is the canonical response format. The cURL request works with the same key and parameters.
+
+## Collections, IDs, and pagination
+
+Collection routes return a stable envelope:
+
+```json
+{
+  "data": [
+    {
+      "id": "EVENT_UUID",
+      "kind": "event",
+      "created_at": "2026-05-19T06:00:00Z",
+      "tags": ["supply_chain"],
+      "summary": "A concrete development"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "num_results": 1,
+    "next_cursor": "OPAQUE_TOKEN_OR_NULL"
+  },
+  "meta": {}
+}
+```
+
+- Preserve IDs exactly. Event, Signal, and Source IDs are UUIDs used by follow-up routes.
+- Collections do not return a `pagination.cursor` field. Continue with `pagination.next_cursor` only.
+- `pagination.num_results` is the count in this page. It is not the total number of possible matches.
+- If `pagination.next_cursor` is non-null, send that exact value as the next request `cursor`. Do not create, decode, modify, or sort cursor tokens.
+- Empty collections are successful HTTP `200` responses with `data: []`.
+- Detail routes return `{ "data": { ... } }`. A missing detail record returns HTTP `404`.
+
+## Event and Signal fields
+
+Every Event and Signal has a stable core. Other keys may be absent or added over time. Clients must ignore unknown extension fields.
+
+| Role | Fields | Client rule |
+| --- | --- | --- |
+| Stable core | `id`, `kind`, `created_at`, `tags` | Always present. Parse these first. |
+| Conditional | `summary`, `source`, `links`, `counts` | May be omitted. Do not require them. |
+| Extension | any other keys (for example `event_type`, `impact_level`, `forecast`) | Optional. Ignore unknown keys. |
+
+`kind` is `event` or `signal`. JSON, YAML, and TOON are projections of the same logical payload.
+
+## Public route matrix
+
+Default `limit` is 20 (maximum 100). Empty collections return HTTP `200`. Missing detail returns HTTP `404`. REST and MCP share the same operations except health, which is REST-only.
+
+| Intent | Route | Required | Filters | Envelope | Typical next call |
+| --- | --- | --- | --- | --- | --- |
+| What happened? | `GET /espresso/events` | — | `q`, tags, structured Event filters, `from`/`to`, `cursor` | collection | Event detail, evidence, or Signals |
+| Inspect one Event | `GET /espresso/events/{event_id}` | path UUID | `response_type` | detail | evidence or related Signals |
+| Supporting context | `GET /espresso/events/{event_id}/evidence` | path UUID | Event filters, `cursor` | collection | Source detail |
+| Related conclusions | `GET /espresso/events/{event_id}/signals` | path UUID | Signal filters, `cursor` | collection | Signal detail |
+| What does it mean? | `GET /espresso/signals` | — | `q`, tags, Signal filters, `from`/`to`, `cursor` | collection | Signal detail or supporting Events |
+| Inspect one Signal | `GET /espresso/signals/{signal_id}` | path UUID | `response_type` | detail | supporting Events |
+| Support for a Signal | `GET /espresso/signals/{signal_id}/events` | path UUID | Event filters, `cursor` | collection | Event evidence |
+| Source catalog | `GET /espresso/sources` | — | `q`, `domains`, `cursor` | collection | Source detail or Event `source_ids` |
+| One Source | `GET /espresso/sources/{source_id}` | path UUID | `response_type` | detail | Event search |
+| Fuzzy tag vocabulary | `GET /espresso/tags` | — | `q`, `resource`, `cursor` | collection | Event or Signal search |
+| Entity vocabulary | `GET /espresso/entities` | — | `q`, `types`, `cursor` | collection | Event search |
+| Region vocabulary | `GET /espresso/regions` | — | `q`, `cursor` | collection | Event search |
+| Event-type vocabulary | `GET /espresso/event-types` | — | `q`, `cursor` | collection | Event search |
+| Liveness | `GET /espresso/health` | — | — | `{ status }` | none |
+
+## What are you trying to understand?
+
+| User question | Espresso path |
+| --- | --- |
+| What happened? | Search Events |
+| What is the likely business or market implication? | Search Signals |
+| What evidence supports that implication? | Signal-linked Events, then Event evidence |
+| Which companies, people, products, or regions are affected? | Structured filters and discovery |
+| Is this a one-off or a developing pattern? | Compare related Events, Signals, Sources, and `meta.as_of` |
+
+## Query and filter rules
+
+Use `q` for natural-language semantic search on Event and Signal collections. Use `score_threshold` with `q` to control the minimum semantic similarity: `0.0` is broad, `1.0` is strict, and the default is `0.5`. Use `q` alone before adding filters unless the request calls for a clear structured constraint.
+
+| Parameter | Matching behavior | Example |
+| --- | --- | --- |
+| `q` | Natural-language semantic query. | `semiconductor supply pressure` |
+| `score_threshold` | Minimum semantic similarity for `q`; `0.0` is broad, `1.0` is strict, default `0.5`. | `0.75` |
+| `tags` | Fuzzy text matching. | `supply_chain,policy` |
+| `event_types` | Exact Event type names in snake_case. | `policy_change,market_entry` |
+| `categories` | Exact category names in snake_case. This is separate from `event_types`. | `regulation,technology` |
+| `entities` | Exact company or people names in snake_case. | `microsoft,nvidia` |
+| `companies`, `people`, `products`, `regions` | Exact names in snake_case. | `microsoft`, `sam_altman`, `geforce`, `north_america` |
+| `impact_levels` | Exact impact level. | `high,medium` |
+| `impacted_domains` | Exact Signal domain in snake_case. | `public_health,climate` |
+| `source_ids` | Exact Source UUID. | `SOURCE_UUID` |
+| `from`, `to` | Inclusive date-only bounds on record `created_at`. | `2026-05-01` |
+
+`created_at` describes when Espresso created the record. It is not an occurrence, publication, lifecycle, or forecast date.
+
+Discovery routes are optional helpers when a client needs an accepted value:
+
+| Route | Returns | Use it for |
+| --- | --- | --- |
+| `GET /espresso/tags` | Fuzzy tag vocabulary. | `tags` on Event or Signal search. |
+| `GET /espresso/event-types` | Exact Event type values. | `event_types`. |
+| `GET /espresso/entities` | Exact company and people values. | `entities`, `companies`, or `people`. |
+| `GET /espresso/regions` | Exact region values. | `regions`. |
+
+Do not call discovery when the normalized value is already known. Discovery output is filter vocabulary, not a canonical entity, company-profile, or geography service.
+
+## Follow-up calls for explanation and provenance
+
+### Inspect a selected Event
+
+```bash
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Event detail can include available Source provenance and links or counts for evidence and related Signals. Follow one of these paths only when it helps answer the user question:
+
+```bash
+# Need supporting context or source coverage?
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/evidence?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+# Need related higher-level conclusions?
+curl -s "${BASE_URL}/espresso/events/EVENT_UUID/signals?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Evidence is a bounded set of directly related records. It is not article content, a story-cluster export, or a complete record history.
+
+### Inspect a selected Signal
+
+```bash
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+
+curl -s "${BASE_URL}/espresso/signals/SIGNAL_UUID/events?limit=20" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Use the second request when a conclusion needs concrete support, verification, or citations. It returns Events that support the selected Signal and can be narrowed with Event filters.
+
+### Resolve a Source
+
+```bash
+curl -s --get "${BASE_URL}/espresso/sources" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  --data-urlencode "q=example.com" \
+  --data-urlencode "domains=example.com"
+
+curl -s "${BASE_URL}/espresso/events?source_ids=SOURCE_UUID" \
+  -H "Authorization: Bearer ${API_KEY}"
+```
+
+Source `q` is case-insensitive metadata matching across source domain, name, and URL. It is not semantic search.
+
+## JSON, YAML, TOON, and MCP
+
+Set `response_type` to choose the representation returned by any Espresso route. JSON is the canonical format. YAML and TOON carry the same response fields in formats optimized for MCP and AI-agent context.
+
+The following excerpts use real values from a one-Event response returned by `GET /events?limit=1` from the running Espresso service. Selected fields are shown so the three serializations remain easy to compare; `meta.as_of` changes on every request.
+
+<CodeTabs syncKey="espresso-response-types">
+```json title="JSON"
+{
+  "data": [
+    {
+      "key_points": [
+        "2026-08-13 NDC president Peter Obi declares Nigerian youths great assets",
+        "2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors"
+      ],
+      "created_at": "2026-08-13T02:30:04-04:00",
+      "event_type": "youth_empowerment_declaration",
+      "forecast": "Increased public funding directed at youth programs within six months",
+      "id": "9cefc4ae-cad9-548e-9f5f-28ef22327a13",
+      "impact_level": "high",
+      "impacted_domains": ["education", "employment", "technology"],
+      "impacts": [
+        "Nigeria's government commits resources toward youth development initiatives",
+        "Private sector encouraged to engage young professionals across multiple domains"
+      ],
+      "kind": "event",
+      "macro_context": "african_demographic_dividend_strategy",
+      "people": ["peter_obi"],
+      "regions": ["bauchi"],
+      "summary": "Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.",
+      "tags": [
+        "african_demographic_dividend_strategy",
+        "entrepreneurship_and_startups",
+        "peter_obi",
+        "news",
+        "bauchi",
+        "digital_communities_and_online_platforms"
+      ]
+    }
+  ],
+  "pagination": {
+    "limit": 1,
+    "num_results": 1,
+    "next_cursor": null
+  },
+  "meta": {
+    "as_of": "2026-08-14T17:44:34.874458971Z"
+  }
+}
+```
+
+```yaml title="YAML"
+data:
+- key_points:
+  - 2026-08-13 NDC president Peter Obi declares Nigerian youths great assets
+  - 2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors
+  created_at: 2026-08-13T02:30:04-04:00
+  event_type: youth_empowerment_declaration
+  forecast: Increased public funding directed at youth programs within six months
+  id: 9cefc4ae-cad9-548e-9f5f-28ef22327a13
+  impact_level: high
+  impacted_domains:
+  - education
+  - employment
+  - technology
+  impacts:
+  - Nigeria's government commits resources toward youth development initiatives
+  - Private sector encouraged to engage young professionals across multiple domains
+  kind: event
+  macro_context: african_demographic_dividend_strategy
+  people:
+  - peter_obi
+  regions:
+  - bauchi
+  summary: Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.
+  tags:
+  - african_demographic_dividend_strategy
+  - entrepreneurship_and_startups
+  - peter_obi
+  - news
+  - bauchi
+  - digital_communities_and_online_platforms
+pagination:
+  limit: 1
+  num_results: 1
+  next_cursor: null
+meta:
+  as_of: 2026-08-14T17:44:34.874458971Z
+```
+
+```text title="TOON"
+data[1]:
+  - key_points[2]: 2026-08-13 NDC president Peter Obi declares Nigerian youths great assets,2026-08-13 Former Anambra Governor Peter Obi emphasizes need for investment in youth sectors
+    created_at: "2026-08-13T02:30:04-04:00"
+    event_type: youth_empowerment_declaration
+    forecast: Increased public funding directed at youth programs within six months
+    id: 9cefc4ae-cad9-548e-9f5f-28ef22327a13
+    impact_level: high
+    impacted_domains[3]: education,employment,technology
+    impacts[2]: Nigeria's government commits resources toward youth development initiatives,Private sector encouraged to engage young professionals across multiple domains
+    kind: event
+    macro_context: african_demographic_dividend_strategy
+    people[1]: peter_obi
+    regions[1]: bauchi
+    summary: Peter Obi declared Nigerian youths critical national assets during an August 13 tweet celebrating International Youth Day; citing examples like young pilots flying aircraft and emphasizing underfunded sectors including health and tech. He frames current challenges—lack of jobs and learning opportunities—as preventable due to insufficient state investment rather than inherent limitations among young citizens.
+    tags[6]: african_demographic_dividend_strategy,entrepreneurship_and_startups,peter_obi,news,bauchi,digital_communities_and_online_platforms
+pagination:
+  limit: 1
+  num_results: 1
+  next_cursor: null
+meta:
+  as_of: "2026-08-14T17:44:34.874458971Z"
+```
+</CodeTabs>
+
+MCP clients can connect to `https://api.cafecito.tech/espresso/mcp` with the same API key. See [MCP & AI agents](/guides/mcp-ai-agents) for the tool list and agent operating guidance.
+
+## Continue learning
+
+- [Espresso workflows and scenarios](/products/espresso/workflows)
+- [Migrate to Espresso](/products/espresso/migration)
+- [Espresso API reference](/api/espresso)
+- [MCP & AI agents](/guides/mcp-ai-agents)
+- [Bruno Examples](https://github.com/soumitsalman/cafecito-api-platform) in `apis/espresso/bruno/`
