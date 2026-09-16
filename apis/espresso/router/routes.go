@@ -1,6 +1,7 @@
 // @title             Espresso API & MCP
 // @version           0.5
 // @description       Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence.
+// @description       All Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase.
 // @description       **Events** are concrete developments involving an organization, person, product, market, or region. **Signals** are higher-level conclusions synthesized from supporting Events.
 // @description       **Choose a route by user intent**: What happened? Search Events. What does it mean or what is the outlook? Search Signals. What supports a conclusion? Retrieve a Signal, then list its supporting Events. What evidence or source coverage exists? Retrieve an Event, then inspect its evidence. Which exact filter value should I use? Use a discovery route only when the value is not already known.
 // @description       **Recommended agent workflow**: (1) search the appropriate collection with the smallest useful filter set; (2) select IDs from `data`; (3) retrieve detail only for selected IDs; (4) traverse evidence, related Signals, or supporting Events only when explanation, provenance, or context is needed.
@@ -8,10 +9,10 @@
 // @description       **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
 // @description       **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
 // @schemes           https
-// @termsOfService    https://developer.cafecito.tech/company/terms-of-use
+// @termsOfService    https://cafecito.tech/docs/terms-of-use/
 // @contact.name      Project Cafecito
 // @contact.url       https://cafecito.tech
-// @contact.email     soumitsrah@cafecito.tech
+// @contact.email     support@cafecito.tech
 // @securityDefinitions.apikey BackendAPIKey
 // @in header
 // @name X-API-KEY
@@ -662,7 +663,7 @@ func (r *Configuration) getSources(c *gin.Context) {
 // getSource godoc
 // @Summary Inspect one Source
 // @Description Returns provenance metadata for one Source. Use this route to enrich a citation or inspect publisher metadata, not to retrieve published Events.
-// @Description To find Events from this Source, call `GET /events?source_ids={source_id}`. Optional description, favicon, and RSS feed fields can be absent when unavailable.
+// @Description To find Events from this Source, call `GET /events?source_ids={source_id}`. Optional source-description, favicon, and source-reference fields can be absent when unavailable.
 // @Tags Sources
 // @Produce json
 // @Param source_id path string true "Source UUID (RFC 4122)." format(uuid)

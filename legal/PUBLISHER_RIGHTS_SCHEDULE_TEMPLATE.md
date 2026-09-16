@@ -24,7 +24,7 @@ For each row select **Granted**, **Denied**, or **Granted with conditions**, and
 | Right | Decision | Conditions |
 | --- | --- | --- |
 | Automated access/crawl | [ ] | |
-| RSS/Atom/API retrieval | [ ] | |
+| Public-information collection and API processing | [ ] | |
 | Technical reproduction | [ ] | |
 | Parse/extract article body and metadata | [ ] | |
 | Convert HTML/feed content to Markdown, text, JSON, YAML, or TOON | [ ] | |

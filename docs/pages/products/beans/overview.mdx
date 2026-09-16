@@ -1,5 +1,5 @@
 ---
-description: Search and monitor news, blogs, earnings, litigation, official statements, research, and technical documents with the Beans publisher-content API and MCP server.
+description: Search public information across news, blogs, earnings, litigation, official statements, research, and technical documents with the Beans API and MCP server.
 ---
 
 import { Badge } from "zudoku/ui/Badge";
@@ -11,7 +11,9 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v1</Badge><Badge className="badge-live">Live</Badge>
 
-Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+
+Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. Coverage varies and does not imply source endorsement, complete coverage, or unrestricted content rights.
 
 - **Articles** are publisher items (news, blogs, reports, statements, research, and other stored types).
 - **Sources** are publisher records available on an Article or through the Source routes.
@@ -268,7 +270,7 @@ The route matrix below names the response type for every public path. The follow
 | `content_type` | string enum | One stored Beans content type. |
 | `published_at` | RFC 3339 timestamp | Publisher publication time. |
 | `title`, `summary`, `author`, `image_url` | string or `null` | Available publisher metadata. |
-| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee or a grant of republication rights. Handle a missing value, preserve `url` for attribution, and follow the [Third-Party Content and Attribution Policy](/company/content-rights-policy). |
+| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee or a grant of republication rights. Handle a missing value, preserve `url` for attribution, and follow the [Third-Party Content Policy](https://cafecito.tech/docs/third-party-content-policy/). |
 | `language` | string or omitted | ISO 639 language code when available. |
 | `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
 | `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |
@@ -280,7 +282,7 @@ The route matrix below names the response type for every public path. The follow
 
 | Response item | Fields | Contract |
 | --- | --- | --- |
-| Source | `id`, `url`, `domain`, `name`, optional `description`, `favicon_url`, `rss_feed_url` | Publisher metadata. Preserve `id` and use it with the `sources` Article or Story filter. |
+| Source | `id`, `url`, `domain`, `name`, optional `description`, `favicon_url`, `rss_feed_url` | Source metadata. Preserve `id` and use it with the `sources` Article or Story filter. |
 | Discovery label | `value`, optional `type` | A normalized filter value from categories, entities, regions, or sentiments. |
 | Mention | `url`, `platform`, `forum`, `observed_at`, `engagement` | An external observation for a selected Article, not another publisher Article. |
 | Mention engagement | `likes`, `comments`, `audience` | Nullable observed engagement values. Treat absent or null values as unavailable, not zero. |
@@ -437,7 +439,7 @@ curl -s --get "${BASE_URL}/beans/articles/search" \
   --data-urlencode "limit=20"
 ```
 
-`GET /beans/sources/{id}` returns one Source detail envelope. Description, favicon, and RSS metadata are optional display fields; an unavailable field is not an error.
+`GET /beans/sources/{id}` returns one Source detail envelope. Optional source-description, favicon, and source-reference fields can be absent; an unavailable field is not an error.
 
 ## Follow-up calls for coverage and context
 

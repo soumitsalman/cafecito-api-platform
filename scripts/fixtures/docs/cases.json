@@ -77,7 +77,7 @@
       "id": "positioning-drift",
       "check": "positioning",
       "dir": "positioning-drift",
-      "expect": "missing canonical positioning: Espresso is a market, business, event, and news intelligence API"
+      "expect": "missing canonical positioning: Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence."
     },
     {
       "id": "generated-llms",

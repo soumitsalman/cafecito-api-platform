@@ -1,5 +1,6 @@
 import {
   STALE_PUBLIC_PATHS,
+  exists,
   issue,
   readText,
   rel,
@@ -21,6 +22,12 @@ export async function checkTerms(ctx) {
       if (text.includes(stale)) {
         issues.push(issue(check, loc, `stale public path or term: ${stale}`));
       }
+    }
+  }
+  if (ctx.zudokuPath && await exists(ctx.zudokuPath)) {
+    const navigation = await readText(ctx.zudokuPath);
+    if (/file:\s*["'](?:\.\.\/)?legal\//i.test(navigation) || /to:\s*["']\/legal\//i.test(navigation)) {
+      issues.push(issue(check, rel(ctx.root, ctx.zudokuPath), "internal legal directory exposed in portal navigation"));
     }
   }
   return issues;

@@ -1,14 +1,14 @@
 {
   "info": {
     "title": "Beans News API & MCP",
-    "description": "Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. Collections return `{data, pagination, meta}` with `pagination.limit`, `pagination.num_results` (this page only), `pagination.next_cursor`, and `meta.as_of`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Application errors (400, 404, 500) return `{ \"error\": { \"code\", \"message\" } }`. Gateway authentication and rate-limit failures return HTTP 401 and 429 as RFC 7807 Problem Details. Unknown or route-inapplicable query parameters return HTTP 400. `content_type=post` is not a valid request filter and returns HTTP 400; `post` may still appear on Article responses. REST and MCP operations require `Authorization: Bearer <api-key>` except `/beans/health`.",
+    "description": "Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. Coverage varies and does not imply source endorsement, complete coverage, or unrestricted content rights. All Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase. Collections return `{data, pagination, meta}` with `pagination.limit`, `pagination.num_results` (this page only), `pagination.next_cursor`, and `meta.as_of`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Application errors (400, 404, 500) return `{ \"error\": { \"code\", \"message\" } }`. Gateway authentication and rate-limit failures return HTTP 401 and 429 as RFC 7807 Problem Details. Unknown or route-inapplicable query parameters return HTTP 400. `content_type=post` is not a valid request filter and returns HTTP 400; `post` may still appear on Article responses. REST and MCP operations require `Authorization: Bearer <api-key>` except `/beans/health`.",
     "version": "1.0",
     "contact": {
       "name": "Project Cafecito",
       "url": "https://cafecito.tech",
-      "email": "soumitsrah@cafecito.tech"
+      "email": "support@cafecito.tech"
     },
-    "termsOfService": "https://developer.cafecito.tech/company/terms-of-use"
+    "termsOfService": "https://cafecito.tech/docs/terms-of-use/"
   },
   "openapi": "3.1.0",
   "tags": [
@@ -322,7 +322,7 @@
           "type": "boolean",
           "default": false
         },
-        "description": "Request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights. Handle a missing content value, preserve the canonical url, and follow https://developer.cafecito.tech/company/content-rights-policy."
+        "description": "Request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights. Handle a missing content value, preserve the canonical url, and follow https://cafecito.tech/docs/third-party-content-policy/."
       },
       "limit": {
         "name": "limit",
@@ -609,7 +609,7 @@
           },
           "content": {
             "type": "string",
-            "description": "Present only when full_content=true and Beans has body content available. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical url and follow https://developer.cafecito.tech/company/content-rights-policy."
+            "description": "Present only when full_content=true and Beans has body content available. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical url and follow https://cafecito.tech/docs/third-party-content-policy/."
           },
           "language": {
             "type": "string",
@@ -2876,7 +2876,7 @@
       "get": {
         "operationId": "getArticle",
         "summary": "Get an Article",
-        "description": "Returns one Article selected by UUID. Set full_content=true to request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow https://developer.cafecito.tech/company/content-rights-policy.",
+        "description": "Returns one Article selected by UUID. Set full_content=true to request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow https://cafecito.tech/docs/third-party-content-policy/.",
         "tags": [
           "Articles"
         ],

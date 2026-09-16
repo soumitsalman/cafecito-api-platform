@@ -1,15 +1,16 @@
 // @title 			Beans News API & MCP
 // @version 		1.0
-// @description Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
-// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+// @description Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+// @description Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. Beans returns citable Articles, Source metadata, attention-ranked collections, related source material, external Article mentions, and normalized filter discovery. Coverage varies and does not imply source endorsement or unrestricted content rights.
+// @description All Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase.
 // @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
 // @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
 // @description Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
 // @schemes 		https
-// @termsOfService https://developer.cafecito.tech/company/terms-of-use
+// @termsOfService https://cafecito.tech/docs/terms-of-use/
 // @contact.name 	Project Cafecito
 // @contact.url  	https://cafecito.tech
-// @contact.email 	soumitsrah@cafecito.tech
+// @contact.email 	support@cafecito.tech
 // @securityDefinitions.apikey BackendAPIKey
 // @in header
 // @name X-API-KEY

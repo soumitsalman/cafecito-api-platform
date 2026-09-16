@@ -12,7 +12,7 @@ The register must be authoritative for automated source and output decisions. A 
 | Identity | `source_id` | Stable internal source identifier |
 | Identity | `legal_name` | Rights-holder or publisher legal name |
 | Identity | `domains` | Covered domains and subdomain rules |
-| Identity | `feeds` | Covered RSS/Atom/API feed URLs |
+| Identity | `source_references` | Covered public-information source references |
 | Identity | `path_rules` | Included and excluded URL paths |
 | Identity | `jurisdictions` | Relevant source/operator jurisdictions |
 | Scope | `territories` | Territories where rights may be exercised |
@@ -74,7 +74,7 @@ legal_name: Example Publisher, Inc.
 domains:
   - example.com
 feeds:
-  - https://example.com/rss.xml
+  - https://example.com/source-reference
 territories: [US]
 languages: [en]
 products: [beans]
@@ -177,7 +177,7 @@ Before full-display launch, add a stable public object similar to:
     "training_allowed": false,
     "media_included": false,
     "expires_at": "2027-09-10T23:59:59Z",
-    "policy_url": "https://developer.cafecito.tech/company/content-rights-policy"
+    "policy_url": "https://cafecito.tech/docs/third-party-content-policy/"
   }
 }
 ```
@@ -186,7 +186,7 @@ Do not expose private contract terms, agreement IDs, prices, legal analysis, or 
 
 ## Required enforcement tests
 
-- restricted scraped bodies are absent from all REST and MCP routes and formats;
+- restricted third-party bodies are absent from all REST and MCP routes and formats;
 - unknown sources never return content;
 - license expiration cuts off content without deployment;
 - excluded paths and syndicated items override domain permission;
