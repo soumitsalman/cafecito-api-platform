@@ -1003,9 +1003,9 @@ func (b *PGSack) hydrateStories(ctx context.Context, ids []uuid.UUID, languages 
 		) ranked
 		WHERE rn <= 3
 		ORDER BY cluster_id, rn`,
-		CLUSTER_BEAN_COLUMNS_MINIMAL,
-		CLUSTER_BEAN_COLUMNS_MINIMAL,
-		CLUSTER_BEAN_COLUMNS_MINIMAL,
+		BEAN_COLUMNS_MINIMAL,
+		BEAN_COLUMNS_MINIMAL,
+		BEAN_COLUMNS_MINIMAL,
 	)
 	beans, err := utils.FetchAll[Bean](ctx, b.db, top_query, params)
 	if err != nil {

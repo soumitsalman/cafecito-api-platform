@@ -5,12 +5,10 @@
     "version": "1.0",
     "contact": {
       "name": "Project Cafecito",
-      "url": "http://cafecito.tech",
+      "url": "https://cafecito.tech",
       "email": "soumitsrah@cafecito.tech"
     },
-    "license": {
-      "name": "MIT"
-    }
+    "termsOfService": "https://developer.cafecito.tech/company/terms-of-use"
   },
   "openapi": "3.1.0",
   "tags": [
@@ -324,7 +322,7 @@
           "type": "boolean",
           "default": false
         },
-        "description": "Request body content when available. This does not guarantee a full publisher copy for every Article. Handle a missing content value and use the canonical url for attribution."
+        "description": "Request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights. Handle a missing content value, preserve the canonical url, and follow https://developer.cafecito.tech/company/content-rights-policy."
       },
       "limit": {
         "name": "limit",
@@ -611,7 +609,7 @@
           },
           "content": {
             "type": "string",
-            "description": "Present only when full_content=true and Beans has body content available. Not a universal full-text guarantee."
+            "description": "Present only when full_content=true and Beans has body content available. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical url and follow https://developer.cafecito.tech/company/content-rights-policy."
           },
           "language": {
             "type": "string",
@@ -2878,7 +2876,7 @@
       "get": {
         "operationId": "getArticle",
         "summary": "Get an Article",
-        "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
+        "description": "Returns one Article selected by UUID. Set full_content=true to request available body content. Availability is not a grant of republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow https://developer.cafecito.tech/company/content-rights-policy.",
         "tags": [
           "Articles"
         ],

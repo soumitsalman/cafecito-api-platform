@@ -5,12 +5,10 @@
     "title": "Espresso API & MCP",
     "contact": {
       "name": "Project Cafecito",
-      "url": "http://cafecito.tech",
+      "url": "https://cafecito.tech",
       "email": "soumitsrah@cafecito.tech"
     },
-    "license": {
-      "name": "MIT"
-    },
+    "termsOfService": "https://developer.cafecito.tech/company/terms-of-use",
     "version": "0.5"
   },
   "tags": [

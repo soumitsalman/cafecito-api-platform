@@ -27,6 +27,19 @@ type privateUniqueArticleParams struct {
 	Sort string `form:"sort,default=recent" binding:"omitempty,oneof=recent trend relevant"`
 }
 
+// StoryArticlePreviewDocument is a compact Article preview for Story top_articles.
+type privateStoryArticlePreviewDocument struct {
+	StoryArticlePreviewDocument
+	Trend *Trend `json:"trend,omitempty"`
+}
+
+func toPrivateStoryArticlePreview(bean *db.Bean) *privateStoryArticlePreviewDocument {
+	return &privateStoryArticlePreviewDocument{
+		StoryArticlePreviewDocument: toStoryArticlePreview(bean),
+		Trend:                       nullArticleTrendPtr(bean),
+	}
+}
+
 func (params *privateUniqueArticleParams) shouldBind(c *gin.Context) error {
 	if err := bindQuery(c, params); err != nil {
 		return err
@@ -77,7 +90,7 @@ func (params *privateUniqueArticleParams) createPageRequest(c *gin.Context, r *C
 	return page_req, nil
 }
 
-func (r *Configuration) privateListUniqueArticles(c *gin.Context) {
+func (r *Configuration) privateGetUniqueArticles(c *gin.Context) {
 	var params privateUniqueArticleParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
@@ -127,18 +140,16 @@ func (r *Configuration) privateGetStory(c *gin.Context) {
 	writeDetail(c, toStoryDetail(&story))
 }
 
-// privateGetStoryPropagation is the same shape as getStoryArticles: storyArticleParams,
+// privateGetStoryArticles is the same shape as getStoryArticles: storyArticleParams,
 // extractBeanFiltersAndPage, ClusterExists, QueryBeans. It silently drops limit/cursor
 // so the full cluster membership is returned, and selects CLUSTER_BEAN_COLUMNS_MINIMAL.
-func (r *Configuration) privateGetStoryPropagation(c *gin.Context) {
+func (r *Configuration) privateGetStoryArticles(c *gin.Context) {
 	var params storyArticleParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	page_req.Cursor = nil
-	page_req.Limit = 0
 
 	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
 	if err != nil {
@@ -151,14 +162,14 @@ func (r *Configuration) privateGetStoryPropagation(c *gin.Context) {
 		return
 	}
 
-	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.CLUSTER_BEAN_COLUMNS_MINIMAL)
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_MINIMAL_WITH_TREND)
 	if err != nil {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
-	previews := make([]StoryArticlePreviewDocument, 0, len(page_out.Items))
+	previews := make([]privateStoryArticlePreviewDocument, 0, len(page_out.Items))
 	for i := range page_out.Items {
-		previews = append(previews, toStoryArticlePreview(&page_out.Items[i]))
+		previews = append(previews, *toPrivateStoryArticlePreview(&page_out.Items[i]))
 	}
 	writeCollection(c, previews, len(previews), nil)
 }

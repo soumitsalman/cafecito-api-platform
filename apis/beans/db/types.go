@@ -8,23 +8,21 @@ import (
 )
 
 const (
-	_BEAN_COLUMNS_BASE         = "id, url, kind, created, author, image_url, language, categories, sentiments, entities, regions, title, source_id, base_url, domain_name, site_name, cluster_id"
-	_BEAN_COLUMNS_SUMMARY      = "summary"
-	_BEAN_COLUMNS_CONTENT      = "CASE WHEN restricted_content THEN NULL ELSE content END AS content"
-	_BEAN_COLUMNS_TREND        = "likes, comments, mentions, subscribers, related, trend_score"
-	_BEAN_COLUMNS_ALL          = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY + ", " + _BEAN_COLUMNS_CONTENT + ", " + _BEAN_COLUMNS_TREND
-	BEAN_COLUMNS_HEADLINES     = _BEAN_COLUMNS_BASE
-	BEAN_COLUMNS_WITHOUT_TREND = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY
-	BEAN_COLUMNS_WITH_TREND    = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY + ", " + _BEAN_COLUMNS_TREND
+	_BEAN_COLUMNS_BASE              = "id, url, kind, created, author, image_url, language, categories, sentiments, entities, regions, title, source_id, base_url, domain_name, site_name, cluster_id"
+	_BEAN_COLUMNS_SUMMARY           = "summary"
+	_BEAN_COLUMNS_CONTENT           = "CASE WHEN restricted_content THEN NULL ELSE content END AS content"
+	_BEAN_COLUMNS_TREND             = "likes, comments, mentions, subscribers, related, trend_score"
+	_BEAN_COLUMNS_ALL               = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY + ", " + _BEAN_COLUMNS_CONTENT + ", " + _BEAN_COLUMNS_TREND
+	BEAN_COLUMNS_HEADLINES          = _BEAN_COLUMNS_BASE
+	BEAN_COLUMNS_WITHOUT_TREND      = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY
+	BEAN_COLUMNS_WITH_TREND         = _BEAN_COLUMNS_BASE + ", " + _BEAN_COLUMNS_SUMMARY + ", " + _BEAN_COLUMNS_TREND
+	BEAN_COLUMNS_MINIMAL            = "id, url, created, title, source_id, base_url, domain_name, site_name, cluster_id"
+	BEAN_COLUMNS_MINIMAL_WITH_TREND = BEAN_COLUMNS_MINIMAL + ", " + _BEAN_COLUMNS_TREND
 )
 
 const (
 	SOURCE_COLUMNS_BASE = "id, base_url, domain_name, site_name"
 	SOURCE_COLUMNS_ALL  = SOURCE_COLUMNS_BASE + ", description, favicon, rss_feed"
-)
-
-const (
-	CLUSTER_BEAN_COLUMNS_MINIMAL = "id, url, created, title, source_id, base_url, domain_name, site_name, cluster_id"
 )
 
 const (

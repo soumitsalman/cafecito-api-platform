@@ -268,7 +268,7 @@ The route matrix below names the response type for every public path. The follow
 | `content_type` | string enum | One stored Beans content type. |
 | `published_at` | RFC 3339 timestamp | Publisher publication time. |
 | `title`, `summary`, `author`, `image_url` | string or `null` | Available publisher metadata. |
-| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee. Handle a missing value and use `url` for attribution. |
+| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee or a grant of republication rights. Handle a missing value, preserve `url` for attribution, and follow the [Third-Party Content and Attribution Policy](/company/content-rights-policy). |
 | `language` | string or omitted | ISO 639 language code when available. |
 | `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
 | `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |

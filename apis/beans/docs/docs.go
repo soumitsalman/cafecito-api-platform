@@ -9,13 +9,11 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
+        "termsOfService": "https://developer.cafecito.tech/company/terms-of-use",
         "contact": {
             "name": "Project Cafecito",
             "url": "https://cafecito.tech",
             "email": "soumitsrah@cafecito.tech"
-        },
-        "license": {
-            "name": "MIT"
         },
         "version": "{{.Version}}"
     },
@@ -199,7 +197,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -452,7 +450,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -671,7 +669,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -720,7 +718,7 @@ const docTemplate = `{
                         "BackendAPIKey": []
                     }
                 ],
-                "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
+                "description": "Returns one Article selected by UUID. Set full_content=true to request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                 "produces": [
                     "application/json"
                 ],
@@ -741,7 +739,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     }
@@ -1061,7 +1059,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1409,7 +1407,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1606,7 +1604,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1803,7 +1801,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -2577,7 +2575,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },

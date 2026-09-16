@@ -12,6 +12,10 @@
 
 There is **no official SDK**. Integrate with REST (`https://api.cafecito.tech`) or MCP (`/beans/mcp`, `/espresso/mcp`) using a Bearer API key.
 
+## License scope
+
+The [MIT License](LICENSE) applies to source code in this repository. It does not license hosted API output, API data, third-party publisher content, publisher or Cafecito names and marks, or the hosted Services. Use of the Services is governed by the [Terms of Use](https://developer.cafecito.tech/company/terms-of-use), and publisher material remains subject to the [Third-Party Content and Attribution Policy](https://developer.cafecito.tech/company/content-rights-policy) and applicable source rights.
+
 ## Documentation indexes and authority
 
 | Surface | Location | Authority for |

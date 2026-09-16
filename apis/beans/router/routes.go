@@ -6,7 +6,7 @@
 // @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
 // @description Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
 // @schemes 		https
-// @license.name 	MIT
+// @termsOfService https://developer.cafecito.tech/company/terms-of-use
 // @contact.name 	Project Cafecito
 // @contact.url  	https://cafecito.tech
 // @contact.email 	soumitsrah@cafecito.tech
@@ -291,7 +291,7 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower timestamp bound." format(date)
 // @Param to query string false "UTC upper timestamp bound." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -337,7 +337,7 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -383,7 +383,7 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -427,7 +427,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -473,7 +473,7 @@ func (r *Configuration) getLatestNews(c *gin.Context) {
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -523,7 +523,7 @@ func (r *Configuration) getTrendingNews(c *gin.Context) {
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -569,12 +569,12 @@ func extractBeanFiltersAndPage[P beanCollectionParams](r *Configuration, c *gin.
 
 // getArticle godoc
 // @Summary Get an Article
-// @Description Returns one Article selected by UUID. Set full_content=true to request content when available.
+// @Description Returns one Article selected by UUID. Set full_content=true to request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.
 // @Tags Articles
 // @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Article UUID." format(uuid)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Success 200 {object} ArticleDetailResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
@@ -622,7 +622,7 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower timestamp bound." format(date)
 // @Param to query string false "UTC upper timestamp bound." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -978,7 +978,7 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower publication timestamp." format(date)
 // @Param to query string false "UTC upper publication timestamp." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} StoryArticleCollectionResponse "Story Article collection envelope"
@@ -1080,9 +1080,9 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	// They may change without notice.
 	// Exclude these from Swaggo and `beans.oas.json` generation.
 	private := protected.Group("/private")
-	private.GET("/articles/unique", config.privateListUniqueArticles)
+	private.GET("/articles/unique", config.privateGetUniqueArticles)
 	private.GET("/stories/:id", config.privateGetStory)
-	private.GET("/stories/:id/propagation", config.privateGetStoryPropagation)
+	private.GET("/stories/:id/articles", config.privateGetStoryArticles)
 
 	return router
 }

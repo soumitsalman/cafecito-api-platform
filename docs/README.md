@@ -58,8 +58,14 @@ Bug reports and feature requests via GitHub issue templates.
 | Page | File |
 |------|------|
 | About Us | `company/about-us.md` |
-| Privacy Policy | `company/privacy-policy.md` |
 | Terms of Use | `company/terms-of-use.md` |
+| Acceptable Use Policy | `company/acceptable-use-policy.md` |
+| Privacy Policy | `company/privacy-policy.md` |
+| Third-Party Content and Attribution Policy | `company/content-rights-policy.md` |
+| Publisher Requests and Licensing | `company/publisher-requests.md` |
+| Copyright and Rights Complaints Policy | `company/copyright-policy.md` |
+| Corrections and Retractions Policy | `company/corrections-policy.md` |
+| Automated Collection Policy | `company/automated-collection-policy.md` |
 
 ## Local development
 

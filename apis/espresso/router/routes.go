@@ -8,13 +8,13 @@
 // @description       **Filtering**: `tags` use fuzzy text matching. `event_types`, `categories`, `entities`, `impact_levels`, `companies`, `people`, `products`, and `regions` use exact matching after snake_case normalization. `categories` and `event_types` are separate fields. `from` and `to` bound record `created_at`, not occurrence, publication, lifecycle, or forecast time.
 // @description       **Formats**: JSON is canonical. YAML and TOON represent the same public payload in token-optimized forms for MCP and AI-agent context. Public payloads never expose embeddings, relation direction, or internal storage objects.
 // @schemes           https
+// @termsOfService    https://developer.cafecito.tech/company/terms-of-use
+// @contact.name      Project Cafecito
+// @contact.url       https://cafecito.tech
+// @contact.email     soumitsrah@cafecito.tech
 // @securityDefinitions.apikey BackendAPIKey
 // @in header
 // @name X-API-KEY
-// @license.name      MIT
-// @contact.name      Project Cafecito
-// @contact.url       http://cafecito.tech
-// @contact.email     soumitsrah@cafecito.tech
 package router
 
 import (

@@ -1,40 +1,54 @@
 ---
-description: Cafecito Mission and Founders
+description: Cafecito mission, products, founders, and legal operator
 sidebar_label: About Us
 category: "Company & Policies"
 ---
 
-# About Our Mess
+# About Cafecito
 
-**[Project Cafecito](https://cafecito.tech)** is the brainchild of **Soumit Salman Rahman** and **Daniel Oliver Vidaud** — two tech geeks who thought, "Why not make life easier for people who actually work for a living?" We're building AI tools to handle the soul-crushing parts of running a business. We're a bootstrapped outfit — cause VCs can eat it.
+[Project Cafecito](https://cafecito.tech) builds developer-facing media and business-information tools. The product suite focuses on source discovery, publisher coverage, structured events and signals, and API and MCP access for software and agent workflows.
 
-## The Humans Behind This
+## Products
+
+- **Beans** — news and publisher-content API
+- **Espresso** — market and business intelligence API for Events and Signals
+- **Cortado** — future social-media product
+
+## Founders
 
 ### Soumit Salman Rahman
-> [Blog](https://medium.com/@soumitsr) · [LinkedIn](https://www.linkedin.com/in/soumitsrahman/) · [X/Twitter](https://x.com/soumitsrah) 
 
-Soumit's the guy who's built some stuff for Microsoft and Aurora Innovation. Computer engineer, product nerd, AI tinkerer. When he's not shipping code, he's probably over-caffeinated and arguing about distributed systems.
+[Blog](https://medium.com/@soumitsr) · [LinkedIn](https://www.linkedin.com/in/soumitsrahman/) · [X](https://x.com/soumitsrah)
 
 ### Daniel Oliver Vidaud
-> [Blog](https://personalizedtransformations.com/blog/) · [LinkedIn](https://www.linkedin.com/in/dvidaud/) · [X/Twitter](https://x.com/DannyVidaud) 
 
-Daniel's the aerospace nerd who made Boeing planes less chaotic. Pilot, operations strategist, and the kind of person who looks at a broken process and refuses to leave it alone until it works.
+[Blog](https://personalizedtransformations.com/blog/) · [LinkedIn](https://www.linkedin.com/in/dvidaud/) · [X](https://x.com/DannyVidaud)
 
-Together, we're trying to save you from the horrors of paperwork and bad workflows. No promises, but we're giving it a shot.
+## Legal operator
 
-## What We're Building
+Cafecito API products are operated by:
 
-Project Cafecito is a media product suite with real APIs that real developers can actually use:
+**Strategic Implementation Advising, LLC**  
+Project Cafecito  
+7683 SE 27th St. #188  
+Mercer Island, WA 98040  
+United States  
+[soumitsrah@cafecito.tech](mailto:soumitsrah@cafecito.tech)
 
-- **Beans** — news and publisher-content API (live)
-- **Espresso** — market and business intelligence API for Events and Signals (live)
-- **Cortado** — social media management (future; no public API)
+The legal operator should be used on contracts, rights notices, privacy requests, and publisher licenses. Project Cafecito is a product and trade name, not a separate contracting entity.
+
+## Policies and requests
+
+- [Terms of Use](/company/terms-of-use)
+- [Privacy Policy](/company/privacy-policy)
+- [Acceptable Use Policy](/company/acceptable-use-policy)
+- [Third-Party Content and Attribution Policy](/company/content-rights-policy)
+- [Copyright and Rights Complaints Policy](/company/copyright-policy)
+- [Publisher Requests and Licensing](/company/publisher-requests)
+- [Corrections and Retractions Policy](/company/corrections-policy)
+- [Automated Collection Policy](/company/automated-collection-policy)
 
 ## Links
 
-- **Main site:** [https://cafecito.tech](https://cafecito.tech)
-- **Parent Company (Strategic Implementation Advising):** [LinkedIn](https://www.linkedin.com/company/strategic-implementation-advising)
-
-## Yell at Us
-
-Complain, praise, or just say hi — we might even read it. (No guarantees.)
+- [Cafecito website](https://cafecito.tech)
+- [Strategic Implementation Advising on LinkedIn](https://www.linkedin.com/company/strategic-implementation-advising)
