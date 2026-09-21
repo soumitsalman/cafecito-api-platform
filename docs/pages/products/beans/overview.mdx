@@ -13,7 +13,7 @@ import { Button } from "zudoku/ui/Button";
 
 Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
 
-Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. Coverage varies and does not imply source endorsement, complete coverage, or unrestricted content rights.
+Cafecito uses a changing catalog of public-information and publicly available sources/outlets. Coverage, availability, and update timing vary and do not imply source endorsement, complete coverage, or unrestricted content rights.
 
 - **Articles** are publisher items (news, blogs, reports, statements, research, and other stored types).
 - **Sources** are publisher records available on an Article or through the Source routes.
@@ -35,7 +35,7 @@ Cafecito collects data from nearly 15,000 different public-information and publi
 - **Purposeful feeds**: use `latest` for chronology, `top-headlines` for recent attention-ranked news, and `trending` for attention-ranked coverage.
 - **Controlled exploration**: choose Article, Source, and Story UUIDs from collection `data`, then request detail or a subresource only when it answers the next question.
 - **Coverage context**: inspect related publisher reading, Story membership, and external mentions without treating those concepts as interchangeable.
-- **Content on demand**: keep collections compact and request `full_content=true` (Applies to a subset of articles. Full content is not available for all articles).
+- **Content on demand**: keep collections compact and request `full_content=true` only for a selected Article when body content is available. Availability is not a grant of display, redistribution, archival, training, or other downstream rights.
 - **Agent-friendly transport**: JSON is canonical. Cursor pagination, stable UUIDs, explicit envelopes, and small follow-up calls make the API suitable for tool and agent workflows.
 
 ## Choose a route by the user question

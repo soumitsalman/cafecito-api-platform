@@ -1,7 +1,7 @@
 // @title 			Beans News API & MCP
 // @version 		1.0
 // @description Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
-// @description Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. Beans returns citable Articles, Source metadata, attention-ranked collections, related source material, external Article mentions, and normalized filter discovery. Coverage varies and does not imply source endorsement or unrestricted content rights.
+// @description Beans returns citable Articles, Source metadata, attention-ranked collections, related source material, external Article mentions, and normalized filter discovery. Coverage, availability, and update timing vary by source and record; they do not imply source endorsement or unrestricted content rights.
 // @description All Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase.
 // @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
 // @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.

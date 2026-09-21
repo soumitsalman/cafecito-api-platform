@@ -4,7 +4,7 @@
 
 ## Current position
 
-All Cafecito products are currently available as free tier. Cafecito collects data from nearly 15,000 different public-information and publicly available sources/outlets daily. `cafecito.tech` is the canonical public policy source. This directory must remain outside portal navigation, generated Markdown, search, sitemaps, and `llms.txt`.
+All Cafecito products are currently available as free tier. `cafecito.tech` is the canonical public policy source. This directory must remain outside portal navigation, generated Markdown, search, sitemaps, and `llms.txt`.
 
 Public availability, attribution, or API delivery does not establish customer rights to display, redistribute, archive, resell, build datasets from, permanently store for retrieval-augmented generation, or train models on third-party expression.
 
