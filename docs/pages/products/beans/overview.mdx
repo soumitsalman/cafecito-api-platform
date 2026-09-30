@@ -178,6 +178,7 @@ Every REST collection returns `pagination`, `meta`, and `data`. This is a captur
       "regions": null,
       "entities": ["carrington_malin"],
       "sentiments": ["disturbed", "anxious"],
+      "ideology": "center",
       "tags": [
         "artificial_intelligence_and_machine_learning",
         "generative_ai_and_foundation_models",
@@ -220,6 +221,7 @@ Article detail returns the same Article fields plus follow-up links. This captur
     "regions": null,
     "entities": ["carrington_malin"],
     "sentiments": ["disturbed", "anxious"],
+    "ideology": "center",
     "tags": [
       "artificial_intelligence_and_machine_learning",
       "generative_ai_and_foundation_models",
@@ -273,6 +275,7 @@ The route matrix below names the response type for every public path. The follow
 | `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee or a grant of republication rights. Handle a missing value, preserve `url` for attribution, and follow the [Third-Party Content Policy](https://cafecito.tech/docs/third-party-content-policy/). |
 | `language` | string or omitted | ISO 639 language code when available. |
 | `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
+| `ideology` | optional string | Experimental political ideology label. Omitted when unavailable. The value can misrepresent an Article based on geo-cultural context. |
 | `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |
 | `source` | Source object or `null` | Available publisher metadata for this Article. |
 | `trend` | optional Trend object | Available observed attention values on attention-ranked or enriched responses. It is not a forecast and is not guaranteed on every Article. |
@@ -586,6 +589,7 @@ Story-member Articles use the normal Article collection shape with Story-specifi
       "published_at": "2026-08-24T02:00:43Z",
       "title": "UAE AI Programme adds Agentic AI focus",
       "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+      "ideology": "center",
       "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a"
     }
   ]
@@ -615,3 +619,7 @@ MCP clients connect to `https://api.cafecito.tech/beans/mcp` with the same API k
 - [Beans API reference](/api/beans)
 - [MCP & AI agents](/guides/mcp-ai-agents)
 - [Bruno Examples](https://github.com/soumitsalman/cafecito-api-platform) in `apis/beans/bruno/`
+
+## Disclaimer
+
+Article `ideology` is an experimental feature. It indicates a political ideology label and can misrepresent an Article based on geo-cultural context. The field is omitted when no label is available.

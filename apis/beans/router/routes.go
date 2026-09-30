@@ -112,6 +112,7 @@ func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*
 func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFeedParams.createFilters(c, r)
 	filters.IDs = p.IDs
+	filters.ExcludeIDs = p.ExcludeIDs
 	filters.URLs = p.URLs
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
@@ -170,14 +171,6 @@ func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db
 		return nil, err
 	}
 	return &db.ClusterFilters{BeanFilters: *filters, MinBeanCount: p.MinArticleCount}, nil
-}
-
-func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.ClusterID = p.ID
-	filters.CreatedFrom = p.From
-	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
-	return filters, nil
 }
 
 func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
@@ -989,7 +982,7 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @ID listStoryArticles
 // @Router /stories/{id}/articles [get]
 func (r *Configuration) getStoryArticles(c *gin.Context) {
-	var params storyArticleParams
+	var params similarArticlesParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
@@ -1005,6 +998,7 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		return
 	}
+	filters.ClusterID = params.ID
 
 	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
@@ -1082,8 +1076,8 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	// Exclude these from Swaggo and `beans.oas.json` generation.
 	private := protected.Group("/private")
 	private.GET("/articles/unique", config.privateGetUniqueArticles)
-	private.GET("/stories/:id", config.privateGetStory)
-	private.GET("/stories/:id/articles", config.privateGetStoryArticles)
+	// private.GET("/stories/:id", config.privateGetStory)
+	private.GET("/articles/:id/similar", config.privateGetSimilarArticles)
 
 	return router
 }

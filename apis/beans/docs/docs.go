@@ -2692,6 +2692,10 @@ const docTemplate = `{
                     "type": "string",
                     "format": "uuid"
                 },
+                "ideology": {
+                    "description": "Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.",
+                    "type": "string"
+                },
                 "image_url": {
                     "type": "string"
                 },
@@ -2799,6 +2803,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "ideology": {
+                    "description": "Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.",
+                    "type": "string"
                 },
                 "image_url": {
                     "type": "string"

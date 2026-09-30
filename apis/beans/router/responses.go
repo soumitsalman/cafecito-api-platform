@@ -101,24 +101,26 @@ type Trend struct {
 
 // ArticleDocument is the normalized public Article payload.
 type ArticleDocument struct {
-	ID         uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
-	URL        string          `json:"url"`
-	Kind       string          `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
-	Created    time.Time       `json:"published_at" swaggertype:"string" format:"date-time"`
-	Author     *string         `json:"author"`
-	ImageURL   *string         `json:"image_url"`
-	Title      *string         `json:"title"`
-	Summary    *string         `json:"summary"`
-	Content    *string         `json:"content,omitempty"`
-	Language   *string         `json:"language,omitempty"`
-	Categories []string        `json:"categories"`
-	Regions    []string        `json:"regions"`
-	Entities   []string        `json:"entities"`
-	Sentiments []string        `json:"sentiments"`
-	Tags       []string        `json:"tags"`
-	StoryID    uuid.UUID       `json:"story_id,omitzero" swaggertype:"string" format:"uuid"`
-	Source     *SourceDocument `json:"source"`
-	Trend      *Trend          `json:"trend,omitempty"`
+	ID         uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
+	URL        string    `json:"url"`
+	Kind       string    `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
+	Created    time.Time `json:"published_at" swaggertype:"string" format:"date-time"`
+	Author     *string   `json:"author"`
+	ImageURL   *string   `json:"image_url"`
+	Title      *string   `json:"title"`
+	Summary    *string   `json:"summary"`
+	Content    *string   `json:"content,omitempty"`
+	Language   *string   `json:"language,omitempty"`
+	Categories []string  `json:"categories"`
+	Regions    []string  `json:"regions"`
+	Entities   []string  `json:"entities"`
+	Sentiments []string  `json:"sentiments"`
+	// Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.
+	Ideology string          `json:"ideology,omitempty"`
+	Tags     []string        `json:"tags"`
+	StoryID  uuid.UUID       `json:"story_id,omitzero" swaggertype:"string" format:"uuid"`
+	Source   *SourceDocument `json:"source"`
+	Trend    *Trend          `json:"trend,omitempty"`
 }
 
 func toArticleDocument(bean *db.Bean) *ArticleDocument {
@@ -133,6 +135,7 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 		Sentiments: bean.Sentiments,
 		Regions:    bean.Regions,
 		Entities:   bean.Entities,
+		Ideology:   bean.Ideology.String,
 		Tags:       concatArrays(bean.Categories, bean.Regions, bean.Entities),
 		Title:      nullStringPtr(bean.Title),
 		Summary:    nullStringPtr(bean.Summary),

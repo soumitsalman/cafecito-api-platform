@@ -69,6 +69,7 @@ examples:
                 "regions": [],
                 "entities": [],
                 "sentiments": [],
+                "ideology": "",
                 "tags": [
                   "technology"
                 ],

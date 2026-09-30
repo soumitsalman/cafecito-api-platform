@@ -651,6 +651,11 @@
               "type": "string"
             }
           },
+          "ideology": {
+            "type": "string",
+            "description": "Experimental political ideology label. Omitted when unavailable. The value can misrepresent an Article based on geo-cultural context.",
+            "example": "center"
+          },
           "tags": {
             "type": [
               "array",
@@ -1704,6 +1709,7 @@
                             "contemplative",
                             "observant"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "internet_culture_and_social_media",
                             "elections_and_voting",
@@ -1871,6 +1877,7 @@
                             "disturbed",
                             "anxious"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "artificial_intelligence_and_machine_learning",
                             "generative_ai_and_foundation_models",
@@ -2038,6 +2045,7 @@
                             "contemplative",
                             "observant"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "internet_culture_and_social_media",
                             "elections_and_voting",
@@ -2216,6 +2224,7 @@
                             "disturbed",
                             "anxious"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "artificial_intelligence_and_machine_learning",
                             "generative_ai_and_foundation_models",
@@ -2385,6 +2394,7 @@
                             "frustrated",
                             "doubtful"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "Video Games and Game Development",
                             "Interactive Entertainment and Streaming",
@@ -2574,6 +2584,7 @@
                             "disturbed",
                             "anxious"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "artificial_intelligence_and_machine_learning",
                             "generative_ai_and_foundation_models",
@@ -2921,6 +2932,7 @@
                           "disturbed",
                           "anxious"
                         ],
+                        "ideology": "center",
                         "tags": [
                           "artificial_intelligence_and_machine_learning",
                           "generative_ai_and_foundation_models",
@@ -3936,6 +3948,7 @@
                             "disturbed",
                             "anxious"
                           ],
+                          "ideology": "center",
                           "tags": [
                             "artificial_intelligence_and_machine_learning",
                             "generative_ai_and_foundation_models",

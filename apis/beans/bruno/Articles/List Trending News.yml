@@ -52,6 +52,7 @@ examples:
                 "published_at": "",
                 "regions": [],
                 "sentiments": [],
+                "ideology": "",
                 "source": {
                   "description": "",
                   "domain": "",
