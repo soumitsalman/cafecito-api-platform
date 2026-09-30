@@ -44,5 +44,8 @@ Maintained executable examples for the Espresso REST contract. This collection i
 | Discover exact Event entity filters | GET /entities | listIntelligenceEntities |
 | Discover exact Event region filters | GET /regions | listIntelligenceRegions |
 | Discover exact Event type filters | GET /event-types | listIntelligenceEventTypes |
+| Get derived Signal confidence | GET /private/confidence | Internal only |
+
+The `Private` folder calls internal backend paths under `/private`. Those routes are not in the public OpenAPI, generated Swagger, or portal docs.
 
 Do not add Beans requests to this folder.

@@ -1,0 +1,126 @@
+info:
+  name: Get derived Signal confidence
+  type: http
+  seq: 1
+  tags:
+    - Private
+
+http:
+  method: GET
+  url: "{{baseUrl}}/private/confidence?ids=7a8e9e71-c5c0-56f2-bd34-989e1c03fd27&ids=cd04fe3d-5732-563f-b7ca-d7f2ef4ce887"
+  params:
+    - name: ids
+      value: 7a8e9e71-c5c0-56f2-bd34-989e1c03fd27
+      type: query
+    - name: ids
+      value: cd04fe3d-5732-563f-b7ca-d7f2ef4ce887
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/private/confidence"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": "7a8e9e71-c5c0-56f2-bd34-989e1c03fd27",
+                "confidence": "high"
+              },
+              {
+                "id": "cd04fe3d-5732-563f-b7ca-d7f2ef4ce887",
+                "confidence": null
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 2,
+              "next_cursor": null,
+              "num_results": 2
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/private/confidence"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "invalid_request",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/private/confidence"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unauthorized",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/private/confidence"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "db_error",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Internal only. Not part of the public API.
+  Returns one row per requested ID, in request order. `confidence` is taken from the newest Signal derived from that ID.
+  `confidence` is null when that Signal has no confidence value, or when no Signal is derived from the ID.
+  `ids` is a required CSV of UUIDs, at most 128. The list is not cursor-paged: `pagination.next_cursor` is null and `limit` equals the number of requested IDs.

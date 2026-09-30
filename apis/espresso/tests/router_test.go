@@ -1010,3 +1010,92 @@ func TestRouterDiscoveryRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestRouterPrivateConfidence(t *testing.T) {
+	srv := newTestHTTPServer(t)
+
+	status, body := routerGET(t, srv.URL, "/private/confidence", nil, "")
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+
+	status, body = routerGET(t, srv.URL, "/private/confidence", url.Values{"ids": {"not-a-uuid"}}, "")
+	requireStatus(t, http.StatusBadRequest, status, body)
+	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
+
+	const fixture_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01"
+	status, body = routerGET(t, srv.URL, "/events/"+fixture_id, nil, "")
+	if status == http.StatusNotFound {
+		assertPrivateConfidenceForLiveEvent(t, srv.URL)
+		return
+	}
+	requireStatus(t, http.StatusOK, status, body)
+
+	unknown_id := uuid.NewString()
+	status, body = routerGET(t, srv.URL, "/private/confidence", url.Values{
+		"ids": {fixture_id + "," + unknown_id},
+	}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	items := parseConfidenceCollection(t, body)
+	require.Len(t, items, 2)
+	assert.Equal(t, fixture_id, items[0]["id"])
+	assert.Nil(t, items[0]["confidence"])
+	assert.Equal(t, unknown_id, items[1]["id"])
+	assert.Nil(t, items[1]["confidence"])
+}
+
+func assertPrivateConfidenceForLiveEvent(t *testing.T, base string) {
+	t.Helper()
+	status, body := routerGET(t, base, ROUTE_SIGNALS, url.Values{"limit": {"1"}}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	signals := parseDigestArray(t, body)
+	if len(signals) == 0 {
+		t.Skip("no signals available to exercise private confidence")
+	}
+	signal_id, ok := signals[0]["id"].(string)
+	require.True(t, ok)
+
+	status, body = routerGET(t, base, ROUTE_SIGNALS+"/"+signal_id+"/events", url.Values{"limit": {"1"}}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	events := parseDigestArray(t, body)
+	if len(events) == 0 {
+		t.Skip("signal has no supporting events")
+	}
+	event_id, ok := events[0]["id"].(string)
+	require.True(t, ok)
+
+	status, body = routerGET(t, base, ROUTE_EVENTS+"/"+event_id+"/signals", url.Values{"limit": {"100"}}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	derived := parseDigestArray(t, body)
+	require.NotEmpty(t, derived)
+
+	unknown_id := uuid.NewString()
+	status, body = routerGET(t, base, "/private/confidence", url.Values{
+		"ids": {event_id + "," + unknown_id},
+	}, "")
+	requireStatus(t, http.StatusOK, status, body)
+	items := parseConfidenceCollection(t, body)
+	require.Len(t, items, 2)
+	assert.Equal(t, event_id, items[0]["id"])
+	confidence, present := items[0]["confidence"]
+	require.True(t, present, "confidence field must be present")
+	if confidence != nil {
+		_, is_string := confidence.(string)
+		assert.True(t, is_string, "confidence must be a string or null")
+	}
+	assert.Equal(t, unknown_id, items[1]["id"])
+	assert.Nil(t, items[1]["confidence"])
+}
+
+func parseConfidenceCollection(t *testing.T, body []byte) []map[string]any {
+	t.Helper()
+	var env pageEnvelope[map[string]any]
+	require.NoError(t, json.Unmarshal(body, &env))
+	require.Equal(t, float64(len(env.Data)), env.Pagination["limit"])
+	require.Contains(t, env.Pagination, "next_cursor")
+	assert.Nil(t, env.Pagination["next_cursor"])
+	as_of, ok := env.Meta["as_of"].(string)
+	require.True(t, ok, "collection response is missing meta.as_of")
+	_, err := time.Parse(time.RFC3339Nano, as_of)
+	require.NoError(t, err)
+	return env.Data
+}

@@ -671,7 +671,10 @@ CREATE UNIQUE INDEX idx_trend_aggregates_id ON public.trend_aggregates USING btr
 
 ## Documentation dependency map
 
-Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately
+Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately.
+
+`/private` routes are internal for Beans and Espresso. Do not add Swagger comments, generated Swagger entries, `../config/<product>.oas.json` paths, portal pages, or MCP tools for them. A `/private` change does not follow the public-route steps below or the public API Definition of Done.
+
 For any update in public routes, params and responses
 1. Update Swagger annotations in `apis/<product>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`. Always include request, response and error type definiton for each route.
 2. Update api gateway definitions `../config/<product>.oas.json`'

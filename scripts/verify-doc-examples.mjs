@@ -148,7 +148,7 @@ export async function checkExamples(ctx) {
       const { method, url } = brunoMethodUrl(yaml);
       if (!method || !url) continue;
       let path = gatewayPathFromBruno(url, prefix);
-      if (SKIP_PATHS.has(path)) continue;
+      if (SKIP_PATHS.has(path) || path.includes("/private/")) continue;
       const op = findOperation(ops, method, path);
       if (!op) {
         issues.push(issue(check, loc, `Bruno ${method} ${path} is not in gateway OpenAPI`));
