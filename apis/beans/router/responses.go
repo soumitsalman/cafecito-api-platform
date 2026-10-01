@@ -322,8 +322,8 @@ func concatArrays(arrays ...[]string) []string {
 	return result
 }
 
-// StoryArticlePreviewDocument is a compact Article preview for Story top_articles.
-type StoryArticlePreviewDocument struct {
+// ArticlePreviewDocument is a compact Article preview for Story top_articles.
+type ArticlePreviewDocument struct {
 	ID          uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
 	URL         string          `json:"url"`
 	Title       string          `json:"title"`
@@ -331,8 +331,8 @@ type StoryArticlePreviewDocument struct {
 	Source      *SourceDocument `json:"source"`
 }
 
-func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
-	return StoryArticlePreviewDocument{
+func toArticlePreview(bean *db.Bean) ArticlePreviewDocument {
+	return ArticlePreviewDocument{
 		ID:          bean.ID,
 		URL:         bean.URL,
 		Title:       bean.Title.String,
@@ -343,18 +343,18 @@ func toStoryArticlePreview(bean *db.Bean) StoryArticlePreviewDocument {
 
 // StoryDocument is the canonical Story payload for B09 and B10.
 type StoryDocument struct {
-	ID               uuid.UUID                     `json:"id"`
-	Title            string                        `json:"title"`
-	Summary          string                        `json:"summary,omitempty"`
-	FirstPublishedAt time.Time                     `json:"first_published_at" swaggertype:"string" format:"date-time"`
-	LastPublishedAt  time.Time                     `json:"last_published_at" swaggertype:"string" format:"date-time"`
-	ArticleCount     int                           `json:"article_count"`
-	SourceCount      int                           `json:"source_count"`
-	Categories       []string                      `json:"categories"`
-	Regions          []string                      `json:"regions"`
-	Entities         []string                      `json:"entities"`
-	Tags             []string                      `json:"tags"`
-	TopArticles      []StoryArticlePreviewDocument `json:"top_articles"`
+	ID               uuid.UUID                `json:"id"`
+	Title            string                   `json:"title"`
+	Summary          string                   `json:"summary,omitempty"`
+	FirstPublishedAt time.Time                `json:"first_published_at" swaggertype:"string" format:"date-time"`
+	LastPublishedAt  time.Time                `json:"last_published_at" swaggertype:"string" format:"date-time"`
+	ArticleCount     int                      `json:"article_count"`
+	SourceCount      int                      `json:"source_count"`
+	Categories       []string                 `json:"categories"`
+	Regions          []string                 `json:"regions"`
+	Entities         []string                 `json:"entities"`
+	Tags             []string                 `json:"tags"`
+	TopArticles      []ArticlePreviewDocument `json:"top_articles"`
 }
 
 // StoryLinks contains sub-resource links for B10 Story detail.
@@ -363,11 +363,11 @@ type StoryLinks struct {
 }
 
 func toStoryDocument(story *db.Cluster) StoryDocument {
-	previews := datautils.Transform(story.TopArticles, func(bean *db.Bean) StoryArticlePreviewDocument {
-		return toStoryArticlePreview(bean)
+	previews := datautils.Transform(story.TopArticles, func(bean *db.Bean) ArticlePreviewDocument {
+		return toArticlePreview(bean)
 	})
 	if previews == nil {
-		previews = []StoryArticlePreviewDocument{}
+		previews = []ArticlePreviewDocument{}
 	}
 	return StoryDocument{
 		ID:               story.ID,

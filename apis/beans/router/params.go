@@ -102,8 +102,8 @@ func requireScoreThresholdNeedsQ(c *gin.Context, q string) error {
 
 // articleScopeParams is the Article filter set shared by feeds and search, excluding content_type.
 type articleScopeParams struct {
-	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
-	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
+	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
+	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	Domains           []string    `form:"domains" collection_format:"csv" binding:"max=100"`
 	ExcludeDomains    []string    `form:"exclude_domains" collection_format:"csv" binding:"max=100"`
 	Authors           []string    `form:"authors" collection_format:"csv" binding:"max=100"`

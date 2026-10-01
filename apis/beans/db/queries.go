@@ -93,7 +93,7 @@ func buildScalarWhere(filters *BeanFilters) ([]string, pgx.NamedArgs) {
 		params["urls"] = filters.URLs
 	}
 	if len(filters.Sources) > 0 {
-		where = append(where, "source_id = ANY(@sources)")
+		where = append(where, "source_id = ANY(@source_ids)")
 		params["source_ids"] = filters.Sources
 	}
 	if len(filters.ExcludeSources) > 0 {
@@ -160,14 +160,18 @@ func buildScalarWhere(filters *BeanFilters) ([]string, pgx.NamedArgs) {
 		params["sentiments"] = filters.Sentiments
 	}
 	if len(filters.Languages) > 0 {
-		lang_parts := make([]string, len(filters.Languages))
-		for i, lang := range filters.Languages {
-			param_key := fmt.Sprintf("language_%d", i)
-			params[param_key] = lang
-			lang_parts[i] = fmt.Sprintf("STARTS_WITH(language, @%s)", param_key)
-		}
-		where = append(where, "("+strings.Join(lang_parts, " OR ")+")")
+		where = append(where, "language = ANY(@languages)")
+		params["languages"] = filters.Languages
 	}
+	// if len(filters.Languages) > 0 {
+	// 	lang_parts := make([]string, len(filters.Languages))
+	// 	for i, lang := range filters.Languages {
+	// 		param_key := fmt.Sprintf("language_%d", i)
+	// 		params[param_key] = lang
+	// 		lang_parts[i] = fmt.Sprintf("STARTS_WITH(language, @%s)", param_key)
+	// 	}
+	// 	where = append(where, "("+strings.Join(lang_parts, " OR ")+")")
+	// }
 	if filters.ClusterID != uuid.Nil {
 		where = append(where, "cluster_id = @cluster_id")
 		params["cluster_id"] = filters.ClusterID

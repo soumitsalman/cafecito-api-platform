@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/articles/latest?tags=startups&domains=substack&full_content=true&languages=en,es"
+  url: "{{baseUrl}}/articles/latest?tags=startups&languages=en,es&sources=286d582d-d880-52b5-b2bf-acead419271a"
   params:
     - name: tags
       value: startups
@@ -15,11 +15,16 @@ http:
     - name: domains
       value: substack
       type: query
+      disabled: true
     - name: full_content
       value: "true"
       type: query
+      disabled: true
     - name: languages
       value: en,es
+      type: query
+    - name: sources
+      value: 286d582d-d880-52b5-b2bf-acead419271a
       type: query
   auth: inherit
 
@@ -28,7 +33,6 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-  forwardAuthorizationHeader: false
 
 examples:
   - name: 200 Response

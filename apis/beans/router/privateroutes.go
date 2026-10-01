@@ -29,15 +29,15 @@ type privateUniqueArticleParams struct {
 }
 
 // StoryArticlePreviewDocument is a compact Article preview for Story top_articles.
-type privateStoryArticlePreviewDocument struct {
-	StoryArticlePreviewDocument
+type privateArticlePreviewDocument struct {
+	ArticlePreviewDocument
 	Trend *Trend `json:"trend,omitempty"`
 }
 
-func toPrivateStoryArticlePreview(bean *db.Bean) *privateStoryArticlePreviewDocument {
-	return &privateStoryArticlePreviewDocument{
-		StoryArticlePreviewDocument: toStoryArticlePreview(bean),
-		Trend:                       nullArticleTrendPtr(bean),
+func toPrivateArticlePreview(bean *db.Bean) *privateArticlePreviewDocument {
+	return &privateArticlePreviewDocument{
+		ArticlePreviewDocument: toArticlePreview(bean),
+		Trend:                  nullArticleTrendPtr(bean),
 	}
 }
 
@@ -161,8 +161,8 @@ func (r *Configuration) privateGetSimilarArticles(c *gin.Context) {
 		}
 		return
 	}
-	previews := datautils.Transform(page_out.Items, func(item *db.Bean) privateStoryArticlePreviewDocument {
-		return *toPrivateStoryArticlePreview(item)
+	previews := datautils.Transform(page_out.Items, func(item *db.Bean) privateArticlePreviewDocument {
+		return *toPrivateArticlePreview(item)
 	})
 	writeCollection(c, previews, page_req.Limit, page_out.NextCursor)
 }
