@@ -166,3 +166,32 @@ func (r *Configuration) privateGetSimilarArticles(c *gin.Context) {
 	})
 	writeCollection(c, previews, page_req.Limit, page_out.NextCursor)
 }
+
+// privateGetStoryArticles returns articles for a story cluster.
+// this is basically the same as getStoryArticles, but with less columns.
+func (r *Configuration) privateGetStoryArticles(c *gin.Context) {
+	var params similarArticlesParams
+	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
+	if err != nil {
+		utils.LogError(err, "[ERROR] ClusterExists")
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	if !exists {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
+		return
+	}
+	filters.ClusterID = params.ID
+
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_MINIMAL)
+	if err != nil {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		return
+	}
+	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.ID)
+}

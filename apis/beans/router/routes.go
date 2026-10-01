@@ -1076,8 +1076,9 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	// Exclude these from Swaggo and `beans.oas.json` generation.
 	private := protected.Group("/private")
 	private.GET("/articles/unique", config.privateGetUniqueArticles)
-	// private.GET("/stories/:id", config.privateGetStory)
 	private.GET("/articles/:id/similar", config.privateGetSimilarArticles)
+	// private.GET("/stories/:id", config.privateGetStory)
+	private.GET("/stories/:id/articles", config.privateGetStoryArticles)
 
 	return router
 }
