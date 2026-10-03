@@ -452,10 +452,10 @@ func (b *PGSack) QueryUniqueBeans(ctx context.Context, filters BeanFilters, page
 	}
 	page.Cursor.Sort = sort
 
-	table := "latest_beans_view"
-	if sort == SORT_TRENDING {
-		table = "trending_beans_view"
-	}
+	table := "trending_beans_view"
+	// if sort == SORT_TRENDING {
+	// 	table = "trending_beans_view"
+	// }
 	query, params := buildUniqueBeanQuery(table, &filters, &page, sort, columns)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
 	if err != nil {
