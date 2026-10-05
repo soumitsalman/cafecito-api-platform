@@ -71,6 +71,9 @@ func (params *privateUniqueArticleParams) createFilters(c *gin.Context, r *Confi
 	if err != nil {
 		return nil, err
 	}
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		return nil, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED)
+	}
 	// sort=trend scopes observed attention metrics to the same from/to window.
 	if params.dbSort() == db.SORT_TRENDING {
 		filters.ObservedFrom = params.From
@@ -100,7 +103,6 @@ func (r *Configuration) privateGetUniqueArticles(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryUniqueBeans(c.Request.Context(), *filters, *page_req, params.dbSort(), db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryUniqueBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}

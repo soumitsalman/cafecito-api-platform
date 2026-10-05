@@ -365,28 +365,44 @@ func (b *PGSack) QueryBeans(ctx context.Context, filters BeanFilters, page PageR
 //
 // table: latest_beans_view (recent/relevant) or trending_beans_view (trend).
 // sort: SORT_RECENT, SORT_TRENDING, or SORT_RELEVANT.
+//
+// An embedding assumes filters.Distance is already the cosine cutoff and always
+// applies it. recent and trend put that predicate on the candidate scan, before
+// LIMIT, matching buildScalarOrderQuery. relevant leaves the candidate scan as a
+// nearest-neighbor window and puts the cutoff on the final SELECT with the page
+// LIMIT, matching buildKNNSearchQuery. unique_candidates only deduplicates.
 func buildUniqueBeanQuery(table string, filters *BeanFilters, page *PageRequest, sort string, select_columns string) (string, pgx.NamedArgs) {
 	where, params := buildScalarWhere(filters)
+	has_embedding := len(filters.Embedding) > 0
+	if has_embedding {
+		params["embedding"] = pgvector.NewVector(filters.Embedding)
+		params["distance"] = filters.Distance
+	}
 
 	order_expr := ""
-	has_distance := false
+	candidate_distance := ""
+	outer_distance := ""
+	outer_where_expr := ""
 
 	switch sort {
 	case SORT_TRENDING:
 		order_expr = "trend_score DESC, id DESC"
+		if has_embedding {
+			where = append(where, "embedding <=> @embedding <= @distance")
+		}
 		if page.Cursor != nil && page.Cursor.ID != nil && page.Cursor.TrendScore != nil {
 			where = append(where, "(trend_score, id) < (@cursor_value, @cursor_id)")
 			params["cursor_value"] = *page.Cursor.TrendScore
 			params["cursor_id"] = *page.Cursor.ID
 		}
 	case SORT_RELEVANT:
-		has_distance = true
+		// id keeps the candidate window aligned with the (distance, id) cursor.
 		order_expr = "distance ASC, id ASC"
+		candidate_distance = ", embedding <=> @embedding AS distance"
+		outer_distance = ", distance"
 		params["embedding"] = pgvector.NewVector(filters.Embedding)
-		// embedding distance filter only when a threshold is set
-		if filters.Distance > 0 {
-			where = append(where, "embedding <=> @embedding <= @distance")
-			params["distance"] = filters.Distance
+		if has_embedding {
+			outer_where_expr = "WHERE distance <= @distance"
 		}
 		if page.Cursor != nil && page.Cursor.ID != nil && page.Cursor.Distance != nil {
 			where = append(where, "(embedding <=> @embedding, id) > (@cursor_distance, @cursor_id)")
@@ -395,6 +411,9 @@ func buildUniqueBeanQuery(table string, filters *BeanFilters, page *PageRequest,
 		}
 	default: // SORT_RECENT
 		order_expr = "created DESC, id DESC"
+		if has_embedding {
+			where = append(where, "embedding <=> @embedding <= @distance")
+		}
 		if page.Cursor != nil && page.Cursor.ID != nil && page.Cursor.Created != nil {
 			where = append(where, "(created, id) < (@cursor_value, @cursor_id)")
 			params["cursor_value"] = *page.Cursor.Created
@@ -405,11 +424,6 @@ func buildUniqueBeanQuery(table string, filters *BeanFilters, page *PageRequest,
 	where_expr := ""
 	if len(where) > 0 {
 		where_expr = "WHERE " + strings.Join(where, " AND ")
-	}
-
-	distance_select := ""
-	if has_distance {
-		distance_select = ", embedding <=> @embedding AS distance"
 	}
 
 	params["candidate_limit"] = searchCandidateLimit(page.Limit)
@@ -429,15 +443,17 @@ func buildUniqueBeanQuery(table string, filters *BeanFilters, page *PageRequest,
 			ORDER BY COALESCE(cluster_id, id), %s
 		)
 		SELECT %s%s FROM unique_candidates
+		%s
 		ORDER BY %s
 		LIMIT @limit`,
-		distance_select,
+		candidate_distance,
 		table,
 		where_expr,
 		order_expr,
 		order_expr,
 		buildSelect(select_columns, filters.FullContent),
-		distance_select,
+		outer_distance,
+		outer_where_expr,
 		order_expr,
 	)
 	return query, params
@@ -453,9 +469,6 @@ func (b *PGSack) QueryUniqueBeans(ctx context.Context, filters BeanFilters, page
 	page.Cursor.Sort = sort
 
 	table := "trending_beans_view"
-	// if sort == SORT_TRENDING {
-	// 	table = "trending_beans_view"
-	// }
 	query, params := buildUniqueBeanQuery(table, &filters, &page, sort, columns)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
 	if err != nil {

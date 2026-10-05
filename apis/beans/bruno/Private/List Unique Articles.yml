@@ -7,17 +7,25 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/private/articles/unique?sort=recent&limit=20"
+  url: "{{baseUrl}}/private/articles/unique?sort=recent&q=climate+issues+negotiation&limit=20&content_type=news&score_threshold=0.5&from=2026-09-25"
   params:
     - name: sort
       value: recent
       type: query
     - name: q
-      value: ""
+      value: climate+issues+negotiation
       type: query
-      disabled: true
     - name: limit
       value: "20"
+      type: query
+    - name: content_type
+      value: news
+      type: query
+    - name: score_threshold
+      value: "0.5"
+      type: query
+    - name: from
+      value: 2026-09-25
       type: query
     - name: languages
       value: en,es

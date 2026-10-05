@@ -47,16 +47,18 @@ const (
 )
 
 const (
-	API_ERROR_MSG_OUR_BAD            = "Our bad. Please try again later."
-	API_ERROR_MSG_SOURCE_NOT_FOUND   = "Source not found."
-	API_ERROR_MSG_TAG_NOT_FOUND      = "Tag not found."
-	API_ERROR_MSG_ENTITY_NOT_FOUND   = "Entity not found."
-	API_ERROR_MSG_REGION_NOT_FOUND   = "Region not found."
-	API_ERROR_MSG_CATEGORY_NOT_FOUND = "Category not found."
-	API_ERROR_MSG_COMPANY_NOT_FOUND  = "Company not found."
-	API_ERROR_MSG_PRODUCT_NOT_FOUND  = "Product not found."
-	API_ERROR_MSG_ARTICLE_NOT_FOUND  = "Article not found."
-	API_ERROR_MSG_STORY_NOT_FOUND    = "Story not found."
+	API_ERROR_MSG_OUR_BAD                     = "Our bad. Please try again later."
+	API_ERROR_MSG_SOURCE_NOT_FOUND            = "Source not found."
+	API_ERROR_MSG_TAG_NOT_FOUND               = "Tag not found."
+	API_ERROR_MSG_ENTITY_NOT_FOUND            = "Entity not found."
+	API_ERROR_MSG_REGION_NOT_FOUND            = "Region not found."
+	API_ERROR_MSG_CATEGORY_NOT_FOUND          = "Category not found."
+	API_ERROR_MSG_COMPANY_NOT_FOUND           = "Company not found."
+	API_ERROR_MSG_PRODUCT_NOT_FOUND           = "Product not found."
+	API_ERROR_MSG_ARTICLE_NOT_FOUND           = "Article not found."
+	API_ERROR_MSG_STORY_NOT_FOUND             = "Story not found."
+	API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED    = "score_threshold>0 is required when q is provided."
+	API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER = "Unknown or unsupported query parameter: "
 )
 
 type Configuration struct {
@@ -346,10 +348,12 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
 	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -392,9 +396,12 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -430,21 +437,14 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @ID getLatestNews
 // @Router /news/latest [get]
 func (r *Configuration) getLatestNews(c *gin.Context) {
-	var params topHeadlinesParams
-	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
-	if err != nil {
-		writeError(c, err)
+	if _, present := c.GetQuery("content_type"); present {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER+"content_type"))
 		return
 	}
-	filters.Kind = "news"
-
-	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
-	if err != nil {
-		utils.LogError(err, "[ERROR] QueryBeans")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+	q := c.Request.URL.Query()
+	q.Set("content_type", "news")
+	c.Request.URL.RawQuery = q.Encode()
+	r.getLatestArticles(c)
 }
 
 // getTrendingNews godoc
@@ -476,21 +476,14 @@ func (r *Configuration) getLatestNews(c *gin.Context) {
 // @ID getTrendingNews
 // @Router /news/trending [get]
 func (r *Configuration) getTrendingNews(c *gin.Context) {
-	var params topHeadlinesParams
-	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
-	if err != nil {
-		writeError(c, err)
+	if _, present := c.GetQuery("content_type"); present {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER+"content_type"))
 		return
 	}
-	filters.Kind = "news"
-
-	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
-	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+	q := c.Request.URL.Query()
+	q.Set("content_type", "news")
+	c.Request.URL.RawQuery = q.Encode()
+	r.getTrendingArticles(c)
 }
 
 // getTopHeadlines is the B04 GET /news/top-headlines target scaffold.
@@ -532,13 +525,16 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
 	filters.CreatedFrom = time.Now().AddDate(0, 0, -2)
 	filters.ObservedFrom = time.Now().AddDate(0, 0, -1)
 	filters.Kind = "news"
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -583,7 +579,6 @@ func (r *Configuration) getArticle(c *gin.Context) {
 	}
 	bean, err := r.DB.GetBean(c.Request.Context(), params.ID, params.FullContent)
 	if err != nil {
-		utils.LogError(err, "[ERROR] GetBean")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -635,7 +630,6 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QuerySimilarBeans")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -683,7 +677,6 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryMentions")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -728,7 +721,6 @@ func (r *Configuration) getSources(c *gin.Context) {
 	}
 	page_out, err := r.DB.QuerySources(c.Request.Context(), *filters, *page_req, db.SOURCE_COLUMNS_BASE)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QuerySources")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -854,7 +846,6 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 
 	page_out, err := r.DB.QueryTags(c.Request.Context(), strings.ToLower(strings.TrimSpace(params.Q)), db_tag_type, *page)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTags")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -911,7 +902,6 @@ func (r *Configuration) getStories(c *gin.Context) {
 
 	page_out, err := r.DB.QueryClusters(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryClusters")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -939,7 +929,6 @@ func (r *Configuration) getStory(c *gin.Context) {
 	}
 	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
 	if err != nil {
-		utils.LogError(err, "[ERROR] GetCluster")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		} else {
@@ -990,7 +979,6 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 	}
 	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
 	if err != nil {
-		utils.LogError(err, "[ERROR] ClusterExists")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
