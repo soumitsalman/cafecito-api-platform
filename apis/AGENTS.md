@@ -415,6 +415,7 @@ CREATE TABLE public.beans (
     id uuid NOT NULL,
     url character varying NOT NULL,
     kind character varying,
+    language character varying,
     title character varying,
     author character varying,
     image_url character varying,
@@ -448,40 +449,6 @@ CREATE TABLE public.publishers (
     rss_feed character varying,
     collected timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
-
-
---
--- Name: beans_sources_view; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.beans_sources_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    p.domain_name,
-    p.site_name,
-    p.description,
-    p.favicon,
-    p.rss_feed
-   FROM (public.beans b
-     LEFT JOIN public.publishers p ON ((b.source_id = p.id)));
-
 
 --
 -- Name: chatters; Type: TABLE; Schema: public; Owner: -
@@ -632,87 +599,30 @@ CREATE MATERIALIZED VIEW public.trend_aggregates AS
   WHERE (GREATEST(likes, comments, mentions, related) > 0)
   WITH NO DATA;
 
+-- PRIMARY DIFF: between latest vs trending
+-- trending requires some chatter or related items. Hence INNER JOIN trend_aggregates
+-- latest does not require chatter or related items. Hence LEFT JOIN trend_aggregates
 
---
--- Name: latest_beans_view; Type: VIEW; Schema: public; Owner: -
---
+CREATE OR REPLACE VIEW beans_sources_view AS
+SELECT
+    b.*,
+    p.domain_name, p.site_name, p.description, p.favicon, p.rss_feed
+FROM beans b
+LEFT JOIN publishers p ON b.source_id = p.id;
 
-CREATE VIEW public.latest_beans_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    b.domain_name,
-    b.site_name,
-    b.description,
-    b.favicon,
-    b.rss_feed,
-    tr.observed,
-    tr.comments,
-    tr.mentions,
-    tr.likes,
-    tr.subscribers,
-    tr.related,
-    tr.trend_score,
-    tr.cluster_id
-   FROM (public.beans_sources_view b
-     LEFT JOIN public.trend_aggregates tr ON ((b.id = tr.id)));
+CREATE OR REPLACE VIEW latest_beans_view AS
+SELECT
+    b.*,
+    tr.likes, tr.comments, tr.subscribers, tr.mentions, tr.related, tr.observed, tr.cluster_id, tr.trend_score
+FROM beans_sources_view b
+LEFT JOIN trend_aggregates tr ON b.id = tr.id;
 
-
---
--- Name: trending_beans_view; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.trending_beans_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    b.domain_name,
-    b.site_name,
-    b.description,
-    b.favicon,
-    b.rss_feed,
-    tr.observed,
-    tr.comments,
-    tr.mentions,
-    tr.likes,
-    tr.subscribers,
-    tr.related,
-    tr.trend_score,
-    tr.cluster_id
-   FROM (public.beans_sources_view b
-     JOIN public.trend_aggregates tr ON ((b.id = tr.id)));
+CREATE OR REPLACE VIEW trending_beans_view AS
+SELECT
+    b.*,
+    tr.likes, tr.comments, tr.subscribers, tr.mentions, tr.related, tr.observed, tr.cluster_id, tr.trend_score
+FROM beans_sources_view b
+INNER JOIN trend_aggregates tr ON b.id = tr.id;
 
 ALTER TABLE ONLY public.beans
     ADD CONSTRAINT beans_pkey PRIMARY KEY (id);
@@ -732,6 +642,8 @@ CREATE INDEX idx_beans_embedding_hnsw_cosine ON public.beans USING hnsw (embeddi
 CREATE INDEX idx_beans_entities ON public.beans USING gin (entities);
 
 CREATE INDEX idx_beans_kind ON public.beans USING btree (kind);
+
+CREATE INDEX idx_beans_language ON public.beans USING btree (language);
 
 CREATE INDEX idx_beans_regions ON public.beans USING gin (regions);
 
@@ -759,7 +671,10 @@ CREATE UNIQUE INDEX idx_trend_aggregates_id ON public.trend_aggregates USING btr
 
 ## Documentation dependency map
 
-Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately
+Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately.
+
+`/private` routes are internal for Beans and Espresso. Do not add Swagger comments, generated Swagger entries, `../config/<product>.oas.json` paths, portal pages, or MCP tools for them. A `/private` change does not follow the public-route steps below or the public API Definition of Done.
+
 For any update in public routes, params and responses
 1. Update Swagger annotations in `apis/<product>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`. Always include request, response and error type definiton for each route.
 2. Update api gateway definitions `../config/<product>.oas.json`'

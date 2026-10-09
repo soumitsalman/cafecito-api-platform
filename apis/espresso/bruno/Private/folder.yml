@@ -1,0 +1,6 @@
+info:
+  name: Private
+  type: folder
+
+request:
+  auth: inherit

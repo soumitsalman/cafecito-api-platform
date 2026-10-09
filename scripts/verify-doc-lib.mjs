@@ -60,6 +60,15 @@ export const STALE_PUBLIC_PATHS = [
 
 /** Public-surface terms that violate AGENTS.md documentation boundary. */
 export const FORBIDDEN_PUBLIC_PATTERNS = [
+  { id: "retired-contact", re: new RegExp(["soumitsrah", "cafecito\\.tech"].join("@"), "i"), hint: "retired personal contact" },
+  { id: "old-source-count", re: /7,000\+?|7000\+?/i, hint: "stale source count" },
+  { id: "internal-pipeline", re: /\bPyCoffeeMaker\b/i, hint: "internal project name" },
+  { id: "acquisition-rss", re: /\bRSS\s+(feed|ingestion|collection)\b/i, hint: "specific acquisition mechanism" },
+  { id: "acquisition-scrape", re: /\b(page|web)?[ -]?scrap(e|ed|ing|er)\b/i, hint: "specific acquisition mechanism" },
+  { id: "acquisition-crawler", re: /\bcrawler\b/i, hint: "specific acquisition mechanism" },
+  { id: "internal-legal-worklog", re: /\b(Monetization Readiness|Future Paid Services Addendum|Insurance Underwriting Preparation|API Legal Readiness Plan)\b/i, hint: "internal legal worklog" },
+  { id: "worklog-route", re: /(?:\]\(|\bto:\s*["']|href=["'])\/worklog\//i, hint: "internal worklog route" },
+  { id: "local-legal-route", re: /(?:\]\(|\bto:\s*["']|href=["'])\/legal\//i, hint: "internal legal route" },
   { id: "cupboard", re: /\bcupboard\b/i, hint: "persistence architecture" },
   { id: "beansack", re: /\bbeansack\b/i, hint: "persistence architecture" },
   { id: "sips-table", re: /\bsips\b[^\n]{0,40}\b(table|schema|column)/i, hint: "sips table internals" },

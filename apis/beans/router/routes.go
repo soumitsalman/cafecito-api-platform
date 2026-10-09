@@ -1,15 +1,16 @@
 // @title 			Beans News API & MCP
 // @version 		1.0
-// @description Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
-// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+// @description Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+// @description Beans returns citable Articles, Source metadata, attention-ranked collections, related source material, external Article mentions, and normalized filter discovery. Coverage, availability, and update timing vary by source and record; they do not imply source endorsement or unrestricted content rights.
+// @description All Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase.
 // @description Collections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ "error": { "code", "message" } }`.
 // @description `content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.
 // @description Backend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.
 // @schemes 		https
-// @license.name 	MIT
+// @termsOfService https://cafecito.tech/docs/terms-of-use/
 // @contact.name 	Project Cafecito
 // @contact.url  	https://cafecito.tech
-// @contact.email 	soumitsrah@cafecito.tech
+// @contact.email 	support@cafecito.tech
 // @securityDefinitions.apikey BackendAPIKey
 // @in header
 // @name X-API-KEY
@@ -46,16 +47,18 @@ const (
 )
 
 const (
-	API_ERROR_MSG_OUR_BAD            = "Our bad. Please try again later."
-	API_ERROR_MSG_SOURCE_NOT_FOUND   = "Source not found."
-	API_ERROR_MSG_TAG_NOT_FOUND      = "Tag not found."
-	API_ERROR_MSG_ENTITY_NOT_FOUND   = "Entity not found."
-	API_ERROR_MSG_REGION_NOT_FOUND   = "Region not found."
-	API_ERROR_MSG_CATEGORY_NOT_FOUND = "Category not found."
-	API_ERROR_MSG_COMPANY_NOT_FOUND  = "Company not found."
-	API_ERROR_MSG_PRODUCT_NOT_FOUND  = "Product not found."
-	API_ERROR_MSG_ARTICLE_NOT_FOUND  = "Article not found."
-	API_ERROR_MSG_STORY_NOT_FOUND    = "Story not found."
+	API_ERROR_MSG_OUR_BAD                     = "Our bad. Please try again later."
+	API_ERROR_MSG_SOURCE_NOT_FOUND            = "Source not found."
+	API_ERROR_MSG_TAG_NOT_FOUND               = "Tag not found."
+	API_ERROR_MSG_ENTITY_NOT_FOUND            = "Entity not found."
+	API_ERROR_MSG_REGION_NOT_FOUND            = "Region not found."
+	API_ERROR_MSG_CATEGORY_NOT_FOUND          = "Category not found."
+	API_ERROR_MSG_COMPANY_NOT_FOUND           = "Company not found."
+	API_ERROR_MSG_PRODUCT_NOT_FOUND           = "Product not found."
+	API_ERROR_MSG_ARTICLE_NOT_FOUND           = "Article not found."
+	API_ERROR_MSG_STORY_NOT_FOUND             = "Story not found."
+	API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED    = "score_threshold>0 is required when q is provided."
+	API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER = "Unknown or unsupported query parameter: "
 )
 
 type Configuration struct {
@@ -97,7 +100,7 @@ func (p *articleScopeParams) createFilters(c *gin.Context, r *Configuration) (*d
 		Entities:          utils.NormalizeTags(p.Entities),
 		Regions:           utils.NormalizeTags(p.Regions),
 		FullContent:       p.FullContent,
-		Language:          utils.NormalizeText(p.Language),
+		Languages:         utils.NormalizeTexts(p.Languages),
 	}
 	return &filters, nil
 }
@@ -111,6 +114,7 @@ func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*
 func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFeedParams.createFilters(c, r)
 	filters.IDs = p.IDs
+	filters.ExcludeIDs = p.ExcludeIDs
 	filters.URLs = p.URLs
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
@@ -169,14 +173,6 @@ func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db
 		return nil, err
 	}
 	return &db.ClusterFilters{BeanFilters: *filters, MinBeanCount: p.MinArticleCount}, nil
-}
-
-func (p *storyArticleParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	filters.ClusterID = p.ID
-	filters.CreatedFrom = p.From
-	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
-	return filters, nil
 }
 
 func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
@@ -288,9 +284,10 @@ func (r *Configuration) health(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower timestamp bound." format(date)
 // @Param to query string false "UTC upper timestamp bound." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -335,7 +332,8 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -350,10 +348,12 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
 	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -380,7 +380,8 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -395,9 +396,12 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -423,7 +427,8 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -432,21 +437,14 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 // @ID getLatestNews
 // @Router /news/latest [get]
 func (r *Configuration) getLatestNews(c *gin.Context) {
-	var params topHeadlinesParams
-	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
-	if err != nil {
-		writeError(c, err)
+	if _, present := c.GetQuery("content_type"); present {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER+"content_type"))
 		return
 	}
-	filters.Kind = "news"
-
-	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
-	if err != nil {
-		utils.LogError(err, "[ERROR] QueryBeans")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+	q := c.Request.URL.Query()
+	q.Set("content_type", "news")
+	c.Request.URL.RawQuery = q.Encode()
+	r.getLatestArticles(c)
 }
 
 // getTrendingNews godoc
@@ -468,7 +466,8 @@ func (r *Configuration) getLatestNews(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -477,21 +476,14 @@ func (r *Configuration) getLatestNews(c *gin.Context) {
 // @ID getTrendingNews
 // @Router /news/trending [get]
 func (r *Configuration) getTrendingNews(c *gin.Context) {
-	var params topHeadlinesParams
-	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
-	if err != nil {
-		writeError(c, err)
+	if _, present := c.GetQuery("content_type"); present {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER+"content_type"))
 		return
 	}
-	filters.Kind = "news"
-
-	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
-	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
+	q := c.Request.URL.Query()
+	q.Set("content_type", "news")
+	c.Request.URL.RawQuery = q.Encode()
+	r.getTrendingArticles(c)
 }
 
 // getTopHeadlines is the B04 GET /news/top-headlines target scaffold.
@@ -517,7 +509,8 @@ func (r *Configuration) getTrendingNews(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -532,13 +525,16 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	filters.CreatedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
-	filters.ObservedFrom = time.Now().AddDate(0, 0, -MIN_WINDOW)
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
+		return
+	}
+	filters.CreatedFrom = time.Now().AddDate(0, 0, -2)
+	filters.ObservedFrom = time.Now().AddDate(0, 0, -1)
 	filters.Kind = "news"
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTrendingBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -563,12 +559,12 @@ func extractBeanFiltersAndPage[P beanCollectionParams](r *Configuration, c *gin.
 
 // getArticle godoc
 // @Summary Get an Article
-// @Description Returns one Article selected by UUID. Set full_content=true to request content when available.
+// @Description Returns one Article selected by UUID. Set full_content=true to request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.
 // @Tags Articles
 // @Security BackendAPIKey
 // @Produce json
 // @Param id path string true "Article UUID." format(uuid)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Success 200 {object} ArticleDetailResponse
 // @Failure 400 {object} ErrorResponse "Invalid parameters"
 // @Failure 500 {object} ErrorResponse "Service unavailable"
@@ -583,7 +579,6 @@ func (r *Configuration) getArticle(c *gin.Context) {
 	}
 	bean, err := r.DB.GetBean(c.Request.Context(), params.ID, params.FullContent)
 	if err != nil {
-		utils.LogError(err, "[ERROR] GetBean")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -613,9 +608,10 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower timestamp bound." format(date)
 // @Param to query string false "UTC upper timestamp bound." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} ArticleCollectionResponse
@@ -634,7 +630,6 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QuerySimilarBeans")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -682,7 +677,6 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryMentions")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
 		} else {
@@ -727,7 +721,6 @@ func (r *Configuration) getSources(c *gin.Context) {
 	}
 	page_out, err := r.DB.QuerySources(c.Request.Context(), *filters, *page_req, db.SOURCE_COLUMNS_BASE)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QuerySources")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -853,7 +846,6 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 
 	page_out, err := r.DB.QueryTags(c.Request.Context(), strings.ToLower(strings.TrimSpace(params.Q)), db_tag_type, *page)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryTags")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -880,6 +872,7 @@ func getTags(r *Configuration, c *gin.Context, db_tag_type string, response_tag_
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param min_article_count query int false "Minimum Story Article count. Default 2." default(2) minimum(2)
 // @Param from query string false "UTC lower publication timestamp." format(date)
 // @Param to query string false "UTC upper publication timestamp." format(date)
@@ -909,7 +902,6 @@ func (r *Configuration) getStories(c *gin.Context) {
 
 	page_out, err := r.DB.QueryClusters(c.Request.Context(), *filters, *page_req)
 	if err != nil {
-		utils.LogError(err, "[ERROR] QueryClusters")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -937,7 +929,6 @@ func (r *Configuration) getStory(c *gin.Context) {
 	}
 	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
 	if err != nil {
-		utils.LogError(err, "[ERROR] GetCluster")
 		if errors.Is(err, db.ErrNonExistentID) {
 			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		} else {
@@ -967,9 +958,10 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @Param entities query []string false "Entity values (CSV)." collectionFormat(csv)
 // @Param sentiments query []string false "Sentiment values (CSV)." collectionFormat(csv)
 // @Param tags query []string false "Normalized tag terms (CSV)." collectionFormat(csv)
+// @Param languages query []string false "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code." collectionFormat(csv)
 // @Param from query string false "UTC lower publication timestamp." format(date)
 // @Param to query string false "UTC upper publication timestamp." format(date)
-// @Param full_content query bool false "Include content when available." default(false)
+// @Param full_content query bool false "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy." default(false)
 // @Param limit query int false "Maximum records per page. Default 20, max 100." default(20) minimum(1) maximum(100)
 // @Param cursor query string false "Opaque continuation token from pagination.next_cursor. Send it unchanged."
 // @Success 200 {object} StoryArticleCollectionResponse "Story Article collection envelope"
@@ -979,7 +971,7 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @ID listStoryArticles
 // @Router /stories/{id}/articles [get]
 func (r *Configuration) getStoryArticles(c *gin.Context) {
-	var params storyArticleParams
+	var params similarArticlesParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
@@ -987,7 +979,6 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 	}
 	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
 	if err != nil {
-		utils.LogError(err, "[ERROR] ClusterExists")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
 	}
@@ -995,6 +986,7 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
 		return
 	}
+	filters.ClusterID = params.ID
 
 	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
@@ -1066,6 +1058,15 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	// protected.GET("/stories/trending", config.getStories)
 	protected.GET("/stories/:id", config.getStory)
 	protected.GET("/stories/:id/articles", config.getStoryArticles)
+
+	// PRIVATE routes. These are not part of the public API and are intended for internal use.
+	// They may change without notice.
+	// Exclude these from Swaggo and `beans.oas.json` generation.
+	private := protected.Group("/private")
+	private.GET("/articles/unique", config.privateGetUniqueArticles)
+	private.GET("/articles/:id/similar", config.privateGetSimilarArticles)
+	// private.GET("/stories/:id", config.privateGetStory)
+	private.GET("/stories/:id/articles", config.privateGetStoryArticles)
 
 	return router
 }

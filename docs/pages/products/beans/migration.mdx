@@ -6,7 +6,7 @@ description: Migrate your news API stack to Beans API. Map TheNewsAPI, World New
 
 Beans API out performs other news APIs on 2 distinctive features:
 
-- **Content Diversity**: In addition to news Beans API provides publisher-content blogs, corporate announcements, earnings reports, litigation, official statements, research, technical documents, and coverage context. It is designed for workflows that need publisher text, metadata and tracking propagation of a story across multiple providers and social media platforms.
+- **Content Diversity**: In addition to news, Beans provides public-information discovery across blogs, corporate announcements, earnings reports, litigation, official statements, research, technical documents, and coverage context. It is designed for workflows that need source material, metadata, and tracking of related coverage across sources/outlets and social platforms.
 - **Real Trend Data**: Beans tracks trending contents and top news from their live social media engagement and NOT just claims from publishers.
 
 ## Choose the right target
@@ -80,6 +80,7 @@ Collection items are intended to help an agent select relevant Article IDs; deta
 | Public content type | `content_type` | One of the 14 filterable types. `post` is response-only. |
 | Publisher or domain narrowing | `sources`, `domains`, `exclude_sources`, or `exclude_domains` | Use Source UUIDs or domain values as documented by the route. |
 | Article labels | `authors`, `categories`, `exclude_categories`, `entities`, `regions`, `sentiments`, or `tags` | Include values within one field use OR; different fields combine with AND. |
+| Language | `languages` | CSV ISO 639 language codes; any listed value matches. A stored language matches if it equals a listed code or starts with that code. |
 | Publication bounds | `from` and `to` | Inclusive `YYYY-MM-DD` bounds on search, similar, Stories, Story Articles, and mention `observed_at`. Not accepted on latest, trending, top-headlines, or the news feed shortcuts. |
 | Larger Article projection | `full_content=true` | Requests body content when Beans has it. Handle missing `content` and cite `url`. |
 

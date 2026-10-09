@@ -8,7 +8,7 @@ Hosted at [developer.cafecito.tech](https://developer.cafecito.tech). Built on [
 
 | Product | Status | Public surface |
 | --- | --- | --- |
-| **Beans** | Live | Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. |
+| **Beans** | Live | Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context. |
 | **Espresso** | Live | Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence. |
 | **Cortado** | Future | No public API |
 
@@ -58,8 +58,14 @@ Bug reports and feature requests via GitHub issue templates.
 | Page | File |
 |------|------|
 | About Us | `company/about-us.md` |
-| Privacy Policy | `company/privacy-policy.md` |
 | Terms of Use | `company/terms-of-use.md` |
+| Acceptable Use Policy | `company/acceptable-use-policy.md` |
+| Privacy Policy | `company/privacy-policy.md` |
+| Third-Party Content and Attribution Policy | `company/content-rights-policy.md` |
+| Publisher Requests and Licensing | `company/publisher-requests.md` |
+| Copyright and Rights Complaints Policy | `company/copyright-policy.md` |
+| Corrections and Retractions Policy | `company/corrections-policy.md` |
+| Automated Collection Policy | `company/automated-collection-policy.md` |
 
 ## Local development
 

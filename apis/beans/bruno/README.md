@@ -22,4 +22,6 @@ Do not document or rely on private backend headers in public copy.
 - Request `content_type=post` is invalid. `post` may appear on Article responses.
 - `full_content=true` requests body text when available; it is not a full-text guarantee.
 
-Operation names in this folder match public `operationId` values (for example Search Articles → `searchArticles`, List Top Headlines → `getTopHeadlines`).
+Operation names in the public folders match public `operationId` values (for example Search Articles → `searchArticles`, List Top Headlines → `getTopHeadlines`).
+
+The `Private` folder calls internal backend paths under `/private`. Those routes are not in the public OpenAPI or portal docs.

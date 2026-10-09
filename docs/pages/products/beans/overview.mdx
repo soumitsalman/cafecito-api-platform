@@ -1,5 +1,5 @@
 ---
-description: Search and monitor news, blogs, earnings, litigation, official statements, research, and technical documents with the Beans publisher-content API and MCP server.
+description: Search public information across news, blogs, earnings, litigation, official statements, research, and technical documents with the Beans API and MCP server.
 ---
 
 import { Badge } from "zudoku/ui/Badge";
@@ -11,7 +11,9 @@ import { Button } from "zudoku/ui/Button";
 
 <Badge variant="default">v1</Badge><Badge className="badge-live">Live</Badge>
 
-Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.
+
+Cafecito uses a changing catalog of public-information and publicly available sources/outlets. Coverage, availability, and update timing vary and do not imply source endorsement, complete coverage, or unrestricted content rights.
 
 - **Articles** are publisher items (news, blogs, reports, statements, research, and other stored types).
 - **Sources** are publisher records available on an Article or through the Source routes.
@@ -33,7 +35,7 @@ Beans is a publisher-content API for news, blogs, financial and earnings reports
 - **Purposeful feeds**: use `latest` for chronology, `top-headlines` for recent attention-ranked news, and `trending` for attention-ranked coverage.
 - **Controlled exploration**: choose Article, Source, and Story UUIDs from collection `data`, then request detail or a subresource only when it answers the next question.
 - **Coverage context**: inspect related publisher reading, Story membership, and external mentions without treating those concepts as interchangeable.
-- **Content on demand**: keep collections compact and request `full_content=true` (Applies to a subset of articles. Full content is not available for all articles).
+- **Content on demand**: keep collections compact and request `full_content=true` only for a selected Article when body content is available. Availability is not a grant of display, redistribution, archival, training, or other downstream rights.
 - **Agent-friendly transport**: JSON is canonical. Cursor pagination, stable UUIDs, explicit envelopes, and small follow-up calls make the API suitable for tool and agent workflows.
 
 ## Choose a route by the user question
@@ -176,6 +178,7 @@ Every REST collection returns `pagination`, `meta`, and `data`. This is a captur
       "regions": null,
       "entities": ["carrington_malin"],
       "sentiments": ["disturbed", "anxious"],
+      "ideology": "center",
       "tags": [
         "artificial_intelligence_and_machine_learning",
         "generative_ai_and_foundation_models",
@@ -218,6 +221,7 @@ Article detail returns the same Article fields plus follow-up links. This captur
     "regions": null,
     "entities": ["carrington_malin"],
     "sentiments": ["disturbed", "anxious"],
+    "ideology": "center",
     "tags": [
       "artificial_intelligence_and_machine_learning",
       "generative_ai_and_foundation_models",
@@ -268,8 +272,10 @@ The route matrix below names the response type for every public path. The follow
 | `content_type` | string enum | One stored Beans content type. |
 | `published_at` | RFC 3339 timestamp | Publisher publication time. |
 | `title`, `summary`, `author`, `image_url` | string or `null` | Available publisher metadata. |
-| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee. Handle a missing value and use `url` for attribution. |
+| `content` | optional string | Included only when `full_content=true` is requested and Beans has body content. This is not a universal full-text guarantee or a grant of republication rights. Handle a missing value, preserve `url` for attribution, and follow the [Third-Party Content Policy](https://cafecito.tech/docs/third-party-content-policy/). |
+| `language` | string or omitted | ISO 639 language code when available. |
 | `categories`, `regions`, `entities`, `sentiments`, `tags` | string array or `null` | Available normalized labels. Use discovery routes when an accepted filter value is unknown. |
+| `ideology` | optional string | Experimental political ideology label. Omitted when unavailable. The value can misrepresent an Article based on geo-cultural context. |
 | `story_id` | optional UUID string | Stable Story identifier when the Article belongs to a Story. |
 | `source` | Source object or `null` | Available publisher metadata for this Article. |
 | `trend` | optional Trend object | Available observed attention values on attention-ranked or enriched responses. It is not a forecast and is not guaranteed on every Article. |
@@ -279,7 +285,7 @@ The route matrix below names the response type for every public path. The follow
 
 | Response item | Fields | Contract |
 | --- | --- | --- |
-| Source | `id`, `url`, `domain`, `name`, optional `description`, `favicon_url`, `rss_feed_url` | Publisher metadata. Preserve `id` and use it with the `sources` Article or Story filter. |
+| Source | `id`, `url`, `domain`, `name`, optional `description`, `favicon_url`, `rss_feed_url` | Source metadata. Preserve `id` and use it with the `sources` Article or Story filter. |
 | Discovery label | `value`, optional `type` | A normalized filter value from categories, entities, regions, or sentiments. |
 | Mention | `url`, `platform`, `forum`, `observed_at`, `engagement` | An external observation for a selected Article, not another publisher Article. |
 | Mention engagement | `likes`, `comments`, `audience` | Nullable observed engagement values. Treat absent or null values as unavailable, not zero. |
@@ -319,23 +325,23 @@ All request parameters are query parameters unless the table marks `id` as a pat
 
 | Route | Response type | Accepted request parameters |
 | --- | --- | --- |
-| `GET /beans/articles/search` | Article collection envelope | `q`, `score_threshold`, `ids`, `urls`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
-| `GET /beans/articles/latest` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
-| `GET /beans/news/latest` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
-| `GET /beans/news/top-headlines` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
-| `GET /beans/articles/trending` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
-| `GET /beans/news/trending` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/search` | Article collection envelope | `q`, `score_threshold`, `ids`, `urls`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `from`, `to`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/latest` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `full_content`, `limit`, `cursor` |
+| `GET /beans/news/latest` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `full_content`, `limit`, `cursor` |
+| `GET /beans/news/top-headlines` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/trending` | Article collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `full_content`, `limit`, `cursor` |
+| `GET /beans/news/trending` | Article collection envelope | `q`, `score_threshold`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `full_content`, `limit`, `cursor` |
 | `GET /beans/articles/{id}` | Article detail envelope | `id` path parameter, `full_content` |
-| `GET /beans/articles/{id}/similar` | Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
+| `GET /beans/articles/{id}/similar` | Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `from`, `to`, `full_content`, `limit`, `cursor` |
 | `GET /beans/articles/{id}/mentions` | Mention collection envelope | `id` path parameter, `platforms`, `forums`, `from`, `to`, `limit`, `cursor` |
 
 ### Story routes
 
 | Route | Response type | Accepted request parameters |
 | --- | --- | --- |
-| `GET /beans/stories` | Story collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `min_article_count`, `from`, `to`, `limit`, `cursor` |
+| `GET /beans/stories` | Story collection envelope | `q`, `score_threshold`, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `min_article_count`, `from`, `to`, `limit`, `cursor` |
 | `GET /beans/stories/{id}` | Story detail envelope | `id` path parameter |
-| `GET /beans/stories/{id}/articles` | Story Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `from`, `to`, `full_content`, `limit`, `cursor` |
+| `GET /beans/stories/{id}/articles` | Story Article collection envelope | `id` path parameter, `content_type`, `sources`, `exclude_sources`, `domains`, `exclude_domains`, `authors`, `categories`, `exclude_categories`, `regions`, `entities`, `sentiments`, `tags`, `languages`, `from`, `to`, `full_content`, `limit`, `cursor` |
 
 ## Query and filter rules
 
@@ -350,7 +356,7 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | Text query | `q` is a route-specific natural-language relevance query and accepts up to 512 characters. |
 | Relevance threshold | `score_threshold` is in the `0.0` through `1.0` range. Use it only with `q`. A threshold without `q` returns HTTP `400`. `q` may omit the threshold. |
 | Content projection | `full_content=true` requests available Article content when Beans has it. It does not change which records match and does not guarantee a full publisher copy. |
-| Filter combination | Different filter fields combine with AND. Include values within one category, region, entity, sentiment, Source, or domain field match any listed value. Exclusion filters remove matching records. All supplied `tags` and author terms further narrow results. |
+| Filter combination | Different filter fields combine with AND. Include values within one category, region, entity, sentiment, languages, Source, or domain field match any listed value. Exclusion filters remove matching records. All supplied `tags` and author terms further narrow results. |
 | Response format | JSON is canonical for REST responses and MCP tool results. |
 
 ### Article and Story filters
@@ -367,6 +373,7 @@ All request parameters are query parameters unless the table marks `id` as a pat
 | `categories`, `exclude_categories` | Normalized category labels. | Article and Story collection routes listed in the matrix. |
 | `regions`, `entities`, `sentiments` | Normalized extracted labels. | Article and Story collection routes listed in the matrix. |
 | `tags` | All supplied normalized category, region, or entity terms must match. It is not a title or body phrase search. | Article and Story collection routes listed in the matrix. |
+| `languages` | ISO 639 language codes. Any listed value matches. A stored language matches if it equals a listed code or starts with that code. | Article and Story collection routes listed in the matrix. |
 | `from`, `to` | Inclusive UTC publication-date bounds. | Article search, similar Articles, Stories, and Story Articles. Mention dates bound `observed_at` instead. |
 | `full_content` | Requests available Article content. | Article search and feeds, Article detail, similar Articles, and Story Articles. |
 | `min_article_count` | Minimum number of Articles in a Story. Default `2`, minimum `2`. | Story discovery only. |
@@ -435,7 +442,7 @@ curl -s --get "${BASE_URL}/beans/articles/search" \
   --data-urlencode "limit=20"
 ```
 
-`GET /beans/sources/{id}` returns one Source detail envelope. Description, favicon, and RSS metadata are optional display fields; an unavailable field is not an error.
+`GET /beans/sources/{id}` returns one Source detail envelope. Optional source-description, favicon, and source-reference fields can be absent; an unavailable field is not an error.
 
 ## Follow-up calls for coverage and context
 
@@ -582,6 +589,7 @@ Story-member Articles use the normal Article collection shape with Story-specifi
       "published_at": "2026-08-24T02:00:43Z",
       "title": "UAE AI Programme adds Agentic AI focus",
       "summary": "Listen now | Middle East AI News Minute - 24-Aug-26",
+      "ideology": "center",
       "story_id": "06860aaa-a43c-585f-9cb3-a6710a93a74a"
     }
   ]
@@ -611,3 +619,7 @@ MCP clients connect to `https://api.cafecito.tech/beans/mcp` with the same API k
 - [Beans API reference](/api/beans)
 - [MCP & AI agents](/guides/mcp-ai-agents)
 - [Bruno Examples](https://github.com/soumitsalman/cafecito-api-platform) in `apis/beans/bruno/`
+
+## Disclaimer
+
+Article `ideology` is an experimental feature. It indicates a political ideology label and can misrepresent an Article based on geo-cultural context. The field is omitted when no label is available.

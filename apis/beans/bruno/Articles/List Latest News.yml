@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/news/latest?tags=startups&domains=substack&full_content=true"
+  url: "{{baseUrl}}/news/latest?tags=startups&languages=en,es"
   params:
     - name: tags
       value: startups
@@ -15,8 +15,13 @@ http:
     - name: domains
       value: substack
       type: query
+      disabled: true
     - name: full_content
       value: "true"
+      type: query
+      disabled: true
+    - name: languages
+      value: en,es
       type: query
   auth: inherit
 
@@ -55,6 +60,7 @@ examples:
                 "published_at": "",
                 "regions": [],
                 "sentiments": [],
+                "ideology": "",
                 "source": {
                   "description": "",
                   "domain": "",

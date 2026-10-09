@@ -17,6 +17,10 @@ http:
     - name: limit
       value: "20"
       type: query
+    - name: languages
+      value: en,es
+      type: query
+      disabled: true
   auth: inherit
 settings:
   encodeUrl: true
@@ -65,6 +69,7 @@ examples:
                 "regions": [],
                 "entities": [],
                 "sentiments": [],
+                "ideology": "",
                 "tags": [
                   "technology"
                 ],
@@ -192,7 +197,7 @@ docs: >-
 
   Request parameters: id is required; Article filters include content_type,
   sources, domains, authors, categories, regions, entities, sentiments, tags,
-  from, to, and full_content; limit is 1-100; cursor continues the same request.
+  languages, from, to, and full_content; limit is 1-100; cursor continues the same request.
 
   Do not use when: related reading is sufficient without Story membership; use
   GET /articles/{id}/similar for similarity results.

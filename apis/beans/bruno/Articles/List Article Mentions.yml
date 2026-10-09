@@ -10,7 +10,7 @@ http:
   url: "{{baseUrl}}/articles/:id/mentions"
   params:
     - name: id
-      value: 865d1ebb-1d1f-5d91-92c1-fac05b3c4c38
+      value: 24df878a-7fad-53c5-8ba8-c0d6a073d1aa
       type: path
   auth: inherit
 

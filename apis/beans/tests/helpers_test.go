@@ -23,6 +23,7 @@ var (
 	test_domains      = []string{"techcrunch.com", "slashgear.com"}
 	test_source_query = "tech"
 	test_authors      = []string{"Reuters"}
+	test_languages    = []string{"en", "es"}
 	test_article_urls = []string{
 		"https://techcrunch.com/ci/beans-article-1",
 		"https://techcrunch.com/ci/beans-article-2",

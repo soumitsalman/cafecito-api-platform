@@ -17,6 +17,10 @@ http:
     - name: limit
       value: "20"
       type: query
+    - name: languages
+      value: en,es
+      type: query
+      disabled: true
   auth: inherit
 settings:
   encodeUrl: true

@@ -12,6 +12,10 @@ http:
     - name: id
       value: e15d0fe2-079b-530a-8799-160fe7cae066
       type: path
+    - name: languages
+      value: en,es
+      type: query
+      disabled: true
   auth: inherit
 
 settings:
@@ -49,6 +53,7 @@ examples:
                 "published_at": "",
                 "regions": [],
                 "sentiments": [],
+                "ideology": "",
                 "source": {
                   "description": "",
                   "domain": "",
@@ -188,7 +193,7 @@ docs: |-
   Returns: A cursor-paginated collection of related publisher coverage for the path Article, ordered newest first; this is not a guarantee of Story membership.
   Use when: an agent has selected an Article and wants comparable coverage or related context.
   Do not use when: all Articles in a durable Story or external mentions are needed.
-  Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
+  Search/filter behavior: the path UUID is the related-coverage anchor. Source, domain, author, label, languages, content-type, and date filters narrow candidates; full_content changes only the Article projection; q, score_threshold, ids, and urls are not accepted.
   Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD.
   Sort/pagination: published_at descending; follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100.
   Missing fields: Article enrichment, Source metadata, and content may be null or omitted.

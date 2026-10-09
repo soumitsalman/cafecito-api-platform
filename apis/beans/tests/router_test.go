@@ -652,6 +652,80 @@ func TestRouterSearchArticlesFilters(t *testing.T) {
 	}
 }
 
+func TestRouterSearchArticlesByLanguages(t *testing.T) {
+	srv := newTestHTTPServer(t)
+
+	t.Run("without_languages", func(t *testing.T) {
+		params := url.Values{}
+		params.Set("from", testSearchFrom().Format("2006-01-02"))
+		params.Set("limit", "5")
+		status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+		printResponse(t, "SEARCH_WITHOUT_LANGUAGES", body)
+		requireStatus(t, http.StatusOK, status, body)
+		items := assertExpectedPagination(t, body, 5)
+		require.NotEmpty(t, items)
+		for _, item := range items {
+			assertExpectedArticle(t, item)
+		}
+	})
+
+	t.Run("es_only", func(t *testing.T) {
+		params := url.Values{}
+		params.Set("languages", test_languages[1])
+		params.Set("from", testSearchFrom().Format("2006-01-02"))
+		params.Set("limit", "5")
+		status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+		printResponse(t, "SEARCH_LANGUAGES_ES", body)
+		requireStatus(t, http.StatusOK, status, body)
+		items := assertExpectedPagination(t, body, 5)
+		require.NotEmpty(t, items)
+		for _, item := range items {
+			assertExpectedArticle(t, item)
+			lang, _ := item["language"].(string)
+			assert.True(t, strings.HasPrefix(lang, test_languages[1]), "language %q should start with %q", lang, test_languages[1])
+		}
+	})
+
+	t.Run("en_es_csv", func(t *testing.T) {
+		params := url.Values{}
+		params.Set("languages", test_languages[0]+","+test_languages[1])
+		params.Set("from", testSearchFrom().Format("2006-01-02"))
+		params.Set("limit", "5")
+		status, body := routerGET(t, srv.URL, ROUTE_SEARCH, params)
+		printResponse(t, "SEARCH_LANGUAGES_EN_ES", body)
+		requireStatus(t, http.StatusOK, status, body)
+		items := assertExpectedPagination(t, body, 5)
+		require.NotEmpty(t, items)
+		for _, item := range items {
+			assertExpectedArticle(t, item)
+			lang, _ := item["language"].(string)
+			assert.True(t,
+				strings.HasPrefix(lang, test_languages[0]) || strings.HasPrefix(lang, test_languages[1]),
+				"language %q should start with en or es", lang)
+		}
+	})
+}
+
+func TestRouterFeedsAcceptLanguages(t *testing.T) {
+	srv := newTestHTTPServer(t)
+	for _, path := range []string{ROUTE_LATEST, ROUTE_TRENDING, ROUTE_HEADLINES, ROUTE_NEWS_LATEST, ROUTE_NEWS_TRENDING} {
+		t.Run(path, func(t *testing.T) {
+			params := url.Values{}
+			params.Set("languages", test_languages[0])
+			params.Set("limit", "5")
+			status, body := routerGET(t, srv.URL, path, params)
+			printResponse(t, path+"_LANGUAGES_EN", body)
+			requireStatus(t, http.StatusOK, status, body)
+			items := assertExpectedPagination(t, body, 5)
+			for _, item := range items {
+				if lang, ok := item["language"].(string); ok && lang != "" {
+					assert.True(t, strings.HasPrefix(lang, test_languages[0]), "language %q should start with en", lang)
+				}
+			}
+		})
+	}
+}
+
 func TestRouterVectorSearchArticles(t *testing.T) {
 	srv := newTestHTTPServer(t)
 	params := url.Values{}
@@ -863,6 +937,7 @@ func TestRouterSearchRejectsUnsupportedParameters(t *testing.T) {
 		"offset":       "5",
 		"page":         "2",
 		"sort":         "published_at",
+		"language":     "en",
 	} {
 		t.Run(key, func(t *testing.T) {
 			params := url.Values{}

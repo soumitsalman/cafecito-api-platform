@@ -1,25 +1,56 @@
 ---
 navigation_label: Contact
 navigation_icon: messages-square
-description: Contact the Cafecito team to report bugs and file feature requests
+description: Contact Cafecito for support, legal, privacy, publisher, and rights requests
 category: General
 ---
 import { Button } from "zudoku/ui/Button";
-import { BugIcon } from "zudoku/icons";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "zudoku/ui/Dialog";
 
-# Contact Us
+# Contact Cafecito
 
-Got a bug to squash or a killer feature idea to pitch? Hit one of these buttons to file an issue on GitHub. And hey, if you just wanna yell at the team for some reason, go ahead - we don't read much anyway 😉
+Choose the channel that fits your request.
 
-<div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '1rem' }}>
   <Button className="btn-with-link" asChild>
     <a href="https://github.com/soumitsalman/cafecito-api-manager/issues/new?template=bug_report.yml">
-      🐞 Bug Report
+      🐞 Bug report
     </a>
   </Button>
-  <Button className="btn-with-link" asChild>
-    <a href="https://github.com/soumitsalman/cafecito-api-manager/issues/new?template=feature_request.yml">
-      💡Feature Request
-    </a>
-  </Button>
+  <Dialog>
+    <DialogTrigger asChild>
+      <Button className="btn-with-link">
+        ✉️ Private inquiry
+      </Button>
+    </DialogTrigger>
+    <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogHeader>
+        <DialogTitle>Private inquiry</DialogTitle>
+        <DialogDescription>
+          For support and confidential requests.
+        </DialogDescription>
+      </DialogHeader>
+      <iframe
+        src="https://tally.so/r/lbpkA5"
+        title="Contact Project Cafecito"
+        width="100%"
+        height="650"
+        frameBorder="0"
+        marginHeight="0"
+        marginWidth="0"
+      >Loading…</iframe>
+      <p>
+        If the form does not load, <a href="https://tally.so/r/lbpkA5">open it in a new tab</a>.
+      </p>
+    </DialogContent>
+  </Dialog>
 </div>
+
+Use a private inquiry for support, legal, privacy, publisher, correction, abuse, copyright, security, partnership, feature, or other confidential matters. GitHub reports are public; do not include API keys, credentials, private customer data, sensitive personal information, or other confidential information there. See the [canonical corporate policies](https://cafecito.tech/docs/legal/) for the legal operator and complete request procedures.

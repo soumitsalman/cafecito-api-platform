@@ -84,6 +84,7 @@ func seedCIFixtures() error {
 	}
 
 	kinds := []string{"news", "news", "news", "news", "news", "news", "blog", "post"}
+	languages := []string{"en", "en", "es", "en", "en", "en", "en", "en"}
 	sources := []uuid.UUID{fixtureSourceTech, fixtureSourceTech, fixtureSourceSlash, fixtureSourceTech, fixtureSourceTech, fixtureSourceTech, fixtureSourceTech, fixtureSourceTech}
 	urls := []string{
 		test_article_urls[0], test_article_urls[1], test_article_urls[2], test_article_urls[3], test_article_urls[4],
@@ -93,7 +94,7 @@ func seedCIFixtures() error {
 	}
 	for i, id := range fixtureArticleIDs {
 		created := now.Add(-time.Duration(i) * time.Hour)
-		if err := upsertBean(ctx, pool, id, urls[i], kinds[i], sources[i], created, embedding); err != nil {
+		if err := upsertBean(ctx, pool, id, urls[i], kinds[i], languages[i], sources[i], created, embedding); err != nil {
 			return err
 		}
 	}
@@ -126,31 +127,32 @@ func seedCIFixtures() error {
 	return nil
 }
 
-func upsertBean(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, url, kind string, source_id uuid.UUID, created time.Time, embedding pgvector.Vector) error {
+func upsertBean(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, url, kind, language string, source_id uuid.UUID, created time.Time, embedding pgvector.Vector) error {
 	base_url := "https://techcrunch.com"
 	if source_id == fixtureSourceSlash {
 		base_url = "https://slashgear.com"
 	}
 	_, err := pool.Exec(ctx, `
 		INSERT INTO beans (
-			id, url, kind, author, source_id, base_url, image_url, created, collected,
+			id, url, kind, language, author, source_id, base_url, image_url, created, collected,
 			title, summary, content, restricted_content, embedding,
 			categories, sentiments, regions, entities
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $8,
-			$9, $10, $11, false, $12,
-			$13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $9,
+			$10, $11, $12, false, $13,
+			$14, $15, $16, $17
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			url = EXCLUDED.url,
 			kind = EXCLUDED.kind,
+			language = EXCLUDED.language,
 			created = EXCLUDED.created,
 			embedding = EXCLUDED.embedding,
 			categories = EXCLUDED.categories,
 			sentiments = EXCLUDED.sentiments,
 			regions = EXCLUDED.regions,
 			entities = EXCLUDED.entities
-	`, id, url, kind, test_authors[0], source_id, base_url, base_url+"/image.png", created,
+	`, id, url, kind, language, test_authors[0], source_id, base_url, base_url+"/image.png", created,
 		"CI fixture article "+id.String()[:8],
 		"CI fixture summary",
 		"CI fixture full content",

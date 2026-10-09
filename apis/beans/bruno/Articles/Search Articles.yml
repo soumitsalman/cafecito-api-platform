@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/articles/search?q=topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice&limit=20"
+  url: "{{baseUrl}}/articles/search?q=topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice&limit=20&languages=en,es"
   params:
     - name: q
       value: topic+active+cybersecurity+breach+exclude+general+cybersecurity+best+practice
@@ -19,6 +19,9 @@ http:
       value: hello
       type: query
       disabled: true
+    - name: languages
+      value: en,es
+      type: query
   auth: inherit
 
 settings:
@@ -56,6 +59,7 @@ examples:
                 "published_at": "",
                 "regions": [],
                 "sentiments": [],
+                "ideology": "",
                 "source": {
                   "description": "",
                   "domain": "",
@@ -175,7 +179,7 @@ docs: |-
   Returns: A cursor-paginated collection where each data item is one publisher Article identified by UUID. Empty results are HTTP 200 with data: [].
   Use when: broad Article retrieval, semantic topic search, exact Article IDs or URLs, or combined Article filters are needed.
   Do not use when: newest-only, headline-only, or attention-ranked results are needed; use latest, top-headlines, or trending.
-  Search/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.
+  Search/filter behavior: q is semantic natural-language search; score_threshold requires q. ids and urls are exact. languages is a CSV of ISO 639 language codes (any listed value matches; prefix match). Include values use OR within a field; different fields combine with AND. full_content changes only the Article projection.
   Time: from and to are inclusive UTC publication-date bounds in YYYY-MM-DD form.
   Sort/pagination: follow pagination.next_cursor unchanged as cursor. limit defaults to 20 and is capped at 100. offset and page are not supported.
   Missing fields: Article enrichment, Source metadata, story_id, content, and trend may be null or omitted. Content requires full_content=true and source availability.

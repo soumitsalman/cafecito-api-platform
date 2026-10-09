@@ -9,13 +9,11 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
+        "termsOfService": "https://cafecito.tech/docs/terms-of-use/",
         "contact": {
             "name": "Project Cafecito",
             "url": "https://cafecito.tech",
-            "email": "soumitsrah@cafecito.tech"
-        },
-        "license": {
-            "name": "MIT"
+            "email": "support@cafecito.tech"
         },
         "version": "{{.Version}}"
     },
@@ -187,9 +185,19 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -416,6 +424,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "format": "date",
                         "description": "UTC lower timestamp bound.",
@@ -432,7 +450,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -639,9 +657,19 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -690,7 +718,7 @@ const docTemplate = `{
                         "BackendAPIKey": []
                     }
                 ],
-                "description": "Returns one Article selected by UUID. Set full_content=true to request content when available.",
+                "description": "Returns one Article selected by UUID. Set full_content=true to request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                 "produces": [
                     "application/json"
                 ],
@@ -711,7 +739,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     }
@@ -1005,6 +1033,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "format": "date",
                         "description": "UTC lower timestamp bound.",
@@ -1021,7 +1059,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1357,9 +1395,19 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1544,9 +1592,19 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -1731,9 +1789,19 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -2200,6 +2268,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "minimum": 2,
                         "type": "integer",
                         "default": 2,
@@ -2471,6 +2549,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "ISO 639 language codes to include (CSV). Any listed value matches. A stored language matches if it equals a listed code or starts with that code.",
+                        "name": "languages",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "format": "date",
                         "description": "UTC lower publication timestamp.",
@@ -2487,7 +2575,7 @@ const docTemplate = `{
                     {
                         "type": "boolean",
                         "default": false,
-                        "description": "Include content when available.",
+                        "description": "Request available body content. Availability does not grant republication, redistribution, archival, training, or other downstream rights; preserve the canonical URL and follow the Third-Party Content and Attribution Policy.",
                         "name": "full_content",
                         "in": "query"
                     },
@@ -2604,6 +2692,10 @@ const docTemplate = `{
                     "type": "string",
                     "format": "uuid"
                 },
+                "ideology": {
+                    "description": "Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.",
+                    "type": "string"
+                },
                 "image_url": {
                     "type": "string"
                 },
@@ -2711,6 +2803,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "ideology": {
+                    "description": "Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.",
+                    "type": "string"
                 },
                 "image_url": {
                     "type": "string"
@@ -3249,7 +3345,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{"https"},
 	Title:            "Beans News API & MCP",
-	Description:      "Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.\nBeans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
+	Description:      "Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.\nBeans returns citable Articles, Source metadata, attention-ranked collections, related source material, external Article mentions, and normalized filter discovery. Coverage, availability, and update timing vary by source and record; they do not imply source endorsement or unrestricted content rights.\nAll Cafecito products are currently available as free tier. When paid services are introduced, applicable pricing, billing, renewal, cancellation, refund, tax, and additional contract terms will be presented before purchase.\nCollections return `{data, pagination, meta}`. pagination contains `limit`, `num_results` (this page only), and `next_cursor`. Empty collections return HTTP 200 with `data: []`. Missing detail resources return HTTP 404. Errors return `{ \"error\": { \"code\", \"message\" } }`.\n`content_type=post` is not a valid request filter. `post` may still appear on Article responses. Unknown or route-inapplicable query parameters return HTTP 400.\nBackend authentication uses the `X-API-KEY` header (or other headers listed in `API_KEY`). `/health` does not require a key. Public clients send Bearer keys to the gateway, not this service.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

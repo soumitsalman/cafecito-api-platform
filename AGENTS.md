@@ -74,6 +74,7 @@ The backend Swagger, gateway OpenAPI, and portal pages are separate artifacts. A
   - MCP endpoint, tool list, and agent workflow: `docs/pages/guides/mcp-ai-agents.mdx`;
   - shared authentication, pagination, or response-format behavior: `docs/pages/guides/api-conventions.mdx` and, when the quickstart changes, `docs/pages/start/first-api-call.mdx`.
 - Update `docs/zudoku.config.tsx` whenever an API reference mount, documentation page, navigation item, or redirect changes. Update `docs/pages/api-overview.mdx` or `docs/pages/start/overview.mdx` only when product availability or high-level positioning changes.
+- **`/private` routes are internal** for Beans and Espresso and may change without a public contract update. Do not document them in `docs/pages/`, generated Swagger, gateway OpenAPI (`config/beans.oas.json`, `config/espresso.oas.json`), MCP tool lists, or portal navigation. Do not add Swagger comments on private handlers, so `swag` does not emit them. A `/private` change does not require those public artifacts, and the Definition of Done for a public API change does not apply.
 
 ### Public documentation boundary
 
@@ -142,7 +143,7 @@ Zuplo production deploy is GitHub integration: configure path filters to exclude
 
 CODEOWNERS: `.github/CODEOWNERS` (`@soumitsalman`). PR checklist: `.github/pull_request_template.md`.
 
-Definition of Done for a public API change:
+Definition of Done for a public API change (`/private` routes are excluded; see the documentation dependency map):
 
 1. Runtime behavior and tests are complete.
 2. Annotations are updated.

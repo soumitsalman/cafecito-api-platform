@@ -345,6 +345,38 @@ func (p *Cupboard) queryDerivedRelations(ctx context.Context, anchor_expr string
 	}), nil
 }
 
+// QueryDerivedConfidence returns one row per requested id, in request order.
+// Confidence comes from the most recently created signal derived from that id.
+// It is nil when that signal has no confidence, or when no signal is derived from the id.
+func (p *Cupboard) QueryDerivedConfidence(ctx context.Context, ids []uuid.UUID) ([]IDConfidence, error) {
+	if len(ids) == 0 {
+		return []IDConfidence{}, nil
+	}
+	query := `
+	SELECT ids.id, latest.confidence
+	FROM unnest(@ids::uuid[]) WITH ORDINALITY AS ids(id, ord)
+	LEFT JOIN LATERAL (
+		SELECT s.digest->>'confidence' AS confidence
+		FROM relations r
+		INNER JOIN sips s ON s.id = r.from_id
+		WHERE r.relationship = 'DERIVED_FROM'
+		  AND r.to_id = ids.id
+		  AND s.kind = 'signal'
+		ORDER BY s.created DESC, s.id DESC
+		LIMIT 1
+	) latest ON true
+	ORDER BY ids.ord
+	`
+	rows, err := fetchAll[IDConfidence](ctx, p.db, query, pgx.NamedArgs{"ids": ids})
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return []IDConfidence{}, nil
+	}
+	return rows, nil
+}
+
 // GetEventRelationCounts returns the explicit relationship metadata used by R02.
 func (p *Cupboard) CountRelations(ctx context.Context, id uuid.UUID) (RelationCounts, error) {
 	query := `

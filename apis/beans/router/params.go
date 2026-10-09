@@ -102,8 +102,8 @@ func requireScoreThresholdNeedsQ(c *gin.Context, q string) error {
 
 // articleScopeParams is the Article filter set shared by feeds and search, excluding content_type.
 type articleScopeParams struct {
-	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
-	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
+	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
+	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	Domains           []string    `form:"domains" collection_format:"csv" binding:"max=100"`
 	ExcludeDomains    []string    `form:"exclude_domains" collection_format:"csv" binding:"max=100"`
 	Authors           []string    `form:"authors" collection_format:"csv" binding:"max=100"`
@@ -114,7 +114,7 @@ type articleScopeParams struct {
 	Entities          []string    `form:"entities" collection_format:"csv" binding:"max=100"`
 	Regions           []string    `form:"regions" collection_format:"csv" binding:"max=100"`
 	FullContent       bool        `form:"full_content,default=false"`
-	Language          string      `form:"language"`
+	Languages         []string    `form:"languages" collection_format:"csv" binding:"max=100" example:"en,es"`
 }
 
 // articleFilterParams contains the non-query, non-identity Article filters
@@ -163,10 +163,11 @@ func (params *topHeadlinesParams) shouldBind(c *gin.Context) error {
 // articleSearchParams is the B01 GET /articles/search target request.
 type articleSearchParams struct {
 	articleFeedParams
-	IDs  []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
-	URLs []string    `form:"urls" collection_format:"csv" binding:"max=100"`
-	From time.Time   `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
-	To   time.Time   `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
+	IDs        []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
+	ExcludeIDs []uuid.UUID `form:"exclude_ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
+	URLs       []string    `form:"urls" collection_format:"csv" binding:"max=100"`
+	From       time.Time   `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
+	To         time.Time   `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 }
 
 func (params *articleSearchParams) shouldBind(c *gin.Context) error {
@@ -190,8 +191,9 @@ func (params *articleDetailParams) shouldBind(c *gin.Context) error {
 	return bindQuery(c, params)
 }
 
-// similarArticlesParams is the B06 GET /articles/{id}/similar target request.
-// It excludes q, score_threshold, ids, and urls.
+// similarArticlesParams is the target request for GET /articles/{id}/similar
+// and GET /stories/{id}/articles. It excludes q, score_threshold, ids, and urls.
+// Story handlers set filters.ClusterID from the path id after binding.
 type similarArticlesParams struct {
 	itemIDParams
 	articleFilterParams
@@ -294,22 +296,6 @@ func (params *storySearchParams) shouldBind(c *gin.Context) error {
 		return err
 	}
 	return requireScoreThresholdNeedsQ(c, params.Q)
-}
-
-// storyArticleParams is the B11 GET /stories/{story_id}/articles target request.
-type storyArticleParams struct {
-	itemIDParams
-	articleFilterParams
-	From time.Time `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
-	To   time.Time `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
-	paginationParams
-}
-
-func (params *storyArticleParams) shouldBind(c *gin.Context) error {
-	if err := c.ShouldBindUri(&params.itemIDParams); err != nil {
-		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
-	}
-	return bindQuery(c, params)
 }
 
 // articleCountParams is the B19 GET /articles/count target request.

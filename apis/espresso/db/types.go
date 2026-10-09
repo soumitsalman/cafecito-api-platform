@@ -107,6 +107,13 @@ type RelationCounts struct {
 	DerivedTo   int64 `db:"derived_to_count"`
 }
 
+// IDConfidence is one requested sip and the confidence of its newest derived signal.
+// Confidence is nil when that signal has no confidence, or when no signal is derived from the id.
+type IDConfidence struct {
+	ID         uuid.UUID `db:"id"`
+	Confidence *string   `db:"confidence"`
+}
+
 // Page is a page of results plus the cursor to continue scanning, if more rows remain.
 type Page[T any] struct {
 	Items      []T

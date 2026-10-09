@@ -1,0 +1,172 @@
+info:
+  name: List Unique Articles
+  type: http
+  seq: 1
+  tags:
+    - Private
+
+http:
+  method: GET
+  url: "{{baseUrl}}/private/articles/unique?sort=recent&q=climate+issues+negotiation&limit=20&content_type=news&score_threshold=0.5&from=2026-09-25"
+  params:
+    - name: sort
+      value: recent
+      type: query
+    - name: q
+      value: climate+issues+negotiation
+      type: query
+    - name: limit
+      value: "20"
+      type: query
+    - name: content_type
+      value: news
+      type: query
+    - name: score_threshold
+      value: "0.5"
+      type: query
+    - name: from
+      value: 2026-09-25
+      type: query
+    - name: languages
+      value: en,es
+      type: query
+      disabled: true
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/private/articles/unique"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "author": "",
+                "categories": [],
+                "content_type": "news",
+                "entities": [],
+                "id": "",
+                "image_url": "",
+                "published_at": "",
+                "regions": [],
+                "sentiments": [],
+                "ideology": "",
+                "source": {
+                  "description": "",
+                  "domain": "",
+                  "favicon_url": "",
+                  "id": "",
+                  "name": "",
+                  "rss_feed_url": "",
+                  "url": ""
+                },
+                "story_id": "",
+                "summary": "",
+                "tags": [],
+                "title": "",
+                "trend": {
+                  "audiences": 0,
+                  "comments": 0,
+                  "likes": 0,
+                  "mentions": 0,
+                  "related": 0,
+                  "trend_score": 0
+                },
+                "url": ""
+              }
+            ],
+            "meta": {
+              "as_of": ""
+            },
+            "pagination": {
+              "limit": 0,
+              "next_cursor": "",
+              "num_results": 0
+            }
+          }
+  - name: 400 Response
+    description: Bad Request
+    request:
+      url: "{{baseUrl}}/private/articles/unique"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "invalid_request",
+              "message": ""
+            }
+          }
+  - name: 401 Response
+    description: Unauthorized
+    request:
+      url: "{{baseUrl}}/private/articles/unique"
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unauthorized",
+              "message": ""
+            }
+          }
+  - name: 500 Response
+    description: Internal Server Error
+    request:
+      url: "{{baseUrl}}/private/articles/unique"
+      method: GET
+    response:
+      status: 500
+      statusText: Internal Server Error
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": {
+              "code": "unavailable",
+              "message": ""
+            }
+          }
+
+docs: |-
+  Internal only. Not part of the public API.
+  Answers: Which Articles remain after keeping one member per Story, ordered by the selected sort?
+  Returns: A cursor-paginated Article collection with trend fields.
+  Sort: sort is recent (default), trend, or relevant. sort=relevant requires q. sort=trend applies from and to to the observation window as well as publication bounds.
+  Search/filter behavior: accepts the article search filters, including q, score_threshold, ids, urls, content_type, source, domain, author, label, languages, and full_content.
+  Time: from and to are inclusive UTC dates in YYYY-MM-DD.
+  Sort/pagination: follow pagination.next_cursor unchanged as cursor. A cursor from a different sort is rejected. limit defaults to 20 and is capped at 100.

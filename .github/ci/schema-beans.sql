@@ -150,6 +150,7 @@ CREATE TABLE public.beans (
     id uuid NOT NULL,
     url character varying NOT NULL,
     kind character varying,
+    language character varying,
     title character varying,
     author character varying,
     image_url character varying,
@@ -184,43 +185,6 @@ CREATE TABLE public.publishers (
     collected timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
-
---
--- Name: beans_sources_view; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.beans_sources_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    p.domain_name,
-    p.site_name,
-    p.description,
-    p.favicon,
-    p.rss_feed
-   FROM (public.beans b
-     LEFT JOIN public.publishers p ON ((b.source_id = p.id)));
-
-
---
--- Name: chatters; Type: TABLE; Schema: public; Owner: -
---
 
 CREATE TABLE public.chatters (
     chatter_url character varying NOT NULL,
@@ -372,83 +336,30 @@ CREATE MATERIALIZED VIEW public.trend_aggregates AS
 -- Name: latest_beans_view; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW public.latest_beans_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    b.domain_name,
-    b.site_name,
-    b.description,
-    b.favicon,
-    b.rss_feed,
-    tr.observed,
-    tr.comments,
-    tr.mentions,
-    tr.likes,
-    tr.subscribers,
-    tr.related,
-    tr.trend_score,
-    tr.cluster_id
-   FROM (public.beans_sources_view b
-     LEFT JOIN public.trend_aggregates tr ON ((b.id = tr.id)));
+-- PRIMARY DIFF: between latest vs trending
+-- trending requires some chatter or related items. Hence INNER JOIN trend_aggregates
+-- latest does not require chatter or related items. Hence LEFT JOIN trend_aggregates
 
+CREATE OR REPLACE VIEW beans_sources_view AS
+SELECT
+    b.*,
+    p.domain_name, p.site_name, p.description, p.favicon, p.rss_feed
+FROM beans b
+LEFT JOIN publishers p ON b.source_id = p.id;
 
---
--- Name: trending_beans_view; Type: VIEW; Schema: public; Owner: -
---
+CREATE OR REPLACE VIEW latest_beans_view AS
+SELECT
+    b.*,
+    tr.likes, tr.comments, tr.subscribers, tr.mentions, tr.related, tr.observed, tr.cluster_id, tr.trend_score
+FROM beans_sources_view b
+LEFT JOIN trend_aggregates tr ON b.id = tr.id;
 
-CREATE VIEW public.trending_beans_view AS
- SELECT b.id,
-    b.url,
-    b.kind,
-    b.title,
-    b.author,
-    b.image_url,
-    b.created,
-    b.collected,
-    b.summary,
-    b.content,
-    b.restricted_content,
-    b.embedding,
-    b.categories,
-    b.sentiments,
-    b.regions,
-    b.entities,
-    b.tags,
-    b.source_id,
-    b.base_url,
-    b.domain_name,
-    b.site_name,
-    b.description,
-    b.favicon,
-    b.rss_feed,
-    tr.observed,
-    tr.comments,
-    tr.mentions,
-    tr.likes,
-    tr.subscribers,
-    tr.related,
-    tr.trend_score,
-    tr.cluster_id
-   FROM (public.beans_sources_view b
-     JOIN public.trend_aggregates tr ON ((b.id = tr.id)));
-
+CREATE OR REPLACE VIEW trending_beans_view AS
+SELECT
+    b.*,
+    tr.likes, tr.comments, tr.subscribers, tr.mentions, tr.related, tr.observed, tr.cluster_id, tr.trend_score
+FROM beans_sources_view b
+INNER JOIN trend_aggregates tr ON b.id = tr.id;
 
 --
 -- Name: beans beans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -507,6 +418,13 @@ CREATE INDEX idx_beans_entities ON public.beans USING gin (entities);
 --
 
 CREATE INDEX idx_beans_kind ON public.beans USING btree (kind);
+
+
+--
+-- Name: idx_beans_language; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_beans_language ON public.beans USING btree (language);
 
 
 --

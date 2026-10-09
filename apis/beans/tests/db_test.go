@@ -1,6 +1,7 @@
 package gobeansack_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -85,6 +86,39 @@ func TestQueryBeans(t *testing.T) {
 		assert.NotEmpty(t, bean.URL)
 	}
 	pp.Println("BEANS", page.Items)
+}
+
+func TestQueryBeansByLanguages(t *testing.T) {
+	pg_sack := setupTestDB()
+	defer pg_sack.Close()
+
+	unfiltered, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
+		CreatedFrom: testSearchFrom(),
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	require.NoError(t, err)
+	require.NotEmpty(t, unfiltered.Items)
+
+	es_only, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
+		Languages:   []string{"es"},
+		CreatedFrom: testSearchFrom(),
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	require.NoError(t, err)
+	require.NotEmpty(t, es_only.Items)
+	for _, bean := range es_only.Items {
+		require.True(t, bean.Language.Valid)
+		assert.True(t, strings.HasPrefix(bean.Language.String, "es"), "language %q", bean.Language.String)
+	}
+
+	both, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{
+		Languages:   []string{"en", "es"},
+		CreatedFrom: testSearchFrom(),
+	}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	require.NoError(t, err)
+	require.NotEmpty(t, both.Items)
+	for _, bean := range both.Items {
+		require.True(t, bean.Language.Valid)
+		assert.True(t, strings.HasPrefix(bean.Language.String, "en") || strings.HasPrefix(bean.Language.String, "es"), "language %q", bean.Language.String)
+	}
 }
 
 func TestQueryBeansUnfilteredBrowse(t *testing.T) {

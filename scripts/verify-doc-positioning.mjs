@@ -3,17 +3,17 @@ import { exists, issue, readText, rel } from "./verify-doc-lib.mjs";
 
 const POSITIONING = {
   beans:
-    "Beans is a publisher-content API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.",
+    "Beans is a public-information discovery API for news, blogs, financial and earnings reports, litigation and lawsuits, official statements, research, technical documents, and related coverage context.",
   espresso:
     "Espresso is a market and business intelligence API for discovering market actions, signals, and tracing concrete evidence.",
 };
 
 const SITE_METADATA = {
   description:
-    "Cafecito developer docs for Beans news and publisher-content APIs, Espresso market, business, event, and news intelligence APIs, and their MCP servers.",
+    "Cafecito developer docs for Beans public-information discovery, Espresso market, business, event, and news intelligence APIs, and their MCP servers.",
   keywords: [
     "news API",
-    "publisher content API",
+    "public information API",
     "article search API",
     "earnings reports API",
     "litigation monitoring",
@@ -29,11 +29,11 @@ const SITE_METADATA = {
 const TARGETS = [
   {
     file: "docs/pages/start/overview.mdx",
-    required: [POSITIONING.beans, POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.beans, POSITIONING.espresso],
   },
   {
     file: "docs/pages/api-overview.mdx",
-    required: [POSITIONING.beans, POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.beans, POSITIONING.espresso],
   },
   {
     file: "docs/pages/products/beans/overview.mdx",
@@ -41,19 +41,19 @@ const TARGETS = [
   },
   {
     file: "docs/pages/products/espresso/overview.mdx",
-    required: [POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.espresso],
   },
   {
     file: "docs/pages/products/espresso/migration.mdx",
-    required: ["Espresso is a market, business, event, and news intelligence API", POSITIONING.boundary],
+    required: [POSITIONING.espresso],
   },
   {
     file: "docs/pages/guides/mcp-ai-agents.mdx",
-    required: [POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.espresso],
   },
   {
     file: "docs/README.md",
-    required: [POSITIONING.beans, POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.beans, POSITIONING.espresso],
   },
   {
     file: "docs/zudoku.config.tsx",
@@ -72,7 +72,7 @@ const TARGETS = [
   },
   {
     file: "config/espresso.oas.json",
-    required: [POSITIONING.espresso, POSITIONING.boundary],
+    required: [POSITIONING.espresso],
   },
 ];
 

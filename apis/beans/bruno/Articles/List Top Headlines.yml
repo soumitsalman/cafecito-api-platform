@@ -7,6 +7,11 @@ info:
 http:
   method: GET
   url: "{{baseUrl}}/news/top-headlines"
+  params:
+    - name: languages
+      value: en,es
+      type: query
+      disabled: true
   auth: inherit
 settings:
   encodeUrl: true
@@ -42,6 +47,7 @@ examples:
                 "published_at": "",
                 "regions": [],
                 "sentiments": [],
+                "ideology": "",
                 "source": {
                   "description": "",
                   "domain": "",

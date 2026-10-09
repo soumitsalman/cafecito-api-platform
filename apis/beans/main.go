@@ -1,11 +1,10 @@
 // @title 			Beans News API & MCP
 // @version 		1.0
-// @description Beans finds and verifies what publishers published. It returns citable Articles, Source metadata, attention-ranked feeds, similar publisher reading, external Article mentions, and normalized filter discovery.
+// @description Beans provides public-information discovery, Source metadata, search, available content, related source material, external Article mentions, and normalized filter discovery.
 // @schemes 		https
-// @license.name 	MIT
 // @contact.name 	Project Cafecito
 // @contact.url  	https://cafecito.tech
-// @contact.email 	soumitsrah@cafecito.tech
+// @contact.email 	support@cafecito.tech
 package main
 
 import (
