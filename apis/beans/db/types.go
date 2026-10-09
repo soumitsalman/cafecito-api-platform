@@ -97,25 +97,23 @@ func (source *Source) IsZero() bool {
 	return source.ID == uuid.Nil || source.SourceProperties.IsZero()
 }
 
-type clusterBase struct {
-	ID          uuid.UUID       `db:"id"`
-	LastCreated time.Time       `db:"last_created"`
-	Distance    sql.NullFloat64 `db:"distance"`
-}
-
-// Cluster is a derived group of related articles sharing a cluster_id.
+// Cluster contains cluster_id, a representative Bean, and derived stats
 type Cluster struct {
-	clusterBase
-	Title        string    `db:"title"`
-	Summary      string    `db:"summary"`
-	FirstCreated time.Time `db:"first_created"`
-	BeanCount    int       `db:"bean_count"`
-	SourceCount  int       `db:"source_count"`
-	Categories   []string  `db:"categories"`
-	Regions      []string  `db:"regions"`
-	Entities     []string  `db:"entities"`
-	Tags         []string  `db:"tags"`
-	TopArticles  []Bean    `db:"-"`
+	ID           uuid.UUID       `db:"id"` // id of the cluster
+	Title        sql.NullString  `db:"title"`
+	Summary      sql.NullString  `db:"summary"`
+	ImageUrl     sql.NullString  `db:"image_url"`
+	FirstCreated time.Time       `db:"first_created"`
+	LastCreated  time.Time       `db:"last_created"`
+	BeansCount   int             `db:"beans_count"`
+	SourcesCount int             `db:"sources_count"`
+	Categories   []string        `db:"categories"`
+	Entities     []string        `db:"entities"`
+	Regions      []string        `db:"regions"`
+	Tags         []string        `db:"tags"`
+	TopBeans     []Bean          `db:"-"`
+	Created      time.Time       `db:"created"`  // created time of a representative bean - this helps the pagination
+	Distance     sql.NullFloat64 `db:"distance"` // distance of a representative bean to the embedding - this helps the vector search
 }
 
 func (s *Cluster) IsZero() bool {

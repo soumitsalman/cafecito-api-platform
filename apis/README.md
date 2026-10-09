@@ -13,7 +13,7 @@ Public product docs: [Beans overview](../docs/pages/products/beans/overview.mdx)
 
 Required: `PG_CONNECTION_STRING`. Optional: `EMBEDDER_BASE_URL`, `EMBEDDER_API_KEY`, `EMBEDDER_MODEL`, `PORT`, `API_KEY`.
 
-`API_KEY` is semicolon-separated `Header=Value` pairs for the **backend** process. Public clients authenticate with a Bearer API key at the gateway. Do not document private backend headers on public surfaces. If `API_KEY` is unset, backend auth is disabled.
+`API_KEY` is semicolon-separated `Header=Value` pairs for the **backend** process. Public clients authenticate with a Bearer API key at the gateway. Do not document preview backend headers on public surfaces. If `API_KEY` is unset, backend auth is disabled.
 
 ```bash
 cd apis/beans && go run .     # :8080

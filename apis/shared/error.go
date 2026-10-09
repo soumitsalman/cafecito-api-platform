@@ -10,6 +10,7 @@ const (
 	API_ERROR_INVALID_DATA    = "invalid_data"
 	API_ERROR_NOT_FOUND       = "not_found"
 	API_ERROR_UNAUTHORIZED    = "unauthorized"
+	API_ERROR_UNCATEGORIZED   = "uncategorized_error"
 )
 
 type APIError struct {

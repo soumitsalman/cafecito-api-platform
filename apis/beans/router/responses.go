@@ -101,26 +101,25 @@ type Trend struct {
 
 // ArticleDocument is the normalized public Article payload.
 type ArticleDocument struct {
-	ID         uuid.UUID `json:"id" swaggertype:"string" format:"uuid"`
-	URL        string    `json:"url"`
-	Kind       string    `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
-	Created    time.Time `json:"published_at" swaggertype:"string" format:"date-time"`
-	Author     *string   `json:"author"`
-	ImageURL   *string   `json:"image_url"`
-	Title      *string   `json:"title"`
-	Summary    *string   `json:"summary"`
-	Content    *string   `json:"content,omitempty"`
-	Language   *string   `json:"language,omitempty"`
-	Categories []string  `json:"categories"`
-	Regions    []string  `json:"regions"`
-	Entities   []string  `json:"entities"`
-	Sentiments []string  `json:"sentiments"`
-	// Ideology is an experimental political ideology label. It is omitted when unavailable and can misrepresent an Article based on geo-cultural context.
-	Ideology string          `json:"ideology,omitempty"`
-	Tags     []string        `json:"tags"`
-	StoryID  uuid.UUID       `json:"story_id,omitzero" swaggertype:"string" format:"uuid"`
-	Source   *SourceDocument `json:"source"`
-	Trend    *Trend          `json:"trend,omitempty"`
+	ID         uuid.UUID       `json:"id" swaggertype:"string" format:"uuid"`
+	URL        string          `json:"url"`
+	Kind       string          `json:"content_type" enums:"blog,contract,earnings_report,enforcement_action,financial_report,lawsuit,news,official_statement,podcast,post,press_release,research_paper,site,technical_documentation,whitepaper"`
+	Created    time.Time       `json:"published_at" swaggertype:"string" format:"date-time"`
+	Author     *string         `json:"author"`
+	ImageURL   *string         `json:"image_url"`
+	Title      *string         `json:"title"`
+	Summary    *string         `json:"summary"`
+	Content    *string         `json:"content,omitempty"`
+	Language   *string         `json:"language,omitempty"`
+	Categories []string        `json:"categories"`
+	Regions    []string        `json:"regions"`
+	Entities   []string        `json:"entities"`
+	Sentiments []string        `json:"sentiments"`
+	Ideology   string          `json:"ideology,omitempty"`
+	Tags       []string        `json:"tags"`
+	StoryID    uuid.UUID       `json:"story_id,omitzero" swaggertype:"string" format:"uuid"`
+	Source     *SourceDocument `json:"source"`
+	Trend      *Trend          `json:"trend,omitempty"`
 }
 
 func toArticleDocument(bean *db.Bean) *ArticleDocument {
@@ -343,9 +342,14 @@ func toArticlePreview(bean *db.Bean) ArticlePreviewDocument {
 
 // StoryDocument is the canonical Story payload for B09 and B10.
 type StoryDocument struct {
-	ID               uuid.UUID                `json:"id"`
-	Title            string                   `json:"title"`
-	Summary          string                   `json:"summary,omitempty"`
+	// Canonical ID of the story
+	ID uuid.UUID `json:"id"`
+	// Title of a representative article
+	Title string `json:"title"`
+	// Summary of a representative article
+	Summary string `json:"summary,omitempty"`
+	// Image URL of a representative article
+	ImageURL         string                   `json:"image_url,omitempty"`
 	FirstPublishedAt time.Time                `json:"first_published_at" swaggertype:"string" format:"date-time"`
 	LastPublishedAt  time.Time                `json:"last_published_at" swaggertype:"string" format:"date-time"`
 	ArticleCount     int                      `json:"article_count"`
@@ -363,7 +367,7 @@ type StoryLinks struct {
 }
 
 func toStoryDocument(story *db.Cluster) StoryDocument {
-	previews := datautils.Transform(story.TopArticles, func(bean *db.Bean) ArticlePreviewDocument {
+	previews := datautils.Transform(story.TopBeans, func(bean *db.Bean) ArticlePreviewDocument {
 		return toArticlePreview(bean)
 	})
 	if previews == nil {
@@ -371,12 +375,13 @@ func toStoryDocument(story *db.Cluster) StoryDocument {
 	}
 	return StoryDocument{
 		ID:               story.ID,
-		Title:            story.Title,
-		Summary:          story.Summary,
+		Title:            story.Title.String,
+		Summary:          story.Summary.String,
+		ImageURL:         story.ImageUrl.String,
 		FirstPublishedAt: story.FirstCreated,
 		LastPublishedAt:  story.LastCreated,
-		ArticleCount:     story.BeanCount,
-		SourceCount:      story.SourceCount,
+		ArticleCount:     story.BeansCount,
+		SourceCount:      story.SourcesCount,
 		Categories:       story.Categories,
 		Regions:          story.Regions,
 		Entities:         story.Entities,

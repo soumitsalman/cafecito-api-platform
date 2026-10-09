@@ -47,16 +47,8 @@ const (
 )
 
 const (
-	API_ERROR_MSG_OUR_BAD                     = "Our bad. Please try again later."
-	API_ERROR_MSG_SOURCE_NOT_FOUND            = "Source not found."
-	API_ERROR_MSG_TAG_NOT_FOUND               = "Tag not found."
-	API_ERROR_MSG_ENTITY_NOT_FOUND            = "Entity not found."
-	API_ERROR_MSG_REGION_NOT_FOUND            = "Region not found."
-	API_ERROR_MSG_CATEGORY_NOT_FOUND          = "Category not found."
-	API_ERROR_MSG_COMPANY_NOT_FOUND           = "Company not found."
-	API_ERROR_MSG_PRODUCT_NOT_FOUND           = "Product not found."
-	API_ERROR_MSG_ARTICLE_NOT_FOUND           = "Article not found."
-	API_ERROR_MSG_STORY_NOT_FOUND             = "Story not found."
+	API_ERROR_MSG_OUR_BAD                     = "Our bad, please try again later."
+	API_ERROR_MSG_ITEM_NOT_FOUND              = "Item with this ID not found."
 	API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED    = "score_threshold>0 is required when q is provided."
 	API_ERROR_MSG_UNSUPPORTED_QUERY_PARAMETER = "Unknown or unsupported query parameter: "
 )
@@ -126,14 +118,6 @@ func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*
 
 func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFilterParams.createFilters(c, r)
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
-		return nil, err
-	}
-	return filters, nil
-}
-
-func (p *topHeadlinesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleScopeParams.createFilters(c, r)
 	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
@@ -234,8 +218,14 @@ func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next
 // Uses InternalServerError for DB, Embedding, Encoding errors and default cases
 func writeError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
-	body := ErrorBody{Code: utils.API_ERROR_DB_ERROR, Message: err.Error()}
-	if api_err, ok := err.(utils.APIError); ok {
+	body := ErrorBody{Code: utils.API_ERROR_UNCATEGORIZED, Message: err.Error()}
+	if errors.Is(err, db.ErrNonExistentID) {
+		body.Code = utils.API_ERROR_NOT_FOUND
+		body.Message = API_ERROR_MSG_ITEM_NOT_FOUND
+	} else if errors.Is(err, db.DBError) {
+		body.Code = utils.API_ERROR_DB_ERROR
+		body.Message = API_ERROR_MSG_OUR_BAD
+	} else if api_err, ok := err.(utils.APIError); ok {
 		body.Code = api_err.Code
 		body.Message = api_err.Message
 		switch api_err.Code {
@@ -302,7 +292,6 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-
 	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
 		utils.LogError(err, "[ERROR] QueryBeans")
@@ -346,10 +335,6 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
-		return
-	}
-	if params.Q != "" && params.ScoreThreshold <= 0 {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
 		return
 	}
 	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
@@ -396,10 +381,6 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	if params.Q != "" && params.ScoreThreshold <= 0 {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
-		return
-	}
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_TREND)
 	if err != nil {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
@@ -410,7 +391,7 @@ func (r *Configuration) getTrendingArticles(c *gin.Context) {
 
 // getLatestNews godoc
 // @Summary List latest news
-// @Description Returns news Articles ordered newest first. Equivalent to /articles/latest?content_type=news. content_type and date bounds are not accepted.
+// @Description Returns news ordered newest first. Equivalent to /articles/latest?content_type=news. content_type and date bounds are not accepted.
 // @Tags Articles
 // @Security BackendAPIKey
 // @Produce json
@@ -449,7 +430,7 @@ func (r *Configuration) getLatestNews(c *gin.Context) {
 
 // getTrendingNews godoc
 // @Summary List trending news
-// @Description Returns attention-ranked news Articles with trend metrics when available. Equivalent to /articles/trending?content_type=news. content_type and date bounds are not accepted.
+// @Description Returns attention-ranked news with trend metrics when available. Equivalent to /articles/trending?content_type=news. content_type and date bounds are not accepted.
 // @Tags Articles
 // @Security BackendAPIKey
 // @Produce json
@@ -487,12 +468,12 @@ func (r *Configuration) getTrendingNews(c *gin.Context) {
 }
 
 // getTopHeadlines is the B04 GET /news/top-headlines target scaffold.
-// Primary difference between getTrendingArticles and getTopHeadlines is the window of time (last 24 hours) and content type (news).
-// getTopHeadlines is always fixed within the last 24 hours and `news` content type. The returned news are created and trending in the last 24 hours.
+// Primary difference between getTrendingArticles and getTopHeadlines is the window of time (last 48 hours) and content type (news).
+// getTopHeadlines is always fixed within the last 48 hours and `news` content type. The returned news are created and trending in the last 48 hours.
 // The result excludes content unless explicitly requested.
 // getTopHeadlines godoc
 // @Summary List top headlines
-// @Description Returns news Articles from the recent 24-hour window, ordered by attention. content_type and date bounds are not accepted.
+// @Description Returns news headlines from the recent 48-hour window. content_type and date bounds are not accepted.
 // @Tags Articles
 // @Security BackendAPIKey
 // @Produce json
@@ -519,18 +500,14 @@ func (r *Configuration) getTrendingNews(c *gin.Context) {
 // @ID getTopHeadlines
 // @Router /news/top-headlines [get]
 func (r *Configuration) getTopHeadlines(c *gin.Context) {
-	var params topHeadlinesParams
+	var params articleFeedParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	if params.Q != "" && params.ScoreThreshold <= 0 {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED))
-		return
-	}
 	filters.CreatedFrom = time.Now().AddDate(0, 0, -2)
-	filters.ObservedFrom = time.Now().AddDate(0, 0, -1)
+	filters.ObservedFrom = time.Now().AddDate(0, 0, -2)
 	filters.Kind = "news"
 
 	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
@@ -579,11 +556,7 @@ func (r *Configuration) getArticle(c *gin.Context) {
 	}
 	bean, err := r.DB.GetBean(c.Request.Context(), params.ID, params.FullContent)
 	if err != nil {
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
+		writeError(c, err)
 		return
 	}
 	writeDetail(c, *toArticleDetail(&bean))
@@ -630,11 +603,7 @@ func (r *Configuration) getSimilarArticles(c *gin.Context) {
 
 	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
+		writeError(c, err)
 		return
 	}
 	writeCollection(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
@@ -677,11 +646,7 @@ func (r *Configuration) getArticleMentions(c *gin.Context) {
 	}
 	page_out, err := r.DB.QueryMentions(c.Request.Context(), params.ID, *filters, *page_req)
 	if err != nil {
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_ARTICLE_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
+		writeError(c, err)
 		return
 	}
 	writeCollection(c, toMentionDocuments(page_out.Items), page_req.Limit, page_out.NextCursor)
@@ -749,12 +714,7 @@ func (r *Configuration) getSource(c *gin.Context) {
 
 	source, err := r.DB.GetSource(c.Request.Context(), params.ID)
 	if err != nil {
-		utils.LogError(err, "[ERROR] GetSource")
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_SOURCE_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
+		writeError(c, err)
 		return
 	}
 	writeDetail(c, toSourceDocument(&source))
@@ -927,13 +887,9 @@ func (r *Configuration) getStory(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	story, err := r.DB.GetCluster(c.Request.Context(), params.ID)
+	story, err := r.DB.GetCluster(c.Request.Context(), params.ID, db.BeanFilters{})
 	if err != nil {
-		if errors.Is(err, db.ErrNonExistentID) {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
-		} else {
-			writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		}
+		writeError(c, err)
 		return
 	}
 	writeDetail(c, toStoryDetail(&story))
@@ -977,20 +933,10 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	exists, err := r.DB.ClusterExists(c.Request.Context(), params.ID)
-	if err != nil {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
-		return
-	}
-	if !exists {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_NOT_FOUND, API_ERROR_MSG_STORY_NOT_FOUND))
-		return
-	}
-	filters.ClusterID = params.ID
 
-	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QueryClusterMembers(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
 	if err != nil {
-		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
+		writeError(c, err)
 		return
 	}
 	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.ID)
@@ -1059,14 +1005,14 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	protected.GET("/stories/:id", config.getStory)
 	protected.GET("/stories/:id/articles", config.getStoryArticles)
 
-	// PRIVATE routes. These are not part of the public API and are intended for internal use.
+	// preview routes. These are not part of the public API and are intended for internal use.
 	// They may change without notice.
 	// Exclude these from Swaggo and `beans.oas.json` generation.
-	private := protected.Group("/private")
-	private.GET("/articles/unique", config.privateGetUniqueArticles)
-	private.GET("/articles/:id/similar", config.privateGetSimilarArticles)
-	// private.GET("/stories/:id", config.privateGetStory)
-	private.GET("/stories/:id/articles", config.privateGetStoryArticles)
+	preview := protected.Group("/preview")
+	preview.GET("/articles/:id/similar", config.previewGetSimilarArticles)
+	preview.GET("/stories", config.previewGetStories)
+	preview.GET("/stories/:id", config.previewGetStory)
+	preview.GET("/stories/:id/articles", config.previewGetStoryArticles)
 
 	return router
 }

@@ -48,9 +48,9 @@ Auth/gateway behavior:
 - Zudoku signs the create-key request using Clerk auth context.
 - Created Zuplo consumers carry `tags.sub`, `tags.email`, and metadata such as `subscription_plan` and `subscription_status`.
 - `gate-auth` currently requires an authenticated user but has inactive-subscription blocking commented out.
-- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)` (private; never document this header on public surfaces).
+- Gateway injects backend auth with `X-API-KEY: $env(BACKEND_API_KEY)` (preview; never document this header on public surfaces).
 - Published docs: one API key works across product APIs and MCP endpoints.
-- **Frozen public policy:** free tier **100 requests/minute** and **50,000 requests/month** per authenticated user; REST clients send `Authorization: Bearer` except **health** (unauthenticated); do not publish private backend headers.
+- **Frozen public policy:** free tier **100 requests/minute** and **50,000 requests/month** per authenticated user; REST clients send `Authorization: Bearer` except **health** (unauthenticated); do not publish preview backend headers.
 
 Docs/products:
 
@@ -74,7 +74,7 @@ The backend Swagger, gateway OpenAPI, and portal pages are separate artifacts. A
   - MCP endpoint, tool list, and agent workflow: `docs/pages/guides/mcp-ai-agents.mdx`;
   - shared authentication, pagination, or response-format behavior: `docs/pages/guides/api-conventions.mdx` and, when the quickstart changes, `docs/pages/start/first-api-call.mdx`.
 - Update `docs/zudoku.config.tsx` whenever an API reference mount, documentation page, navigation item, or redirect changes. Update `docs/pages/api-overview.mdx` or `docs/pages/start/overview.mdx` only when product availability or high-level positioning changes.
-- **`/private` routes are internal** for Beans and Espresso and may change without a public contract update. Do not document them in `docs/pages/`, generated Swagger, gateway OpenAPI (`config/beans.oas.json`, `config/espresso.oas.json`), MCP tool lists, or portal navigation. Do not add Swagger comments on private handlers, so `swag` does not emit them. A `/private` change does not require those public artifacts, and the Definition of Done for a public API change does not apply.
+- **`/preview` routes are internal** for Beans and Espresso and may change without a public contract update. Do not document them in `docs/pages/`, generated Swagger, gateway OpenAPI (`config/beans.oas.json`, `config/espresso.oas.json`), MCP tool lists, or portal navigation. Do not add Swagger comments on preview handlers, so `swag` does not emit them. A `/preview` change does not require those public artifacts, and the Definition of Done for a public API change does not apply.
 
 ### Public documentation boundary
 
@@ -84,7 +84,7 @@ Never expose:
 
 - persistence architecture: Espresso's `cupboard`, `sips`, `sources`, or `relations` tables; relationship values such as `same_as` and `derived_from`; digest payloads and their structure; Beans' `beansack` and database tables; SQL, schemas, columns, foreign-key choices, indexes, materialized views, or migration details;
 - retrieval implementation: embeddings, vector dimensions or indexes, HNSW, embedder/model configuration, caches, query internals, or relation direction/relationship storage;
-- private code and operations: Go packages/types/handlers, internal identifiers, backend environment variables or headers, gateway rewrites/policies, infrastructure/vendor details, credentials, quotas implementation, and operational topology.
+- preview code and operations: Go packages/types/handlers, internal identifiers, backend environment variables or headers, gateway rewrites/policies, infrastructure/vendor details, credentials, quotas implementation, and operational topology.
 
 Public docs may describe Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements, but not how those concepts are stored or implemented.
 
@@ -143,7 +143,7 @@ Zuplo production deploy is GitHub integration: configure path filters to exclude
 
 CODEOWNERS: `.github/CODEOWNERS` (`@soumitsalman`). PR checklist: `.github/pull_request_template.md`.
 
-Definition of Done for a public API change (`/private` routes are excluded; see the documentation dependency map):
+Definition of Done for a public API change (`/preview` routes are excluded; see the documentation dependency map):
 
 1. Runtime behavior and tests are complete.
 2. Annotations are updated.

@@ -673,14 +673,14 @@ CREATE UNIQUE INDEX idx_trend_aggregates_id ON public.trend_aggregates USING btr
 
 Swagger annotations, gateway OpenAPI, portal pages are separate artifacts. They need to be updated separately.
 
-`/private` routes are internal for Beans and Espresso. Do not add Swagger comments, generated Swagger entries, `../config/<product>.oas.json` paths, portal pages, or MCP tools for them. A `/private` change does not follow the public-route steps below or the public API Definition of Done.
+`/preview` routes are internal for Beans and Espresso. Do not add Swagger comments, generated Swagger entries, `../config/<product>.oas.json` paths, portal pages, or MCP tools for them. A `/preview` change does not follow the public-route steps below or the public API Definition of Done.
 
 For any update in public routes, params and responses
 1. Update Swagger annotations in `apis/<product>/router/` as the service-local contract. After annotation changes, regenerate and commit the service's Swagger outputs; never hand-edit generated `docs/docs.go`, `docs/swagger.json`, or `docs/swagger.yaml`. Always include request, response and error type definiton for each route.
 2. Update api gateway definitions `../config/<product>.oas.json`'
 3. Update developer portal docs under `../docs/pages` e.g. ', `../docs/pages/products/<product>/`, and their effect on shared documents like `../docs/pages/start`, `../docs/pages/guides`. Always include sample params and responses
 4. Update corresponding Bruno definitions in `<product>/bruno/`
-5. Close the Definition of Done in root `AGENTS.md` and `.github/pull_request_template.md`. Maintainer run/test/swag commands: [`README.md`](README.md). Frozen public policy: **100/min**, **50,000/month**, **Bearer** except health, no private backend headers in public docs. Contract/docs GitHub workflow is manual only and does not gate CI.
+5. Close the Definition of Done in root `AGENTS.md` and `.github/pull_request_template.md`. Maintainer run/test/swag commands: [`README.md`](README.md). Frozen public policy: **100/min**, **50,000/month**, **Bearer** except health, no preview backend headers in public docs. Contract/docs GitHub workflow is manual only and does not gate CI.
 
 ### Public documentation boundary
 
@@ -690,7 +690,7 @@ Never expose:
 
 - database internals: Espresso's `cupboard`, `sips`, `sources`, and `relations` storage; internal relationship values such as `same_as` and `derived_from`; digest payloads and their structure; Beans' `beansack` storage; table, schema, column, foreign-key, index, view, or migration details;
 - retrieval internals: embeddings, vector dimensions/indexes, HNSW, embedder/model settings, caches, query implementation, or relation direction/relationship storage;
-- private implementation and operations: Go package/type/handler names, internal identifiers, backend environment variables and headers, gateway rewrites or policies, infrastructure/vendor topology, credentials, or rate-limit/quota implementation.
+- preview implementation and operations: Go package/type/handler names, internal identifiers, backend environment variables and headers, gateway rewrites or policies, infrastructure/vendor topology, credentials, or rate-limit/quota implementation.
 
 Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements are public concepts. Describe them without exposing their storage or implementation.
 

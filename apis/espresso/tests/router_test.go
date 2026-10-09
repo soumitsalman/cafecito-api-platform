@@ -1011,27 +1011,27 @@ func TestRouterDiscoveryRoutes(t *testing.T) {
 	}
 }
 
-func TestRouterPrivateConfidence(t *testing.T) {
+func TestRouterPreviewConfidence(t *testing.T) {
 	srv := newTestHTTPServer(t)
 
-	status, body := routerGET(t, srv.URL, "/private/confidence", nil, "")
+	status, body := routerGET(t, srv.URL, "/preview/confidence", nil, "")
 	requireStatus(t, http.StatusBadRequest, status, body)
 	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 
-	status, body = routerGET(t, srv.URL, "/private/confidence", url.Values{"ids": {"not-a-uuid"}}, "")
+	status, body = routerGET(t, srv.URL, "/preview/confidence", url.Values{"ids": {"not-a-uuid"}}, "")
 	requireStatus(t, http.StatusBadRequest, status, body)
 	assertExpectedAPIError(t, body, shared.API_ERROR_INVALID_REQUEST)
 
 	const fixture_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01"
 	status, body = routerGET(t, srv.URL, "/events/"+fixture_id, nil, "")
 	if status == http.StatusNotFound {
-		assertPrivateConfidenceForLiveEvent(t, srv.URL)
+		assertPreviewConfidenceForLiveEvent(t, srv.URL)
 		return
 	}
 	requireStatus(t, http.StatusOK, status, body)
 
 	unknown_id := uuid.NewString()
-	status, body = routerGET(t, srv.URL, "/private/confidence", url.Values{
+	status, body = routerGET(t, srv.URL, "/preview/confidence", url.Values{
 		"ids": {fixture_id + "," + unknown_id},
 	}, "")
 	requireStatus(t, http.StatusOK, status, body)
@@ -1043,13 +1043,13 @@ func TestRouterPrivateConfidence(t *testing.T) {
 	assert.Nil(t, items[1]["confidence"])
 }
 
-func assertPrivateConfidenceForLiveEvent(t *testing.T, base string) {
+func assertPreviewConfidenceForLiveEvent(t *testing.T, base string) {
 	t.Helper()
 	status, body := routerGET(t, base, ROUTE_SIGNALS, url.Values{"limit": {"1"}}, "")
 	requireStatus(t, http.StatusOK, status, body)
 	signals := parseDigestArray(t, body)
 	if len(signals) == 0 {
-		t.Skip("no signals available to exercise private confidence")
+		t.Skip("no signals available to exercise preview confidence")
 	}
 	signal_id, ok := signals[0]["id"].(string)
 	require.True(t, ok)
@@ -1069,7 +1069,7 @@ func assertPrivateConfidenceForLiveEvent(t *testing.T, base string) {
 	require.NotEmpty(t, derived)
 
 	unknown_id := uuid.NewString()
-	status, body = routerGET(t, base, "/private/confidence", url.Values{
+	status, body = routerGET(t, base, "/preview/confidence", url.Values{
 		"ids": {event_id + "," + unknown_id},
 	}, "")
 	requireStatus(t, http.StatusOK, status, body)

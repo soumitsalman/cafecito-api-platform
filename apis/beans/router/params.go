@@ -1,9 +1,6 @@
 package router
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,65 +37,65 @@ func (params *itemIDParams) shouldBind(c *gin.Context) error {
 }
 
 func bindQuery(c *gin.Context, params any) error {
-	if err := rejectUnknownQuery(c, params); err != nil {
-		return err
-	}
+	// if err := rejectUnknownQuery(c, params); err != nil {
+	// 	return err
+	// }
 	if err := c.ShouldBindQuery(params); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
-func rejectUnknownQuery(c *gin.Context, params any) error {
-	allowed := formQueryNames(params)
-	for key := range c.Request.URL.Query() {
-		if _, ok := allowed[key]; !ok {
-			return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, fmt.Sprintf("Unknown or unsupported query parameter: %s", key))
-		}
-	}
-	return nil
-}
+// func rejectUnknownQuery(c *gin.Context, params any) error {
+// 	allowed := formQueryNames(params)
+// 	for key := range c.Request.URL.Query() {
+// 		if _, ok := allowed[key]; !ok {
+// 			return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, fmt.Sprintf("Unknown or unsupported query parameter: %s", key))
+// 		}
+// 	}
+// 	return nil
+// }
 
-func formQueryNames(params any) map[string]struct{} {
-	names := map[string]struct{}{}
-	collectFormNames(reflect.TypeOf(params), names)
-	return names
-}
+// func formQueryNames(params any) map[string]struct{} {
+// 	names := map[string]struct{}{}
+// 	collectFormNames(reflect.TypeOf(params), names)
+// 	return names
+// }
 
-func collectFormNames(t reflect.Type, names map[string]struct{}) {
-	if t == nil {
-		return
-	}
-	if t.Kind() == reflect.Pointer {
-		collectFormNames(t.Elem(), names)
-		return
-	}
-	if t.Kind() != reflect.Struct {
-		return
-	}
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if field.Anonymous {
-			collectFormNames(field.Type, names)
-			continue
-		}
-		tag := field.Tag.Get("form")
-		if tag == "" || tag == "-" {
-			continue
-		}
-		name := strings.Split(tag, ",")[0]
-		if name != "" {
-			names[name] = struct{}{}
-		}
-	}
-}
+// func collectFormNames(t reflect.Type, names map[string]struct{}) {
+// 	if t == nil {
+// 		return
+// 	}
+// 	if t.Kind() == reflect.Pointer {
+// 		collectFormNames(t.Elem(), names)
+// 		return
+// 	}
+// 	if t.Kind() != reflect.Struct {
+// 		return
+// 	}
+// 	for i := 0; i < t.NumField(); i++ {
+// 		field := t.Field(i)
+// 		if field.Anonymous {
+// 			collectFormNames(field.Type, names)
+// 			continue
+// 		}
+// 		tag := field.Tag.Get("form")
+// 		if tag == "" || tag == "-" {
+// 			continue
+// 		}
+// 		name := strings.Split(tag, ",")[0]
+// 		if name != "" {
+// 			names[name] = struct{}{}
+// 		}
+// 	}
+// }
 
-func requireScoreThresholdNeedsQ(c *gin.Context, q string) error {
-	if _, present := c.GetQuery("score_threshold"); present && strings.TrimSpace(q) == "" {
-		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "score_threshold requires q")
-	}
-	return nil
-}
+// func requireScoreThresholdNeedsQ(c *gin.Context, q string) error {
+// 	if _, present := c.GetQuery("score_threshold"); present && strings.TrimSpace(q) == "" {
+// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "score_threshold requires q")
+// 	}
+// 	return nil
+// }
 
 // articleScopeParams is the Article filter set shared by feeds and search, excluding content_type.
 type articleScopeParams struct {
@@ -142,23 +139,26 @@ func (params *articleFeedParams) shouldBind(c *gin.Context) error {
 	if err := bindQuery(c, params); err != nil {
 		return err
 	}
-	return requireScoreThresholdNeedsQ(c, params.Q)
-}
-
-// topHeadlinesParams is GET /news/top-headlines, /news/latest, and /news/trending.
-// It rejects ids, urls, from, to, and content_type.
-type topHeadlinesParams struct {
-	articleScopeParams
-	vectorSearchParams
-	paginationParams
-}
-
-func (params *topHeadlinesParams) shouldBind(c *gin.Context) error {
-	if err := bindQuery(c, params); err != nil {
-		return err
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED)
 	}
-	return requireScoreThresholdNeedsQ(c, params.Q)
+	return nil
 }
+
+// // topHeadlinesParams is GET /news/top-headlines, /news/latest, and /news/trending.
+// // It rejects ids, urls, from, to, and content_type.
+// type topHeadlinesParams struct {
+// 	articleScopeParams
+// 	vectorSearchParams
+// 	paginationParams
+// }
+
+// func (params *topHeadlinesParams) shouldBind(c *gin.Context) error {
+// 	if err := bindQuery(c, params); err != nil {
+// 		return err
+// 	}
+// 	return requireScoreThresholdNeedsQ(c, params.Q)
+// }
 
 // articleSearchParams is the B01 GET /articles/search target request.
 type articleSearchParams struct {
@@ -174,7 +174,7 @@ func (params *articleSearchParams) shouldBind(c *gin.Context) error {
 	if err := bindQuery(c, params); err != nil {
 		return err
 	}
-	return requireScoreThresholdNeedsQ(c, params.Q)
+	return nil
 }
 
 // articleDetailParams is the B02 GET /articles/{id} target request. The
@@ -264,23 +264,6 @@ func (params *tagListParams) shouldBind(c *gin.Context) error {
 	return bindQuery(c, params)
 }
 
-// // storyPathParams binds the B10/B11 path story_id parameter.
-// // Story IDs are opaque strings (currently a derived cluster key; later a URL).
-// type storyPathParams struct {
-// 	StoryID string `uri:"story_id" binding:"required"`
-// }
-
-// func (params *storyPathParams) shouldBind(c *gin.Context) error {
-// 	if err := c.ShouldBindUri(params); err != nil {
-// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
-// 	}
-// 	params.StoryID = strings.TrimSpace(params.StoryID)
-// 	if params.StoryID == "" {
-// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "story_id is required")
-// 	}
-// 	return nil
-// }
-
 // storySearchParams is the B09 GET /stories target request.
 type storySearchParams struct {
 	articleFilterParams
@@ -295,7 +278,7 @@ func (params *storySearchParams) shouldBind(c *gin.Context) error {
 	if err := bindQuery(c, params); err != nil {
 		return err
 	}
-	return requireScoreThresholdNeedsQ(c, params.Q)
+	return nil
 }
 
 // articleCountParams is the B19 GET /articles/count target request.

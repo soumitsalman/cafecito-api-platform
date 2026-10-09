@@ -901,11 +901,11 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 	protected.GET("/signals/:id", config.getSignal)
 	protected.GET("/signals/:id/events", config.getSignalEvents)
 
-	// PRIVATE routes. These are not part of the public API and are intended for internal use.
+	// PREVIEW routes. These are not part of the public API and are intended for internal use.
 	// They may change without notice.
 	// Exclude these from Swaggo and `espresso.oas.json` generation.
-	private := protected.Group("/private")
-	private.GET("/confidence", config.privateGetConfidence)
+	preview := protected.Group("/preview")
+	preview.GET("/confidence", config.previewGetConfidence)
 
 	return router
 }

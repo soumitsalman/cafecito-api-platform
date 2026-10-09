@@ -1,20 +1,18 @@
 info:
-  name: List Unique Articles
+  name: List Story Previews
   type: http
   seq: 1
   tags:
-    - Private
+    - preview
 
 http:
   method: GET
-  url: "{{baseUrl}}/private/articles/unique?sort=recent&q=climate+issues+negotiation&limit=20&content_type=news&score_threshold=0.5&from=2026-09-25"
+  url: "{{baseUrl}}/preview/stories?limit=20&content_type=news&score_threshold=0.7&from=2026-09-25&languages=en,es"
   params:
-    - name: sort
-      value: recent
-      type: query
     - name: q
       value: climate+issues+negotiation
       type: query
+      disabled: true
     - name: limit
       value: "20"
       type: query
@@ -22,7 +20,7 @@ http:
       value: news
       type: query
     - name: score_threshold
-      value: "0.5"
+      value: "0.7"
       type: query
     - name: from
       value: 2026-09-25
@@ -30,7 +28,6 @@ http:
     - name: languages
       value: en,es
       type: query
-      disabled: true
   auth: inherit
 
 settings:
@@ -44,7 +41,7 @@ examples:
   - name: 200 Response
     description: OK
     request:
-      url: "{{baseUrl}}/private/articles/unique"
+      url: "{{baseUrl}}/preview/articles/unique"
       method: GET
     response:
       status: 200
@@ -104,7 +101,7 @@ examples:
   - name: 400 Response
     description: Bad Request
     request:
-      url: "{{baseUrl}}/private/articles/unique"
+      url: "{{baseUrl}}/preview/articles/unique"
       method: GET
     response:
       status: 400
@@ -124,7 +121,7 @@ examples:
   - name: 401 Response
     description: Unauthorized
     request:
-      url: "{{baseUrl}}/private/articles/unique"
+      url: "{{baseUrl}}/preview/articles/unique"
       method: GET
     response:
       status: 401
@@ -144,7 +141,7 @@ examples:
   - name: 500 Response
     description: Internal Server Error
     request:
-      url: "{{baseUrl}}/private/articles/unique"
+      url: "{{baseUrl}}/preview/articles/unique"
       method: GET
     response:
       status: 500

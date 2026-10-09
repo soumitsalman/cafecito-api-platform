@@ -519,21 +519,21 @@ func TestQueryClusters(t *testing.T) {
 	for _, story := range page.Items {
 		assert.NotEmpty(t, story.ID)
 		assert.NotEmpty(t, story.Title)
-		assert.GreaterOrEqual(t, story.BeanCount, 2)
-		assert.GreaterOrEqual(t, story.SourceCount, 1)
-		assert.NotEmpty(t, story.TopArticles)
-		assert.LessOrEqual(t, len(story.TopArticles), 3)
+		assert.GreaterOrEqual(t, story.BeansCount, 2)
+		assert.GreaterOrEqual(t, story.SourcesCount, 1)
+		assert.NotEmpty(t, story.TopBeans)
+		assert.LessOrEqual(t, len(story.TopBeans), 3)
 		assert.NotNil(t, story.Categories)
 		assert.NotNil(t, story.Regions)
 		assert.NotNil(t, story.Entities)
 		assert.NotNil(t, story.Tags)
 
-		source_ids := make(map[uuid.UUID]struct{}, len(story.TopArticles))
-		for _, article := range story.TopArticles {
+		source_ids := make(map[uuid.UUID]struct{}, len(story.TopBeans))
+		for _, article := range story.TopBeans {
 			source_ids[article.SourceID] = struct{}{}
 		}
-		if story.SourceCount >= 3 {
-			assert.Equal(t, len(story.TopArticles), len(source_ids))
+		if story.SourcesCount >= 3 {
+			assert.Equal(t, len(story.TopBeans), len(source_ids))
 		}
 	}
 	pp.Println("STORIES", page.Items)
@@ -551,12 +551,12 @@ func TestGetCluster(t *testing.T) {
 	require.NotEmpty(t, list.Items)
 	want := list.Items[0]
 
-	cluster, err := pg_sack.GetCluster(test_ctx, want.ID)
+	cluster, err := pg_sack.GetCluster(test_ctx, want.ID, db.BeanFilters{})
 	require.NoError(t, err)
 	assert.False(t, cluster.IsZero())
 	assert.Equal(t, want.ID, cluster.ID)
-	assert.GreaterOrEqual(t, cluster.BeanCount, 2)
-	assert.NotEmpty(t, cluster.TopArticles)
+	assert.GreaterOrEqual(t, cluster.BeansCount, 2)
+	assert.NotEmpty(t, cluster.TopBeans)
 	pp.Println("CLUSTER", cluster)
 }
 
@@ -564,7 +564,7 @@ func TestGetClusterNotFound(t *testing.T) {
 	pg_sack := setupTestDB()
 	defer pg_sack.Close()
 
-	cluster, err := pg_sack.GetCluster(test_ctx, uuid.UUID{})
+	cluster, err := pg_sack.GetCluster(test_ctx, uuid.UUID{}, db.BeanFilters{})
 	assert.ErrorIs(t, err, db.ErrNonExistentID)
 	assert.True(t, cluster.IsZero())
 }
@@ -581,11 +581,7 @@ func TestQueryStoryArticles(t *testing.T) {
 	require.NotEmpty(t, list.Items)
 	cluster_id := list.Items[0].ID
 
-	exists, err := pg_sack.ClusterExists(test_ctx, cluster_id)
-	require.NoError(t, err)
-	assert.True(t, exists)
-
-	page, err := pg_sack.QueryBeans(test_ctx, db.BeanFilters{ClusterID: cluster_id}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page, err := pg_sack.QueryClusterMembers(test_ctx, cluster_id, db.BeanFilters{}, db.PageRequest{Limit: 5}, db.BEAN_COLUMNS_WITHOUT_TREND)
 	require.NoError(t, err)
 	require.NotEmpty(t, page.Items)
 	for _, bean := range page.Items {

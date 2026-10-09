@@ -11,7 +11,7 @@ This collection is **not** the public contract. Align requests with `apis/beans/
 | `baseUrl` | `http://localhost:8080` | No `/beans` prefix on the backend. |
 | `apiKey` | Bearer token | Required for every request except `GET /health` when the process has `API_KEY` set. Public clients send `Authorization: Bearer <key>`. |
 
-Do not document or rely on private backend headers in public copy.
+Do not document or rely on preview backend headers in public copy.
 
 ## Contract reminders
 
@@ -24,4 +24,4 @@ Do not document or rely on private backend headers in public copy.
 
 Operation names in the public folders match public `operationId` values (for example Search Articles → `searchArticles`, List Top Headlines → `getTopHeadlines`).
 
-The `Private` folder calls internal backend paths under `/private`. Those routes are not in the public OpenAPI or portal docs.
+The `preview` folder calls internal backend paths under `/preview`. Those routes are not in the public OpenAPI or portal docs.

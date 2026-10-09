@@ -34,7 +34,8 @@ func LogResult(items any, err error) {
 }
 
 func LogQuery(query string, args map[string]any) {
-	evt := log.Debug().Str("module", "DB").Str("sql", query)
+	fmt.Println(query)
+	evt := log.Debug().Str("module", "DB")
 	for key, value := range args {
 		if key != "embedding" {
 			evt = evt.Interface(key, value)
