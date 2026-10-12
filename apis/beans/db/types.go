@@ -110,10 +110,9 @@ type Cluster struct {
 	Categories   []string        `db:"categories"`
 	Entities     []string        `db:"entities"`
 	Regions      []string        `db:"regions"`
-	Tags         []string        `db:"tags"`
 	TopBeans     []Bean          `db:"-"`
-	Created      time.Time       `db:"created"`  // created time of a representative bean - this helps the pagination
 	Distance     sql.NullFloat64 `db:"distance"` // distance of a representative bean to the embedding - this helps the vector search
+	TrendProperties
 }
 
 func (s *Cluster) IsZero() bool {

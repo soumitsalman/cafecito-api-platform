@@ -141,13 +141,13 @@ func toArticleDocument(bean *db.Bean) *ArticleDocument {
 		Content:    nullStringPtr(bean.Content),
 		Language:   nullStringPtr(bean.Language),
 		StoryID:    bean.ClusterID,
-		Trend:      nullArticleTrendPtr(bean),
-		Source:     nullArticleSourcePtr(bean),
+		Trend:      nullTrendPtr(&bean.TrendProperties),
+		Source:     nullSourcePtr(bean),
 	}
 	return doc
 }
 
-func nullArticleSourcePtr(bean *db.Bean) *SourceDocument {
+func nullSourcePtr(bean *db.Bean) *SourceDocument {
 	if !bean.SourceProperties.IsZero() {
 		doc := toSourceDocumentProperities(&bean.SourceProperties)
 		doc.ID = bean.SourceID
@@ -156,15 +156,15 @@ func nullArticleSourcePtr(bean *db.Bean) *SourceDocument {
 	return nil
 }
 
-func nullArticleTrendPtr(bean *db.Bean) *Trend {
-	if bean.Likes.Valid || bean.Comments.Valid || bean.Mentions.Valid || bean.Subscribers.Valid || bean.Related.Valid {
+func nullTrendPtr(trend *db.TrendProperties) *Trend {
+	if trend.Likes.Valid || trend.Comments.Valid || trend.Mentions.Valid || trend.Subscribers.Valid || trend.Related.Valid {
 		return &Trend{
-			Likes:       nullInt64Ptr(bean.Likes),
-			Comments:    nullInt64Ptr(bean.Comments),
-			Mentions:    nullInt64Ptr(bean.Mentions),
-			Subscribers: nullInt64Ptr(bean.Subscribers),
-			Related:     nullInt64Ptr(bean.Related),
-			TrendScore:  nullFloat64Ptr(bean.TrendScore),
+			Likes:       nullInt64Ptr(trend.Likes),
+			Comments:    nullInt64Ptr(trend.Comments),
+			Mentions:    nullInt64Ptr(trend.Mentions),
+			Subscribers: nullInt64Ptr(trend.Subscribers),
+			Related:     nullInt64Ptr(trend.Related),
+			TrendScore:  nullFloat64Ptr(trend.TrendScore),
 		}
 	}
 	return nil
@@ -336,8 +336,14 @@ func toArticlePreview(bean *db.Bean) ArticlePreviewDocument {
 		URL:         bean.URL,
 		Title:       bean.Title.String,
 		PublishedAt: bean.Created,
-		Source:      nullArticleSourcePtr(bean),
+		Source:      nullSourcePtr(bean),
 	}
+}
+
+func toArticlePreviewDocuments(beans []db.Bean) []ArticlePreviewDocument {
+	return datautils.Transform(beans, func(bean *db.Bean) ArticlePreviewDocument {
+		return toArticlePreview(bean)
+	})
 }
 
 // StoryDocument is the canonical Story payload for B09 and B10.
@@ -367,12 +373,6 @@ type StoryLinks struct {
 }
 
 func toStoryDocument(story *db.Cluster) StoryDocument {
-	previews := datautils.Transform(story.TopBeans, func(bean *db.Bean) ArticlePreviewDocument {
-		return toArticlePreview(bean)
-	})
-	if previews == nil {
-		previews = []ArticlePreviewDocument{}
-	}
 	return StoryDocument{
 		ID:               story.ID,
 		Title:            story.Title.String,
@@ -385,8 +385,8 @@ func toStoryDocument(story *db.Cluster) StoryDocument {
 		Categories:       story.Categories,
 		Regions:          story.Regions,
 		Entities:         story.Entities,
-		Tags:             story.Tags,
-		TopArticles:      previews,
+		Tags:             concatArrays(story.Categories, story.Entities, story.Regions),
+		TopArticles:      toArticlePreviewDocuments(story.TopBeans),
 	}
 }
 

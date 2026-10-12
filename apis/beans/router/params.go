@@ -37,68 +37,17 @@ func (params *itemIDParams) shouldBind(c *gin.Context) error {
 }
 
 func bindQuery(c *gin.Context, params any) error {
-	// if err := rejectUnknownQuery(c, params); err != nil {
-	// 	return err
-	// }
 	if err := c.ShouldBindQuery(params); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
 	return nil
 }
 
-// func rejectUnknownQuery(c *gin.Context, params any) error {
-// 	allowed := formQueryNames(params)
-// 	for key := range c.Request.URL.Query() {
-// 		if _, ok := allowed[key]; !ok {
-// 			return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, fmt.Sprintf("Unknown or unsupported query parameter: %s", key))
-// 		}
-// 	}
-// 	return nil
-// }
-
-// func formQueryNames(params any) map[string]struct{} {
-// 	names := map[string]struct{}{}
-// 	collectFormNames(reflect.TypeOf(params), names)
-// 	return names
-// }
-
-// func collectFormNames(t reflect.Type, names map[string]struct{}) {
-// 	if t == nil {
-// 		return
-// 	}
-// 	if t.Kind() == reflect.Pointer {
-// 		collectFormNames(t.Elem(), names)
-// 		return
-// 	}
-// 	if t.Kind() != reflect.Struct {
-// 		return
-// 	}
-// 	for i := 0; i < t.NumField(); i++ {
-// 		field := t.Field(i)
-// 		if field.Anonymous {
-// 			collectFormNames(field.Type, names)
-// 			continue
-// 		}
-// 		tag := field.Tag.Get("form")
-// 		if tag == "" || tag == "-" {
-// 			continue
-// 		}
-// 		name := strings.Split(tag, ",")[0]
-// 		if name != "" {
-// 			names[name] = struct{}{}
-// 		}
-// 	}
-// }
-
-// func requireScoreThresholdNeedsQ(c *gin.Context, q string) error {
-// 	if _, present := c.GetQuery("score_threshold"); present && strings.TrimSpace(q) == "" {
-// 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, "score_threshold requires q")
-// 	}
-// 	return nil
-// }
-
-// articleScopeParams is the Article filter set shared by feeds and search, excluding content_type.
-type articleScopeParams struct {
+// articleFilters contains the non-query, non-identity Article filters
+// shared by B01, B03, B05, and B06. content_type is request-filterable except post,
+// which is response-only.
+type articleFilters struct {
+	ContentType       string      `form:"content_type" binding:"omitempty,oneof=blog contract earnings_report enforcement_action financial_report lawsuit news official_statement podcast press_release research_paper site technical_documentation whitepaper"`
 	Sources           []uuid.UUID `form:"sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	ExcludeSources    []uuid.UUID `form:"exclude_sources,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=100"`
 	Domains           []string    `form:"domains" collection_format:"csv" binding:"max=100"`
@@ -114,15 +63,7 @@ type articleScopeParams struct {
 	Languages         []string    `form:"languages" collection_format:"csv" binding:"max=100" example:"en,es"`
 }
 
-// articleFilterParams contains the non-query, non-identity Article filters
-// shared by B01, B03, B05, and B06. content_type is request-filterable except post,
-// which is response-only.
-type articleFilterParams struct {
-	ContentType string `form:"content_type" binding:"omitempty,oneof=blog contract earnings_report enforcement_action financial_report lawsuit news official_statement podcast press_release research_paper site technical_documentation whitepaper"`
-	articleScopeParams
-}
-
-type vectorSearchParams struct {
+type vectorFilters struct {
 	Q              string  `form:"q" binding:"max=512"`
 	ScoreThreshold float64 `form:"score_threshold" binding:"min=0,max=1"`
 }
@@ -130,8 +71,8 @@ type vectorSearchParams struct {
 // articleFeedParams is shared by GET /articles/latest and GET /articles/trending.
 // Feed routes reject ids, urls, from, and to.
 type articleFeedParams struct {
-	articleFilterParams
-	vectorSearchParams
+	articleFilters
+	vectorFilters
 	paginationParams
 }
 
@@ -144,21 +85,6 @@ func (params *articleFeedParams) shouldBind(c *gin.Context) error {
 	}
 	return nil
 }
-
-// // topHeadlinesParams is GET /news/top-headlines, /news/latest, and /news/trending.
-// // It rejects ids, urls, from, to, and content_type.
-// type topHeadlinesParams struct {
-// 	articleScopeParams
-// 	vectorSearchParams
-// 	paginationParams
-// }
-
-// func (params *topHeadlinesParams) shouldBind(c *gin.Context) error {
-// 	if err := bindQuery(c, params); err != nil {
-// 		return err
-// 	}
-// 	return requireScoreThresholdNeedsQ(c, params.Q)
-// }
 
 // articleSearchParams is the B01 GET /articles/search target request.
 type articleSearchParams struct {
@@ -191,18 +117,18 @@ func (params *articleDetailParams) shouldBind(c *gin.Context) error {
 	return bindQuery(c, params)
 }
 
-// similarArticlesParams is the target request for GET /articles/{id}/similar
+// linkedArticlesParams is the target request for GET /articles/{id}/similar
 // and GET /stories/{id}/articles. It excludes q, score_threshold, ids, and urls.
 // Story handlers set filters.ClusterID from the path id after binding.
-type similarArticlesParams struct {
+type linkedArticlesParams struct {
 	itemIDParams
-	articleFilterParams
+	articleFilters
 	From time.Time `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	To   time.Time `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	paginationParams
 }
 
-func (params *similarArticlesParams) shouldBind(c *gin.Context) error {
+func (params *linkedArticlesParams) shouldBind(c *gin.Context) error {
 	if err := c.ShouldBindUri(&params.itemIDParams); err != nil {
 		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, err.Error())
 	}
@@ -266,8 +192,8 @@ func (params *tagListParams) shouldBind(c *gin.Context) error {
 
 // storySearchParams is the B09 GET /stories target request.
 type storySearchParams struct {
-	articleFilterParams
-	vectorSearchParams
+	articleFilters
+	vectorFilters
 	MinArticleCount int       `form:"min_article_count,default=2" binding:"min=2"`
 	From            time.Time `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
 	To              time.Time `form:"to" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date"`
@@ -278,12 +204,15 @@ func (params *storySearchParams) shouldBind(c *gin.Context) error {
 	if err := bindQuery(c, params); err != nil {
 		return err
 	}
+	if params.Q != "" && params.ScoreThreshold <= 0 {
+		return utils.NewAPIError(utils.API_ERROR_INVALID_REQUEST, API_ERROR_MSG_SCORE_THRESHOLD_REQUIRED)
+	}
 	return nil
 }
 
 // articleCountParams is the B19 GET /articles/count target request.
 type articleCountParams struct {
-	articleFilterParams
+	articleFilters
 	IDs     []uuid.UUID `form:"ids,parser=encoding.TextUnmarshaler" collection_format:"csv" binding:"max=128"`
 	Urls    []string    `form:"urls" collection_format:"csv" binding:"max=128"`
 	From    time.Time   `form:"from" time_format:"2006-01-02" time_utc:"true" swaggertype:"string" format:"date" binding:"required"`

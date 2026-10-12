@@ -77,9 +77,9 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 	return &db.PageRequest{Limit: p.Limit, Cursor: cursor}, nil
 }
 
-// toDBFilters converts router-level article filter params to db-level Filters.
-func (p *articleScopeParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+func (p *articleFilters) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters := db.BeanFilters{
+		Kind:              strings.ToLower(p.ContentType),
 		Sources:           p.Sources,
 		ExcludeSources:    p.ExcludeSources,
 		Domains:           utils.NormalizeTexts(p.Domains),
@@ -97,12 +97,6 @@ func (p *articleScopeParams) createFilters(c *gin.Context, r *Configuration) (*d
 	return &filters, nil
 }
 
-func (p *articleFilterParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleScopeParams.createFilters(c, r)
-	filters.Kind = strings.ToLower(p.ContentType)
-	return filters, nil
-}
-
 func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
 	filters, _ := p.articleFeedParams.createFilters(c, r)
 	filters.IDs = p.IDs
@@ -110,22 +104,22 @@ func (p *articleSearchParams) createFilters(c *gin.Context, r *Configuration) (*
 	filters.URLs = p.URLs
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+	if err := p.vectorFilters.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
 	return filters, nil
 }
 
 func (p *articleFeedParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+	filters, _ := p.articleFilters.createFilters(c, r)
+	if err := p.vectorFilters.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
 	return filters, nil
 }
 
-func (p *similarArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
+func (p *linkedArticlesParams) createFilters(c *gin.Context, r *Configuration) (*db.BeanFilters, error) {
+	filters, _ := p.articleFilters.createFilters(c, r)
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
 	return filters, nil
@@ -149,17 +143,17 @@ func (p *sourceSearchParams) createFilters(c *gin.Context, r *Configuration) (*d
 }
 
 func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db.ClusterFilters, error) {
-	filters, _ := p.articleFilterParams.createFilters(c, r)
+	filters, _ := p.articleFilters.createFilters(c, r)
 	filters.FullContent = false
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = utils.NormalizeEndOfDay(p.To)
-	if err := p.vectorSearchParams.attachToFilters(c, r, filters); err != nil {
+	if err := p.vectorFilters.attachToFilters(c, r, filters); err != nil {
 		return nil, err
 	}
 	return &db.ClusterFilters{BeanFilters: *filters, MinBeanCount: p.MinArticleCount}, nil
 }
 
-func (p *vectorSearchParams) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
+func (p *vectorFilters) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
 	q := strings.TrimSpace(p.Q)
 	if q != "" {
 		filters.Embedding = config.Embedder.EmbedQuery(c, q)
@@ -219,7 +213,7 @@ func writeStoryArticles(c *gin.Context, items []ArticleDocument, limit int, next
 func writeError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
 	body := ErrorBody{Code: utils.API_ERROR_UNCATEGORIZED, Message: err.Error()}
-	if errors.Is(err, db.ErrNonExistentID) {
+	if errors.Is(err, db.NonExistentIDError) {
 		body.Code = utils.API_ERROR_NOT_FOUND
 		body.Message = API_ERROR_MSG_ITEM_NOT_FOUND
 	} else if errors.Is(err, db.DBError) {
@@ -292,7 +286,7 @@ func (r *Configuration) searchArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QueryBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_SUMMARY)
 	if err != nil {
 		utils.LogError(err, "[ERROR] QueryBeans")
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
@@ -337,7 +331,7 @@ func (r *Configuration) getLatestArticles(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QueryLatestBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_SUMMARY)
 	if err != nil {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
@@ -510,7 +504,7 @@ func (r *Configuration) getTopHeadlines(c *gin.Context) {
 	filters.ObservedFrom = time.Now().AddDate(0, 0, -2)
 	filters.Kind = "news"
 
-	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_HEADLINES)
+	page_out, err := r.DB.QueryTrendingBeans(c.Request.Context(), *filters, *page_req, db.BEAN_COLUMNS_WITH_HEADLINE)
 	if err != nil {
 		writeError(c, utils.NewAPIError(utils.API_ERROR_DB_ERROR, API_ERROR_MSG_OUR_BAD))
 		return
@@ -594,14 +588,14 @@ func (r *Configuration) getArticle(c *gin.Context) {
 // @ID getSimilarArticles
 // @Router /articles/{id}/similar [get]
 func (r *Configuration) getSimilarArticles(c *gin.Context) {
-	var params similarArticlesParams
+	var params linkedArticlesParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 
-	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QuerySimilarBeans(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITH_SUMMARY)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -927,14 +921,14 @@ func (r *Configuration) getStory(c *gin.Context) {
 // @ID listStoryArticles
 // @Router /stories/{id}/articles [get]
 func (r *Configuration) getStoryArticles(c *gin.Context) {
-	var params similarArticlesParams
+	var params linkedArticlesParams
 	filters, page_req, err := extractBeanFiltersAndPage(r, c, &params)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 
-	page_out, err := r.DB.QueryClusterMembers(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITHOUT_TREND)
+	page_out, err := r.DB.QueryClusterMembers(c.Request.Context(), params.ID, *filters, *page_req, db.BEAN_COLUMNS_WITH_SUMMARY)
 	if err != nil {
 		writeError(c, err)
 		return

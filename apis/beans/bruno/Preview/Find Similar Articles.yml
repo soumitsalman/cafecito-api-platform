@@ -1,24 +1,23 @@
 info:
   name: Find Similar Articles
   type: http
-  seq: 2
+  seq: 4
   tags:
     - preview
 
 http:
   method: GET
-  url: "{{baseUrl}}/preview/articles/:id/similar"
+  url: "{{baseUrl}}/preview/articles/:id/similar?limit=20&languages=en,es"
   params:
-    - name: id
-      value: e15d0fe2-079b-530a-8799-160fe7cae066
-      type: path
     - name: limit
       value: "20"
       type: query
     - name: languages
       value: en,es
       type: query
-      disabled: true
+    - name: id
+      value: e15d0fe2-079b-530a-8799-160fe7cae066
+      type: path
   auth: inherit
 
 settings:
