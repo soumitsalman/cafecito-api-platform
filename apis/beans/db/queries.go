@@ -635,7 +635,7 @@ WITH
 	SELECT 
 		c.cluster_id AS id, c.title, c.summary, c.image_url, %s -- optional column to order by
 		c.categories, c.entities, c.regions,
-		s.first_created, s.last_created, s.beans_count, s.sources_count, s.mentions, s.comments, s.likes, s.subscribers
+		s.first_created, s.last_created, s.beans_count, s.sources_count, s.trend_score, s.mentions, s.comments, s.likes, s.subscribers
 	FROM candidate_clusters c
 	INNER JOIN stats s ON s.cluster_id = c.cluster_id
 	%s -- cursor
@@ -744,6 +744,7 @@ func (b *PGSack) QueryClusterPreviews(ctx context.Context, filters ClusterFilter
 
 	rows, err := utils.FetchAll[Cluster](ctx, b.db, query, params)
 	if err != nil {
+		utils.LogError(err, "[DB ERROR]")
 		return Page[Cluster]{}, DBError
 	}
 
