@@ -1,0 +1,32 @@
+{
+  "name": "cafecito-plugins",
+  "description": "Cafecito public-information tools and research skills for Grok Build",
+  "owner": {
+    "name": "Cafecito"
+  },
+  "plugins": [
+    {
+      "name": "cafecito-beans",
+      "version": "1.0.0",
+      "description": "Discover publisher articles across news, reports, research, and official statements; explore stories, sources, related coverage, and mentions with Beans MCP.",
+      "category": "research",
+      "source": {
+        "type": "local",
+        "path": "./plugins/cafecito-beans"
+      },
+      "homepage": "https://developer.cafecito.tech/products/beans",
+      "keywords": [
+        "cafecito",
+        "cafecito beans",
+        "cafecito beans mcp",
+        "cafecito beans api"
+      ],
+      "domains": [
+        "cafecito.tech",
+        "developer.cafecito.tech",
+        "api.cafecito.tech",
+        "beans.cafecito.tech"
+      ]
+    }
+  ]
+}

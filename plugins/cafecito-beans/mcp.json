@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cafecito-beans": {
+      "url": "https://api.cafecito.tech/beans/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CAFECITO_API_KEY}"
+      }
+    }
+  }
+}

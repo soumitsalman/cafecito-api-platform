@@ -1,0 +1,33 @@
+{
+  "name": "cafecito-beans",
+  "version": "1.0.0",
+  "description": "Discover publisher articles across news, reports, research, and official statements; explore stories, sources, related coverage, and mentions with Beans MCP.",
+  "author": {
+    "name": "Cafecito"
+  },
+  "homepage": "https://developer.cafecito.tech/products/beans",
+  "license": "MIT",
+  "keywords": [
+    "public-information",
+    "publisher-coverage",
+    "news",
+    "earnings",
+    "litigation",
+    "stories",
+    "mcp"
+  ],
+  "logo": "assets/beans.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "CAFECITO_API_KEY": {
+        "type": "string",
+        "title": "Cafecito API key",
+        "description": "API key from https://developer.cafecito.tech/settings/api-keys"
+      }
+    },
+    "required": [
+      "CAFECITO_API_KEY"
+    ]
+  }
+}

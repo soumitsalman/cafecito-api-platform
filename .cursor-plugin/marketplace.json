@@ -1,0 +1,16 @@
+{
+  "name": "cafecito-plugins",
+  "owner": {
+    "name": "Cafecito"
+  },
+  "metadata": {
+    "description": "Cafecito public-information tools for Cursor"
+  },
+  "plugins": [
+    {
+      "name": "cafecito-beans",
+      "source": "plugins/cafecito-beans",
+      "description": "Discover publisher coverage across news, reports, research, and official statements with Beans MCP"
+    }
+  ]
+}

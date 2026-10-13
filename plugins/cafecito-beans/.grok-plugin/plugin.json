@@ -1,0 +1,17 @@
+{
+  "name": "cafecito-beans",
+  "version": "1.0.0",
+  "description": "Discover publisher articles across news, reports, research, and official statements; explore stories, sources, related coverage, and mentions with Beans MCP.",
+  "author": {
+    "name": "Cafecito"
+  },
+  "homepage": "https://developer.cafecito.tech/products/beans",
+  "license": "MIT",
+  "keywords": [
+    "cafecito",
+    "cafecito beans",
+    "cafecito beans mcp",
+    "cafecito beans api"
+  ],
+  "logo": "./assets/beans.png"
+}
