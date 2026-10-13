@@ -4,7 +4,7 @@ The repository's `.grok-plugin/marketplace.json` makes the Beans plugin availabl
 
 ## Catalog entry
 
-Add the following object to the `plugins` array in xAI's `.grok-plugin/marketplace.json`. Replace `<OWNER>` and `<PUBLIC_REPO>` with the public repository containing this plugin. Replace `<FULL_PUBLIC_COMMIT_SHA>` with the full 40-character lowercase commit SHA that contains these files. These placeholders must be replaced before submission.
+Add the following object to the `plugins` array in xAI's `.grok-plugin/marketplace.json`. It points to the public `soumitsalman/cafecito-api-platform` repository and pins Beans plugin version `1.0.0` to [commit ac1295c1f2cfc79c368bd99acdf2600e369c21f1](https://github.com/soumitsalman/cafecito-api-platform/commit/ac1295c1f2cfc79c368bd99acdf2600e369c21f1). The plugin is loaded from `plugins/cafecito-beans` within that commit.
 
 ```json
 {
@@ -14,8 +14,8 @@ Add the following object to the `plugins` array in xAI's `.grok-plugin/marketpla
   "category": "research",
   "source": {
     "source": "url",
-    "url": "https://github.com/<OWNER>/<PUBLIC_REPO>.git",
-    "sha": "<FULL_PUBLIC_COMMIT_SHA>",
+    "url": "https://github.com/soumitsalman/cafecito-api-platform.git",
+    "sha": "ac1295c1f2cfc79c368bd99acdf2600e369c21f1",
     "path": "plugins/cafecito-beans"
   },
   "homepage": "https://developer.cafecito.tech/products/beans",
