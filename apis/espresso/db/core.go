@@ -269,38 +269,38 @@ func (p *Cupboard) Close() {
 // PGX fetch helpers
 func fetchOne[T any](ctx context.Context, db *pgxpool.Pool, query string, args pgx.NamedArgs) (T, error) {
 	rows, err := db.Query(ctx, query, args)
-	defer rows.Close()
 	if err != nil {
 		var zero T
 		return zero, err
 	}
+	defer rows.Close()
 	return pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[T])
 }
 
 func fetchOneScalar[T any](ctx context.Context, db *pgxpool.Pool, query string, args pgx.NamedArgs) (T, error) {
 	rows, err := db.Query(ctx, query, args)
-	defer rows.Close()
 	if err != nil {
 		var zero T
 		return zero, err
 	}
+	defer rows.Close()
 	return pgx.CollectOneRow(rows, pgx.RowTo[T])
 }
 
 func fetchAll[T any](ctx context.Context, db *pgxpool.Pool, query string, args pgx.NamedArgs) ([]T, error) {
 	rows, err := db.Query(ctx, query, args)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	return pgx.CollectRows(rows, pgx.RowToStructByNameLax[T])
 }
 
 func fetchAllScalar[T any](ctx context.Context, db *pgxpool.Pool, query string, args pgx.NamedArgs) ([]T, error) {
 	rows, err := db.Query(ctx, query, args)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	return pgx.CollectRows(rows, pgx.RowTo[T])
 }
