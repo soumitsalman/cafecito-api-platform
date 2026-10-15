@@ -14,10 +14,6 @@ import (
 )
 
 const (
-	MIN_CANDIDATE_LIMIT = 2048
-)
-
-const (
 	_BEAN_COLUMNS_SUMMARY      = "summary"
 	_BEAN_COLUMNS_CONTENT      = "CASE WHEN restricted_content THEN NULL ELSE content END AS content"
 	_BEAN_COLUMNS_TREND        = "likes, comments, mentions, subscribers, related, trend_score"
@@ -176,7 +172,7 @@ func buildScalarWhere(filters *BeanFilters) ([]string, pgx.NamedArgs) {
 // table: latest_beans_view or trending_beans_view or aggregated_beans_view.
 // sort: Present in page.Cursor.Sort. page must have a cursor and a valid sort value or else the query will fail
 // if filters.Embedding is present, then filter.Distance must be present. Default/not-assigned value = 0.0, returns exact match
-func buildScalarOrderQuery(table string, filters *BeanFilters, page *PageRequest, select_columns string) (string, pgx.NamedArgs) {
+func buildScalarOrderQuery(table string, filters *BeanFilters, page *PageRequest, order string, select_columns string) (string, pgx.NamedArgs) {
 	where, params := buildScalarWhere(filters)
 	if len(filters.Embedding) > 0 {
 		where = append(where, "embedding <=> @embedding <= @distance")
@@ -185,24 +181,25 @@ func buildScalarOrderQuery(table string, filters *BeanFilters, page *PageRequest
 	}
 
 	order_by := ""
-	if page.Cursor != nil {
-		switch page.Cursor.Sort {
-		case SORT_RECENT:
-			order_by = "created DESC, id DESC"
-			if page.Cursor.ID != nil {
-				where = append(where, "(created, id) < (@cursor_value, @cursor_id)")
-				params["cursor_value"] = *page.Cursor.Created
-				params["cursor_id"] = *page.Cursor.ID
-			}
-		case SORT_TRENDING:
-			order_by = "trend_score DESC, id DESC"
-			if page.Cursor.ID != nil {
-				where = append(where, "(trend_score, id) < (@cursor_value, @cursor_id)")
-				params["cursor_value"] = *page.Cursor.TrendScore
-				params["cursor_id"] = *page.Cursor.ID
-			}
+	switch order {
+	case SORT_TRENDING:
+		order_by = "trend_score DESC, id DESC"
+		if page.Cursor != nil && page.Cursor.ID != uuid.Nil {
+			where = append(where, "(trend_score, id) < (@cursor_value, @cursor_id)")
+			params["cursor_value"] = page.Cursor.TrendScore
+			params["cursor_id"] = page.Cursor.ID
 		}
+	case SORT_RECENT:
+		order_by = "created DESC, id DESC"
+		if page.Cursor != nil && page.Cursor.ID != uuid.Nil {
+			where = append(where, "(created, id) < (@cursor_value, @cursor_id)")
+			params["cursor_value"] = page.Cursor.Created
+			params["cursor_id"] = page.Cursor.ID
+		}
+	default:
+		return "", pgx.NamedArgs{}
 	}
+
 	where_expr := ""
 	if len(where) > 0 {
 		where_expr = "WHERE " + strings.Join(where, " AND ")
@@ -228,19 +225,15 @@ func buildScalarOrderQuery(table string, filters *BeanFilters, page *PageRequest
 	return query, params
 }
 
-func searchCandidateLimit(limit int) int {
-	return max(limit*4, MIN_CANDIDATE_LIMIT)
-}
-
 // buildKNNSearchQuery constructs the vector (semantic) search query for both latest and trending beans
 // table: latest_beans_view or trending_beans_view or aggregated_beans_view with cosine distance CTE.
 // filters.Embedding, filters.Limit must be present. filters.Distance will be considered only if > 0.0
 func buildKNNSearchQuery(table string, filters *BeanFilters, page *PageRequest, columns string) (string, pgx.NamedArgs) {
 	where, params := buildScalarWhere(filters)
-	if page.Cursor != nil && page.Cursor.Distance != nil && page.Cursor.ID != nil {
+	if page.Cursor != nil && !page.Cursor.IsZero() {
 		where = append(where, "(embedding <=> @embedding, id) > (@cursor_distance, @cursor_id)")
-		params["cursor_distance"] = *page.Cursor.Distance
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_distance"] = page.Cursor.Distance
+		params["cursor_id"] = page.Cursor.ID
 	}
 	inner_where_expr := ""
 	if len(where) > 0 {
@@ -278,35 +271,26 @@ func buildKNNSearchQuery(table string, filters *BeanFilters, page *PageRequest, 
 // TrendingArticles returns articles ranked by trend_score descending.
 // Forces sort by created descending
 func (b *PGSack) QueryLatestBeans(ctx context.Context, filters BeanFilters, page PageRequest, columns string) (Page[Bean], error) {
-	if page.Cursor == nil {
-		page.Cursor = &Cursor{Sort: SORT_RECENT}
-	}
-	page.Cursor.Sort = SORT_RECENT
-
-	query, params := buildScalarOrderQuery("latest_beans_view", &filters, &page, columns)
+	query, params := buildScalarOrderQuery("latest_beans_view", &filters, &page, SORT_RECENT, columns)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
 	if err != nil {
 		return Page[Bean]{}, DBError
 	}
 	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RECENT, ID: &bean.ID, Created: &bean.Created}
+		return &Cursor{Version: _CURSOR_VERSION, ID: bean.ID, Created: bean.Created}
 	}), nil
 }
 
 // TrendingArticles returns articles ranked by trend_score descending.
 // Forces sort by trend_score descending
 func (b *PGSack) QueryTrendingBeans(ctx context.Context, filters BeanFilters, page PageRequest, columns string) (Page[Bean], error) {
-	if page.Cursor == nil {
-		page.Cursor = &Cursor{Sort: SORT_TRENDING}
-	}
-	page.Cursor.Sort = SORT_TRENDING
-	query, params := buildScalarOrderQuery("trending_beans_view", &filters, &page, columns)
+	query, params := buildScalarOrderQuery("trending_beans_view", &filters, &page, SORT_TRENDING, columns)
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
 	if err != nil {
 		return Page[Bean]{}, DBError
 	}
 	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_TRENDING, ID: &bean.ID, TrendScore: &bean.TrendScore.Float64}
+		return &Cursor{Version: _CURSOR_VERSION, ID: bean.ID, TrendScore: bean.TrendScore.Float64}
 	}), nil
 }
 
@@ -315,17 +299,11 @@ func (b *PGSack) QueryTrendingBeans(ctx context.Context, filters BeanFilters, pa
 // Forces sort by created descending if no embedding is present.
 // Forces sort by relevance if an embedding is present and filters.Distance > 0.0.
 func (b *PGSack) QueryBeans(ctx context.Context, filters BeanFilters, page PageRequest, columns string) (Page[Bean], error) {
-	if page.Cursor == nil {
-		page.Cursor = &Cursor{}
-	}
-	var query string
-	var params pgx.NamedArgs
+	query, params := "", pgx.NamedArgs{}
 	if len(filters.Embedding) > 0 {
-		page.Cursor.Sort = SORT_RELEVANT
 		query, params = buildKNNSearchQuery("latest_beans_view", &filters, &page, columns)
 	} else {
-		page.Cursor.Sort = SORT_RECENT
-		query, params = buildScalarOrderQuery("latest_beans_view", &filters, &page, columns)
+		query, params = buildScalarOrderQuery("latest_beans_view", &filters, &page, SORT_RECENT, columns)
 	}
 
 	rows, err := utils.FetchAll[Bean](ctx, b.db, query, params)
@@ -334,9 +312,9 @@ func (b *PGSack) QueryBeans(ctx context.Context, filters BeanFilters, page PageR
 	}
 	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
 		if len(filters.Embedding) > 0 {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &bean.ID, Distance: &bean.Distance.Float64}
+			return &Cursor{Version: _CURSOR_VERSION, ID: bean.ID, Distance: bean.Distance.Float64}
 		} else {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &bean.ID, Created: &bean.Created}
+			return &Cursor{Version: _CURSOR_VERSION, ID: bean.ID, Created: bean.Created}
 		}
 	}), nil
 }
@@ -352,10 +330,10 @@ func (b *PGSack) beanExists(ctx context.Context, id uuid.UUID) (bool, error) {
 // related_beans edges are treated as undirected. Missing IDs return ErrNonExistentID.
 func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters BeanFilters, page PageRequest, columns string) (Page[Bean], error) {
 	where, params := buildScalarWhere(&filters)
-	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.ID != nil {
+	if page.Cursor != nil && !page.Cursor.Created.IsZero() && page.Cursor.ID != uuid.Nil {
 		where = append(where, "(created, id) < (@cursor_created, @cursor_id)")
-		params["cursor_created"] = *page.Cursor.Created
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_created"] = page.Cursor.Created
+		params["cursor_id"] = page.Cursor.ID
 	}
 	params["id"] = id
 	params["limit"] = page.Limit + 1
@@ -395,7 +373,7 @@ func (b *PGSack) QuerySimilarBeans(ctx context.Context, id uuid.UUID, filters Be
 		}
 	}
 	return finalizePage(rows, page.Limit, func(bean Bean) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, ID: &bean.ID, Created: &bean.Created}
+		return &Cursor{Version: _CURSOR_VERSION, ID: bean.ID, Created: bean.Created}
 	}), nil
 }
 
@@ -428,10 +406,10 @@ func (b *PGSack) QueryMentions(ctx context.Context, id uuid.UUID, filters Mentio
 	}
 
 	outer_where_expr := ""
-	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.TextKey != nil {
+	if page.Cursor != nil && !page.Cursor.Created.IsZero() && page.Cursor.TextKey != "" {
 		outer_where_expr = "WHERE (collected, chatter_url) < (@cursor_collected, @cursor_url)"
-		params["cursor_collected"] = *page.Cursor.Created
-		params["cursor_url"] = *page.Cursor.TextKey
+		params["cursor_collected"] = page.Cursor.Created
+		params["cursor_url"] = page.Cursor.TextKey
 	}
 
 	query := fmt.Sprintf(`
@@ -470,7 +448,7 @@ func (b *PGSack) QueryMentions(ctx context.Context, id uuid.UUID, filters Mentio
 	return finalizePage(rows, page.Limit, func(mention Mention) *Cursor {
 		url := mention.URL
 		observed_at := mention.Observed
-		return &Cursor{Version: _CURSOR_VERSION, Created: &observed_at, TextKey: &url}
+		return &Cursor{Version: _CURSOR_VERSION, Created: observed_at, TextKey: url}
 	}), nil
 }
 
@@ -518,9 +496,9 @@ func (b *PGSack) QuerySources(ctx context.Context, filters SourceFilters, page P
 		where = append(where, "domain_name = ANY(@domains)")
 		params["domains"] = filters.Domains
 	}
-	if page.Cursor != nil && page.Cursor.TextKey != nil {
+	if page.Cursor != nil && page.Cursor.TextKey != "" {
 		where = append(where, "base_url > @cursor_value")
-		params["cursor_value"] = *page.Cursor.TextKey
+		params["cursor_value"] = page.Cursor.TextKey
 	}
 	where_expr := ""
 	if len(where) > 0 {
@@ -544,7 +522,7 @@ func (b *PGSack) QuerySources(ctx context.Context, filters SourceFilters, page P
 		return Page[Source]{}, DBError
 	}
 	return finalizePage(rows, page.Limit, func(source Source) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, TextKey: &source.BaseURL}
+		return &Cursor{Version: _CURSOR_VERSION, TextKey: source.BaseURL}
 	}), nil
 }
 
@@ -565,8 +543,8 @@ func (b *PGSack) QueryTags(ctx context.Context, q string, tag_type string, page 
 		"cursor_value": "",
 		"limit":        page.Limit + 1,
 	}
-	if page.Cursor != nil && page.Cursor.TextKey != nil {
-		params["cursor_value"] = *page.Cursor.TextKey
+	if page.Cursor != nil && page.Cursor.TextKey != "" {
+		params["cursor_value"] = page.Cursor.TextKey
 	}
 	query := fmt.Sprintf(`
 		WITH tag_values AS MATERIALIZED (
@@ -589,7 +567,7 @@ func (b *PGSack) QueryTags(ctx context.Context, q string, tag_type string, page 
 	return finalizePage(rows, page.Limit, func(item string) *Cursor {
 		return &Cursor{
 			Version: _CURSOR_VERSION,
-			TextKey: &item,
+			TextKey: item,
 		}
 	}), nil
 }
@@ -667,8 +645,8 @@ func buildScalarQueryForClusters(filters *ClusterFilters, page *PageRequest) (st
 	cursor := ""
 	if page.Cursor != nil {
 		cursor = "WHERE (s.last_created, c.cluster_id) < (@cursor_value, @cursor_id)"
-		params["cursor_value"] = *page.Cursor.Created
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_value"] = page.Cursor.Created
+		params["cursor_id"] = page.Cursor.ID
 	}
 
 	return fmt.Sprintf(
@@ -712,8 +690,8 @@ func buildVectorQueryForClusters(filters *ClusterFilters, page *PageRequest) (st
 	cursor := ""
 	if page.Cursor != nil {
 		cursor = "WHERE (c.distance, c.cluster_id) > (@cursor_value, @cursor_id)"
-		params["cursor_value"] = *page.Cursor.Distance
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_value"] = page.Cursor.Distance
+		params["cursor_id"] = page.Cursor.ID
 	}
 
 	return fmt.Sprintf(
@@ -750,9 +728,9 @@ func (b *PGSack) QueryClusterPreviews(ctx context.Context, filters ClusterFilter
 
 	return finalizePage(rows, page.Limit, func(cluster Cluster) *Cursor {
 		if len(filters.Embedding) > 0 {
-			return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RELEVANT, ID: &cluster.ID, Distance: &cluster.Distance.Float64}
+			return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RELEVANT, ID: cluster.ID, Distance: cluster.Distance.Float64}
 		}
-		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RECENT, ID: &cluster.ID, Created: &cluster.LastCreated}
+		return &Cursor{Version: _CURSOR_VERSION, Sort: SORT_RECENT, ID: cluster.ID, Created: cluster.LastCreated}
 	}), nil
 }
 

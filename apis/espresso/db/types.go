@@ -122,7 +122,7 @@ type Page[T any] struct {
 
 // Tag is one exact value exposed by a discovery route.
 type Tag struct {
-	Value string `db:"value" json:"value" toon:"value"`
+	Value string `db:"value" json:"value,omitempty" toon:"value,omitempty"`
 	Type  string `db:"type" json:"type,omitempty" toon:"type,omitempty" example:"region"`
 }
 
@@ -143,20 +143,19 @@ type Filters struct {
 	ImpactLevels    []string
 	ImpactedDomains []string
 	Embedding       []float32
-	Distance        *float64
-	// Sort            string
+	Distance        float64
 }
 
 // Cursor is the opaque, versioned pagination cursor. It encodes the last sort key and UUID
 // so clients can resume a deterministic keyset scan without inspecting or constructing it.
 type Cursor struct {
-	Version  int        `json:"v"`
-	Sort     *string    `json:"s,omitempty"`
-	ID       *uuid.UUID `json:"id"`
-	Created  *time.Time `json:"c,omitempty"`
-	Distance *float64   `json:"d,omitempty"`
-	TextKey  *string    `json:"k,omitempty"`
-	Tag      *Tag       `json:"et,omitempty"`
+	Version  int       `json:"v"`
+	Sort     string    `json:"s,omitempty"`
+	ID       uuid.UUID `json:"id,omitzero"`
+	Created  time.Time `json:"c,omitzero"`
+	Distance float64   `json:"d,omitzero"`
+	TextKey  string    `json:"k,omitempty"`
+	Tag      Tag       `json:"et,omitzero"`
 }
 
 // PageRequest is the cursor-based page request. Callers (router) own limit defaults and caps.
@@ -197,8 +196,12 @@ func DecodeCursor(raw string) (*Cursor, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, ErrInvalidCursor
 	}
-	if c.Version != _CURSOR_VERSION || (c.ID == nil && c.TextKey == nil && c.Tag == nil) {
+	if c.IsZero() {
 		return nil, ErrInvalidCursor
 	}
 	return &c, nil
+}
+
+func (c *Cursor) IsZero() bool {
+	return c.Version != _CURSOR_VERSION || (c.ID == uuid.Nil && c.TextKey == "" && c.Tag.Value == "")
 }

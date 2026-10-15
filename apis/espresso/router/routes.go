@@ -97,8 +97,7 @@ func (p *vectorSearchParams) bindFilters(c *gin.Context, config *Configuration, 
 			return utils.NewAPIError(utils.API_ERROR_EMBEDDING_ERROR, API_ERROR_MSG_OUR_BAD)
 		}
 		if p.ScoreThreshold > 0 {
-			distance := (1 - p.ScoreThreshold) * 2
-			filters.Distance = &distance
+			filters.Distance = (1 - p.ScoreThreshold) * 2
 		}
 	}
 	return nil

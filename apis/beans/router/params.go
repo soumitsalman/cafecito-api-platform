@@ -64,7 +64,7 @@ type articleFilters struct {
 }
 
 type vectorFilters struct {
-	Q              string  `form:"q" binding:"max=512"`
+	Q              string  `form:"q" binding:"max=2048"`
 	ScoreThreshold float64 `form:"score_threshold" binding:"min=0,max=1"`
 }
 

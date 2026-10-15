@@ -64,7 +64,7 @@ func TestMaterializeDigest(t *testing.T) {
 func TestCursorEncodeDecodeRoundTrip(t *testing.T) {
 	id := uuid.New()
 	created := time.Date(2026, 7, 29, 13, 0, 0, 0, time.UTC)
-	c := &db.Cursor{Version: 1, ID: &id, Created: &created}
+	c := &db.Cursor{Version: 1, ID: id, Created: created}
 
 	encoded, err := c.Encode()
 	require.NoError(t, err)
@@ -74,15 +74,15 @@ func TestCursorEncodeDecodeRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, decoded)
 	require.NotNil(t, decoded.ID)
-	assert.Equal(t, id, *decoded.ID)
+	assert.Equal(t, id, decoded.ID)
 	require.NotNil(t, decoded.Created)
-	assert.True(t, created.Equal(*decoded.Created))
+	assert.True(t, created.Equal(decoded.Created))
 }
 
 func TestCursorEncodeDecodeRelevance(t *testing.T) {
 	id := uuid.New()
 	distance := 0.42
-	c := &db.Cursor{Version: 1, ID: &id, Distance: &distance}
+	c := &db.Cursor{Version: 1, ID: id, Distance: distance}
 
 	encoded, err := c.Encode()
 	require.NoError(t, err)
@@ -90,9 +90,9 @@ func TestCursorEncodeDecodeRelevance(t *testing.T) {
 	decoded, err := db.DecodeCursor(encoded)
 	require.NoError(t, err)
 	require.NotNil(t, decoded.ID)
-	assert.Equal(t, id, *decoded.ID)
+	assert.Equal(t, id, decoded.ID)
 	require.NotNil(t, decoded.Distance)
-	assert.InDelta(t, distance, *decoded.Distance, 1e-9)
+	assert.InDelta(t, distance, decoded.Distance, 1e-9)
 }
 
 func TestDecodeCursorRejectsGarbage(t *testing.T) {

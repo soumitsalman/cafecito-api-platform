@@ -36,8 +36,8 @@ type paginationParams struct {
 }
 
 type vectorSearchParams struct {
-	Q              string  `form:"q" binding:"max=1024"`
-	ScoreThreshold float64 `form:"score_threshold,default=0.5" binding:"min=0,max=1"`
+	Q              string  `form:"q" binding:"max=2048"`
+	ScoreThreshold float64 `form:"score_threshold,default=0.6" binding:"min=0,max=1"`
 }
 
 // base search params for all action, event and signal queries.

@@ -145,10 +145,10 @@ func buildScalarQuery(filters *Filters, page *PageRequest) (string, pgx.NamedArg
 	LIMIT @limit
 	`
 	where, params := buildWhere(filters, "")
-	if page.Cursor != nil && page.Cursor.Created != nil && page.Cursor.ID != nil {
+	if page.Cursor != nil {
 		where = append(where, "(created, id) < (@cursor_created, @cursor_id)")
 		params["cursor_created"] = page.Cursor.Created
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_id"] = page.Cursor.ID
 	}
 	where_expr := ""
 	if len(where) > 0 {
@@ -175,19 +175,19 @@ func buildVectorSearchQuery(filters *Filters, page *PageRequest) (string, pgx.Na
 	ORDER BY distance ASC, id ASC
 	LIMIT @limit`
 	where, params := buildWhere(filters, "")
-	if page.Cursor != nil && page.Cursor.ID != nil {
+	if page.Cursor != nil {
 		where = append(where, "(embedding <=> @embedding, id) > (@cursor_distance, @cursor_id)")
-		params["cursor_distance"] = *page.Cursor.Distance
-		params["cursor_id"] = *page.Cursor.ID
+		params["cursor_distance"] = page.Cursor.Distance
+		params["cursor_id"] = page.Cursor.ID
 	}
 	inner_where_expr := ""
 	if len(where) > 0 {
 		inner_where_expr = "WHERE " + strings.Join(where, " AND ")
 	}
 	outer_where_expr := ""
-	if filters.Distance != nil {
+	if filters.Distance != 0 {
 		outer_where_expr = "WHERE distance <= @distance"
-		params["distance"] = *filters.Distance
+		params["distance"] = filters.Distance
 	}
 
 	params["embedding"] = pgvector.NewVector(filters.Embedding)
@@ -210,9 +210,9 @@ func (p *Cupboard) QuerySips(ctx context.Context, filters Filters, page PageRequ
 	}
 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor {
 		if len(filters.Embedding) > 0 {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Distance: &s.Distance.Float64}
+			return &Cursor{Version: _CURSOR_VERSION, ID: s.ID, Distance: s.Distance.Float64}
 		} else {
-			return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Created: &s.Created}
+			return &Cursor{Version: _CURSOR_VERSION, ID: s.ID, Created: s.Created}
 		}
 	}), nil
 }
@@ -289,7 +289,7 @@ func (p *Cupboard) QuerySameSips(ctx context.Context, id uuid.UUID, filters Filt
 		return Page[Sip]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Created: &s.Created}
+		return &Cursor{Version: _CURSOR_VERSION, ID: s.ID, Created: s.Created}
 	}), nil
 }
 
@@ -341,7 +341,7 @@ func (p *Cupboard) queryDerivedRelations(ctx context.Context, anchor_expr string
 		return Page[Sip]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(s Sip) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, ID: &s.ID, Created: &s.Created}
+		return &Cursor{Version: _CURSOR_VERSION, ID: s.ID, Created: s.Created}
 	}), nil
 }
 
@@ -421,8 +421,8 @@ func (p *Cupboard) QuerySources(ctx context.Context, q string, domains []string,
 		"cursor_value": "",
 		"limit":        page.Limit + 1,
 	}
-	if page.Cursor != nil && page.Cursor.TextKey != nil {
-		params["cursor_value"] = *page.Cursor.TextKey
+	if page.Cursor != nil {
+		params["cursor_value"] = page.Cursor.TextKey
 	}
 	if len(domains) > 0 {
 		domains_expr = "AND domain_name = ANY(@domains)"
@@ -434,7 +434,7 @@ func (p *Cupboard) QuerySources(ctx context.Context, q string, domains []string,
 		return Page[Source]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(source Source) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, TextKey: &source.BaseURL}
+		return &Cursor{Version: _CURSOR_VERSION, TextKey: source.BaseURL}
 	}), nil
 }
 
@@ -465,8 +465,8 @@ func (p *Cupboard) QueryTags(ctx context.Context, q string, kinds []string, page
 	`
 	kinds_expr, tags_fts_expr, tag_ilike_expr := "", "", ""
 	c_tag := ""
-	if page.Cursor != nil && page.Cursor.TextKey != nil {
-		c_tag = *page.Cursor.TextKey
+	if page.Cursor != nil {
+		c_tag = page.Cursor.TextKey
 	}
 	params := pgx.NamedArgs{
 		"c_tag": c_tag,
@@ -488,7 +488,7 @@ func (p *Cupboard) QueryTags(ctx context.Context, q string, kinds []string, page
 		return Page[string]{}, err
 	}
 	return finalizePage(rows, page.Limit, func(item string) *Cursor {
-		return &Cursor{Version: _CURSOR_VERSION, TextKey: &item}
+		return &Cursor{Version: _CURSOR_VERSION, TextKey: item}
 	}), nil
 }
 
@@ -573,7 +573,7 @@ func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string,
 		"limit":        page.Limit + 1,
 	}
 	where := []string{"(value, type) > (@cursor_value, @cursor_type)"}
-	if page.Cursor != nil && page.Cursor.Tag != nil {
+	if page.Cursor != nil {
 		params["cursor_value"] = page.Cursor.Tag.Value
 		params["cursor_type"] = page.Cursor.Tag.Type
 	}
@@ -595,7 +595,7 @@ func (p *Cupboard) QueryEventTags(ctx context.Context, q string, types []string,
 	return finalizePage(rows, page.Limit, func(item Tag) *Cursor {
 		return &Cursor{
 			Version: _CURSOR_VERSION,
-			Tag:     &item,
+			Tag:     item,
 		}
 	}), nil
 }

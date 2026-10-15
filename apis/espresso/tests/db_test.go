@@ -73,7 +73,7 @@ func TestVectorSearchSignals(t *testing.T) {
 	distance := 0.6
 	filters := db.Filters{
 		Embedding: test_query_embedding,
-		Distance:  &distance,
+		Distance:  distance,
 	}
 	page, err := pg_cupboard.QuerySips(context.Background(), filters, db.PageRequest{Limit: 5})
 	assert.NoError(t, err)

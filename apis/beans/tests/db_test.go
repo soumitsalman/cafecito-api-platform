@@ -20,10 +20,10 @@ func TestEncodeDecodeCursor(t *testing.T) {
 	text_key := "publisher.example"
 
 	cases := []db.Cursor{
-		{Version: 1, ID: &id, Created: &created},
-		{Version: 1, ID: &id, TrendScore: &trend_score},
-		{Version: 1, ID: &id, Distance: &distance},
-		{Version: 1, TextKey: &text_key},
+		{Version: 1, ID: id, Created: created},
+		{Version: 1, ID: id, TrendScore: trend_score},
+		{Version: 1, ID: id, Distance: distance},
+		{Version: 1, TextKey: text_key},
 	}
 	for _, original := range cases {
 		encoded, err := original.Encode()
@@ -34,25 +34,25 @@ func TestEncodeDecodeCursor(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, decoded)
 		assert.Equal(t, original.Version, decoded.Version)
-		if original.ID != nil {
+		if original.ID != uuid.Nil {
 			require.NotNil(t, decoded.ID)
-			assert.Equal(t, *original.ID, *decoded.ID)
+			assert.Equal(t, original.ID, decoded.ID)
 		}
-		if original.Created != nil {
+		if !original.Created.IsZero() {
 			require.NotNil(t, decoded.Created)
-			assert.True(t, original.Created.Equal(*decoded.Created))
+			assert.True(t, original.Created.Equal(decoded.Created))
 		}
-		if original.TrendScore != nil {
+		if original.TrendScore != 0 {
 			require.NotNil(t, decoded.TrendScore)
-			assert.Equal(t, *original.TrendScore, *decoded.TrendScore)
+			assert.Equal(t, original.TrendScore, decoded.TrendScore)
 		}
-		if original.Distance != nil {
+		if original.Distance != 0 {
 			require.NotNil(t, decoded.Distance)
-			assert.Equal(t, *original.Distance, *decoded.Distance)
+			assert.Equal(t, original.Distance, decoded.Distance)
 		}
-		if original.TextKey != nil {
+		if original.TextKey != "" {
 			require.NotNil(t, decoded.TextKey)
-			assert.Equal(t, *original.TextKey, *decoded.TextKey)
+			assert.Equal(t, original.TextKey, decoded.TextKey)
 		}
 	}
 }
