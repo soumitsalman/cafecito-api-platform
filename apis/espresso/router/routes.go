@@ -27,7 +27,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
 	"github.com/toon-format/toon-go"
 
 	"github.com/soumitsalman/cafecito-api-platform/apis/espresso/db"
@@ -78,7 +77,7 @@ func (p *paginationParams) createPageRequest(c *gin.Context, config *Configurati
 func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	filters.CreatedFrom = p.From
 	filters.CreatedTo = p.To
-	filters.Tags = utils.NormalizeTags(p.Tags)
+	filters.Tags = p.Tags
 	filters.Entities = utils.NormalizeTags(p.Entities)
 	filters.Categories = utils.NormalizeTags(p.Categories)
 	filters.Companies = utils.NormalizeTags(p.Companies)
@@ -92,7 +91,7 @@ func (p *sipQueryParams) bindFilters(c *gin.Context, config *Configuration, filt
 
 func (p *vectorSearchParams) bindFilters(c *gin.Context, config *Configuration, filters *db.Filters) error {
 	if len(p.Q) > 0 {
-		filters.Embedding = config.Embedder.EmbedQuery(c, p.Q)
+		filters.Embedding = config.Embedder.EmbedQuery(c.Request.Context(), p.Q)
 		if len(filters.Embedding) == 0 {
 			return utils.NewAPIError(utils.API_ERROR_EMBEDDING_ERROR, API_ERROR_MSG_OUR_BAD)
 		}
@@ -848,15 +847,11 @@ func (r *Configuration) getEventTypes(c *gin.Context) {
 	writePage(c, page_out.Items, page.Limit, encodeNextCursor(page_out.NextCursor), params.ResponseType)
 }
 
-func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
+func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string]string, responseCaches ...*utils.ResponseCache) *gin.Engine {
 	config := &Configuration{
 		DB:       db,
 		Embedder: embedder,
 		APIKeys:  api_keys,
-		// cache: otter.Must(&otter.Options[string, []float32]{
-		// 	MaximumSize:      _CACHE_SIZE,
-		// 	ExpiryCalculator: otter.ExpiryAccessing[string, []float32](_CACHE_TTL),
-		// }),
 	}
 
 	router := gin.New()
@@ -876,29 +871,33 @@ func NewRouter(db *db.Cupboard, embedder embedding.Embedder, api_keys map[string
 	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Authenticated group
+	var responseCache *utils.ResponseCache
+	if len(responseCaches) > 0 {
+		responseCache = responseCaches[0]
+	}
 	protected := router.Group("/")
 	protected.Use(config.apiKeyMiddleware)
 
 	// TAGS discovery routes
-	protected.GET("/tags", config.getTags)
-	protected.GET("/entities", config.getEntities)
-	protected.GET("/regions", config.getRegions)
-	protected.GET("/event-types", config.getEventTypes)
+	protected.GET("/tags", responseCache.Wrap(config.getTags))
+	protected.GET("/entities", responseCache.Wrap(config.getEntities))
+	protected.GET("/regions", responseCache.Wrap(config.getRegions))
+	protected.GET("/event-types", responseCache.Wrap(config.getEventTypes))
 
 	// SOURCES routes
-	protected.GET("/sources", config.getSources)
-	protected.GET("/sources/:id", config.getSource)
+	protected.GET("/sources", responseCache.Wrap(config.getSources))
+	protected.GET("/sources/:id", responseCache.Wrap(config.getSource))
 
 	// EVENTS routes
-	protected.GET("/events", config.getEvents)
-	protected.GET("/events/:id", config.getEvent)
-	protected.GET("/events/:id/signals", config.getEventSignals)
-	protected.GET("/events/:id/evidence", config.getEventEvidence)
+	protected.GET("/events", responseCache.Wrap(config.getEvents))
+	protected.GET("/events/:id", responseCache.Wrap(config.getEvent))
+	protected.GET("/events/:id/signals", responseCache.Wrap(config.getEventSignals))
+	protected.GET("/events/:id/evidence", responseCache.Wrap(config.getEventEvidence))
 
 	// SIGNALS routes
-	protected.GET("/signals", config.getSignals)
-	protected.GET("/signals/:id", config.getSignal)
-	protected.GET("/signals/:id/events", config.getSignalEvents)
+	protected.GET("/signals", responseCache.Wrap(config.getSignals))
+	protected.GET("/signals/:id", responseCache.Wrap(config.getSignal))
+	protected.GET("/signals/:id/events", responseCache.Wrap(config.getSignalEvents))
 
 	// PREVIEW routes. These are not part of the public API and are intended for internal use.
 	// They may change without notice.

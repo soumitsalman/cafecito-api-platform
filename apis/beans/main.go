@@ -16,6 +16,7 @@ import (
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
 	_ "github.com/soumitsalman/cafecito-api-platform/apis/beans/docs"
 	r "github.com/soumitsalman/cafecito-api-platform/apis/beans/router"
+	"github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	"github.com/soumitsalman/cafecito-api-platform/apis/shared/config"
 	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
 )
@@ -26,10 +27,22 @@ const (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Error().Err(err).Msg("API stopped")
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	_ = godotenv.Load()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	responseCache, cache_err := shared.NewResponseCache()
+	if cache_err != nil {
+		return cache_err
+	}
 
 	conn_str := config.GetEnv("PG_CONNECTION_STRING", "", true)
 	beansack := db.NewPGSack(ctx, conn_str)
@@ -43,13 +56,12 @@ func main() {
 			config.GetEnv("EMBEDDER_MODEL", "", false),
 		),
 		config.ParseAPIKeys(os.Getenv("API_KEY")),
+		responseCache,
 	)
 
 	port := config.GetEnv("PORT", DEFAULT_PORT, false)
 	addr := "0.0.0.0:" + port
 	log.Info().Str("module", "MAIN").Str("addr", addr).Msg("Routes Initialized. Server starting")
 
-	if err := api.Run(addr); err != nil {
-		log.Fatal().Str("module", "MAIN").Err(err).Msg("server error")
-	}
+	return shared.Serve(api, addr)
 }

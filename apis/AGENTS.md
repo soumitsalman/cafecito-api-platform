@@ -695,4 +695,6 @@ Never expose:
 Events, Signals, Sources, evidence, filters, pagination, response formats, and API-key requirements are public concepts. Describe them without exposing their storage or implementation.
 
 ## Renovation Plan
-Read the files in [design/](apis/design) for V1 and future renovation plan
+Read the files in [design/](design/) for V1 and future renovation plan.
+
+- [Backend response cache design](design/RESPONSE_CACHE_DESIGN.md): `gin-contrib/cache` wrapper selected by `RESPONSE_CACHE_PATH`, with Redis or in-memory storage, raw request-URI keys, a uniform `RESPONSE_CACHE_TTL` (default `10m`), accepted library behavior, and verification criteria.

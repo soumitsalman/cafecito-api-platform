@@ -29,7 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
 	"github.com/soumitsalman/cafecito-api-platform/apis/beans/db"
 	utils "github.com/soumitsalman/cafecito-api-platform/apis/shared"
 	"github.com/soumitsalman/cafecito-api-platform/apis/shared/embedding"
@@ -85,7 +84,7 @@ func (p *articleFilters) createFilters(c *gin.Context, r *Configuration) (*db.Be
 		Domains:           utils.NormalizeTexts(p.Domains),
 		ExcludeDomains:    utils.NormalizeTexts(p.ExcludeDomains),
 		Authors:           p.Authors,
-		Tags:              utils.NormalizeTags(p.Tags),
+		Tags:              p.Tags,
 		Categories:        utils.NormalizeTags(p.Categories),
 		ExcludeCategories: utils.NormalizeTags(p.ExcludeCategories),
 		Sentiments:        utils.NormalizeTags(p.Sentiments),
@@ -156,7 +155,7 @@ func (p *storySearchParams) createFilters(c *gin.Context, r *Configuration) (*db
 func (p *vectorFilters) attachToFilters(c *gin.Context, config *Configuration, filters *db.BeanFilters) error {
 	q := strings.TrimSpace(p.Q)
 	if q != "" {
-		filters.Embedding = config.Embedder.EmbedQuery(c, q)
+		filters.Embedding = config.Embedder.EmbedQuery(c.Request.Context(), q)
 		if len(filters.Embedding) == 0 {
 			return utils.NewAPIError(utils.API_ERROR_EMBEDDING_ERROR, API_ERROR_MSG_OUR_BAD)
 		}
@@ -936,7 +935,7 @@ func (r *Configuration) getStoryArticles(c *gin.Context) {
 	writeStoryArticles(c, toArticleDocuments(page_out.Items), page_req.Limit, page_out.NextCursor, params.ID)
 }
 
-func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]string) *gin.Engine {
+func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]string, responseCaches ...*utils.ResponseCache) *gin.Engine {
 	config := &Configuration{
 		DB:       db,
 		Embedder: embedder,
@@ -965,39 +964,43 @@ func NewRouter(db *db.PGSack, embedder embedding.Embedder, api_keys map[string]s
 	router.GET("/health", config.health)
 
 	// Authenticated group
+	var responseCache *utils.ResponseCache
+	if len(responseCaches) > 0 {
+		responseCache = responseCaches[0]
+	}
 	protected := router.Group("/")
 	protected.Use(config.apiKeyMiddleware)
 
 	// TAGS discovery routes
 	// protected.GET("/tags", config.getTags)
-	protected.GET("/categories", config.getCategories)
-	protected.GET("/entities", config.getEntities)
-	protected.GET("/regions", config.getRegions)
-	protected.GET("/sentiments", config.getSentiments)
+	protected.GET("/categories", responseCache.Wrap(config.getCategories))
+	protected.GET("/entities", responseCache.Wrap(config.getEntities))
+	protected.GET("/regions", responseCache.Wrap(config.getRegions))
+	protected.GET("/sentiments", responseCache.Wrap(config.getSentiments))
 
 	// SOURCES routes
-	protected.GET("/sources", config.getSources)
-	protected.GET("/sources/:id", config.getSource)
+	protected.GET("/sources", responseCache.Wrap(config.getSources))
+	protected.GET("/sources/:id", responseCache.Wrap(config.getSource))
 
 	// ARTICLES routes
-	protected.GET("/articles/search", config.searchArticles)
-	protected.GET("/articles/latest", config.getLatestArticles)
-	protected.GET("/articles/trending", config.getTrendingArticles)
-	protected.GET("/articles/:id", config.getArticle)
-	protected.GET("/articles/:id/similar", config.getSimilarArticles)
-	protected.GET("/articles/:id/mentions", config.getArticleMentions)
+	protected.GET("/articles/search", responseCache.Wrap(config.searchArticles))
+	protected.GET("/articles/latest", responseCache.Wrap(config.getLatestArticles))
+	protected.GET("/articles/trending", responseCache.Wrap(config.getTrendingArticles))
+	protected.GET("/articles/:id", responseCache.Wrap(config.getArticle))
+	protected.GET("/articles/:id/similar", responseCache.Wrap(config.getSimilarArticles))
+	protected.GET("/articles/:id/mentions", responseCache.Wrap(config.getArticleMentions))
 
 	// HEADLINES routes
-	protected.GET("/news/top-headlines", config.getTopHeadlines)
-	protected.GET("/news/latest", config.getLatestNews)
-	protected.GET("/news/trending", config.getTrendingNews)
+	protected.GET("/news/top-headlines", responseCache.Wrap(config.getTopHeadlines))
+	protected.GET("/news/latest", responseCache.Wrap(config.getLatestNews))
+	protected.GET("/news/trending", responseCache.Wrap(config.getTrendingNews))
 
 	// STORIES routes. Wildcard captures URL-like story IDs (slashes); trailing /articles is membership.
-	protected.GET("/stories", config.getStories)
+	protected.GET("/stories", responseCache.Wrap(config.getStories))
 	// protected.GET("/stories/latest", config.getStories)
 	// protected.GET("/stories/trending", config.getStories)
-	protected.GET("/stories/:id", config.getStory)
-	protected.GET("/stories/:id/articles", config.getStoryArticles)
+	protected.GET("/stories/:id", responseCache.Wrap(config.getStory))
+	protected.GET("/stories/:id/articles", responseCache.Wrap(config.getStoryArticles))
 
 	// preview routes. These are not part of the public API and are intended for internal use.
 	// They may change without notice.

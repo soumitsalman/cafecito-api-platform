@@ -78,3 +78,79 @@ Product-specific notes:
 | `design/` | Internal design records (not public contract) |
 
 Internal persistence and retrieval details stay in each service `db/` package and `apis/AGENTS.md`. They are not public documentation.
+
+## Backend response cache
+
+Beans and Espresso use `gin-contrib/cache` v1.4.4 directly for their public data
+GET handlers: `CachePage` captures/replays responses and the library's persistence
+stores handle storage and expiry. Authentication runs before caching. Health,
+Swagger, and `/preview` are excluded. Existing three-argument `NewRouter` callers
+remain uncached; the optional fourth argument is a `*shared.ResponseCache` wrapper.
+
+| Environment variable | Default | Behavior |
+|---|---|---|
+| `RESPONSE_CACHE_ENABLED` | `true` | Set `false` to bypass store initialization and route caching |
+| `RESPONSE_CACHE_PATH` | blank | `redis://` or `rediss://` connection string; absent/blank selects in-memory storage |
+| `RESPONSE_CACHE_TTL` | `10m` | Positive Go duration such as `30s`, `10m`, or `1h`, applied to every cached route |
+
+The shared initializer is `shared.NewResponseCache()`. Its wrapper holds
+the selected store, path, and TTL; `Wrap(handler)` delegates to `CachePage` using
+that initialized configuration. Missing/blank TTL uses ten minutes. Invalid,
+zero, or negative TTL fails initialization when caching is enabled. Disabled
+caching skips configuration validation. Configuration changes require restart.
+Provision a separate Redis instance or database number for each service through
+`RESPONSE_CACHE_PATH` Fly secrets. Connection pooling, serialization, expiry,
+and database-wide `Flush` use the library defaults; do not share the configured
+database with unrelated data. There is no custom Redis breaker, operation budget,
+or runtime fallback to memory.
+
+`RESPONSE_CACHE_DIR`, `RESPONSE_CACHE_DISK_MAX_BYTES`,
+`RESPONSE_CACHE_DISK_MAX_ENTRIES`, and `RESPONSE_CACHE_MAX_ENTRY_BYTES` are removed
+and ignored. Memory is local to each process/Machine, disappears on restart, and
+has no application-enforced capacity limit. No volume or disk cleanup is needed.
+
+Keys include the concrete path and raw query string via `RequestURI()`. Equivalent
+parameter orders/defaults create different entries. Query values, cursors,
+`full_content`, and `response_type` remain part of the key. Hits skip the handler,
+including binding, embedding, database work, and serialization. Cached bodies
+retain their original `meta.as_of`, pagination cursor, and format.
+
+All cached routes use `RESPONSE_CACHE_TTL`, defaulting to ten minutes per process.
+There is no TTL jitter or shared-fill coordination. The library caches responses
+below HTTP 300, captures headers and bytes during writes, and removes entries
+when the handler aborts. Its header replay and incremental/concurrent write
+behavior are used unchanged. Strict completed-200-only, size, cookie/private,
+and header-allowlist policies are intentionally removed.
+
+Disable caching with `RESPONSE_CACHE_ENABLED=false` and restart/redeploy. Existing
+Redis entries from the custom implementation use different keys and expire
+naturally. Old disk cache files are no longer read or cleaned up by the APIs.
+
+### Cache verification
+
+Use an isolated Redis database for `RESPONSE_CACHE_TEST_REDIS`; never production.
+The shared suite uses native memory by default. Service tests use their normal
+Postgres fixtures and verify all public data routes still serve warmed responses
+after database access is closed.
+
+```bash
+cd apis
+RESPONSE_CACHE_TEST_REDIS=redis://127.0.0.1:6379/0 \
+  GOCACHE=/tmp/cafecito-go-build go test -race ./shared/tests -run TestResponseCache -count=1
+# Set PG_CONNECTION_STRING to the appropriate service's isolated fixture database:
+GOCACHE=/tmp/cafecito-go-build go test ./beans/tests -run TestResponseCache -count=1
+GOCACHE=/tmp/cafecito-go-build go test ./espresso/tests -run TestResponseCache -count=1
+```
+
+The service route suites are sequential: per-key coalescing and concurrent
+response capture are now library behavior. See the
+[design record](design/RESPONSE_CACHE_DESIGN.md) for the accepted tradeoffs.
+Cache implementation details and credentials remain excluded from public docs.
+
+Verified on 2026-10-16: builds, focused static checks, and race-enabled shared and
+service cache tests pass. Broader suites retain the same 10 Beans/four Espresso
+failures reproduced in the pre-replacement source snapshot. Verification used
+isolated Redis/Postgres fixtures; Beans needed the existing database-only
+`ideology` fixture compatibility overlay. Stress tests against the running local
+service and the Espresso live-embedder router test were excluded. See the design
+record's validation section for the precise limits.

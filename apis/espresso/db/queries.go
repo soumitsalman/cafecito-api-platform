@@ -71,11 +71,11 @@ func whereTags(where *[]string, params pgx.NamedArgs, tags []string, prefix stri
 	}
 }
 
-// whereTagsFts appends fuzzy text matching for public tag filters.
+// whereTagsFts matches any supplied tag using full-text search.
 func whereTagsFts(where *[]string, params pgx.NamedArgs, tags []string, prefix string) {
 	if len(tags) > 0 {
-		*where = append(*where, prefix+"tags_fts @@ plainto_tsquery('simple', @tags)")
-		params["tags"] = strings.Join(tags, " & ")
+		*where = append(*where, prefix+"tags_fts @@ websearch_to_tsquery('simple', @tags_query)")
+		params["tags_query"] = strings.Join(tags, " OR ")
 	}
 }
 
