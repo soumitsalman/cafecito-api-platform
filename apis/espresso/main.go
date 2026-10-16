@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
@@ -41,13 +40,6 @@ func run() error {
 	conn_str := config.GetEnv("PG_CONNECTION_STRING", "", true)
 	cupboard := db.NewCupboard(ctx, conn_str)
 	defer cupboard.Close()
-
-	// determine concurrency limit from environment
-	max_str := config.GetEnv("MAX_CONCURRENT_REQUESTS", "", false)
-	max_requests, err := strconv.Atoi(max_str)
-	if err != nil && max_requests < 0 {
-		max_requests = 0
-	}
 
 	api := r.NewRouter(
 		cupboard,
