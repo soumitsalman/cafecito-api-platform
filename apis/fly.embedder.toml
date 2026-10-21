@@ -15,8 +15,8 @@ app = "cafecito-embedder-api"
   method = "GET"
   path = "/health"
   protocol = "http"
-  grace_period = "5s"
-  interval = "5s"
+  grace_period = "15s"
+  interval = "10s"
   timeout = "2s"
 
 [[vm]]

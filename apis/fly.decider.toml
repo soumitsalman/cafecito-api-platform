@@ -1,0 +1,24 @@
+app = "cafecito-decider-api"
+
+[build]
+  dockerfile = "Dockerfile.decider"
+  ignorefile = ".dockerignore"
+
+[http_service]
+  internal_port = 8080
+  force_https = false
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  grace_period = "60s"
+  interval = "10s"
+  timeout = "5s"
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '4gb'

@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+#
+# ggmlc Laya binary. These GGUFs are not llama.cpp files; llama-server cannot load them.
+
+ARG MODEL_URL=https://huggingface.co/mys/laya-typed-decisions-GGUF/resolve/main/laya_typed_decisions_q8_0.gguf
+ARG LAYA_URL=https://github.com/monatis/ggmlc/releases/download/v0.9.7/laya-linux-x86_64-vulkan.tar.gz
+
+FROM ubuntu:24.04 AS model-assets
+ARG MODEL_URL
+ARG LAYA_URL
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates wget && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /models /opt/laya && \
+    wget --no-verbose \
+      --output-document=/models/laya_typed_decisions_q8_0.gguf \
+      "${MODEL_URL}" && \
+    wget --no-verbose \
+      --output-document=/tmp/laya.tar.gz \
+      "${LAYA_URL}" && \
+    tar -xzf /tmp/laya.tar.gz -C /opt/laya && \
+    chmod +x /opt/laya/laya && \
+    rm /tmp/laya.tar.gz
+
+FROM ubuntu:24.04
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libgomp1 libvulkan1 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=model-assets /opt/laya/laya /usr/local/bin/laya
+COPY --from=model-assets /models/laya_typed_decisions_q8_0.gguf /models/laya_typed_decisions_q8_0.gguf
+
+EXPOSE 8080
+
+ENTRYPOINT ["laya"]
+CMD ["serve", "/models/laya_typed_decisions_q8_0.gguf", "--port", "8080", "--device", "cpu", "--threads", "2"]

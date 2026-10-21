@@ -124,7 +124,7 @@ func buildScalarWhere(filters *BeanFilters) ([]string, pgx.NamedArgs) {
 		params["observed_to"] = filters.ObservedTo
 	}
 	if len(filters.Tags) > 0 {
-		where = append(where, "tags @@ websearch_to_tsquery('simple', @tags_query)")
+		where = append(where, "fts_vector @@ websearch_to_tsquery('simple', @tags_query)")
 		params["tags_query"] = strings.Join(filters.Tags, " OR ")
 	}
 	if len(filters.Authors) > 0 {
