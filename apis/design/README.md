@@ -26,6 +26,10 @@ Internal Cafecito design and research notes. These files are **not** the public 
 
 | Document | Role |
 |---|---|
+| [BEANS_BUSINESS_PRODUCT_SPEC.md](BEANS_BUSINESS_PRODUCT_SPEC.md) | October 30, 2026 business/product hypothesis, capability audit, pricing and validation plan for source retrieval |
+| [ESPRESSO_BUSINESS_PRODUCT_SPEC.md](ESPRESSO_BUSINESS_PRODUCT_SPEC.md) | October 30, 2026 business/product hypothesis, capability audit, pricing and validation plan for evidence-linked intelligence |
+| [Research methodology and scope](research/2026-10-30/METHODOLOGY_AND_SCOPE.md) | Application of the supplied manual, evidence standards and shared product boundaries |
+| [Cross-product counterevidence](research/2026-10-30/CROSS_PRODUCT_COUNTEREVIDENCE.md) | Current low-cost and workflow substitutes that constrain differentiation claims |
 | [DOCUMENTATION_GAP_REPORT.md](DOCUMENTATION_GAP_REPORT.md) | Current repository documentation audit |
 | [QUERY_PARAM_NAMES.md](QUERY_PARAM_NAMES.md) | Current naming decision for unstructured search (`q`) |
 | [NEWS_AND_BLOG_API_MARKET_REPORT.md](NEWS_AND_BLOG_API_MARKET_REPORT.md) | Current external news/blog API comparison (not Cafecito contract) |

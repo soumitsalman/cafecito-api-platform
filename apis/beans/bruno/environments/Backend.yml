@@ -1,0 +1,7 @@
+name: Backend
+variables:
+  - name: baseUrl
+    value: https://cafecito-beans-api.fly.dev
+    description: ""
+  - secret: true
+    name: apiKey

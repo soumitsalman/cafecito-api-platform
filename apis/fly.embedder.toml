@@ -21,4 +21,4 @@ app = "cafecito-embedder-api"
 
 [[vm]]
   size = 'shared-cpu-2x'
-  memory = '2gb'
+  memory = '1536mb'
